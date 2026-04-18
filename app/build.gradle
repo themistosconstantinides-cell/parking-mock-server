@@ -1,0 +1,67 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.parking.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.parking.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    // ?? Build flavors: mock vs production ?????????????????????????????????????
+    flavorDimensions "env"
+    productFlavors {
+        mock {
+            dimension "env"
+            applicationIdSuffix ".mock"
+            versionNameSuffix "-mock"
+            buildConfigField "boolean", "USE_MOCK", "true"
+            resValue "string", "app_flavor", "MOCK"
+        }
+        production {
+            dimension "env"
+            buildConfigField "boolean", "USE_MOCK", "false"
+            resValue "string", "app_flavor", ""
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "androidx.constraintlayout:constraintlayout:2.1.4"
+    implementation "androidx.activity:activity-ktx:1.8.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.7.0"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.7.0"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+}
