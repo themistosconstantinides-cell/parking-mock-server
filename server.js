@@ -11,9 +11,9 @@ const logs = [];
 app.use((req, res, next) => {
   const start = Date.now();
 
-  const originalJson = res.json.bind(res);
+  const oldJson = res.json;
 
-  res.json = (data) => {
+  res.json = function (data) {
     const logEntry = {
       time: new Date().toISOString(),
       method: req.method,
@@ -28,12 +28,11 @@ app.use((req, res, next) => {
 
     console.log("LOG:", logEntry);
 
-    return originalJson(data);
+    return oldJson.call(this, data);
   };
 
   next();
 });
-
 /* =========================
    STATE
 ========================= */
