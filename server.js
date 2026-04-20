@@ -83,9 +83,6 @@ function detectMode(reqBody) {
   const terminal = reqBody.terminal || "";
   if (outlet === config.entranceOutlet && terminal === config.entranceTerminal) return "Entrance";
   if (outlet === config.exitOutlet     && terminal === config.exitTerminal)     return "Exit";
-  // Fallback: if only one POS is configured (e.g. during initial setup) match on outlet alone
-  if (outlet && outlet === config.entranceOutlet) return "Entrance";
-  if (outlet && outlet === config.exitOutlet)     return "Exit";
   return "Unknown";
 }
 
