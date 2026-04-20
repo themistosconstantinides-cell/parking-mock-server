@@ -1,13 +1,16 @@
 const express = require("express");
-const app = express();
+const https   = require("https");
+const app     = express();
 
 app.use(express.json());
 app.use(express.static("public"));
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let logs = [];
+let logs          = [];
 let activeEntries = {};
+
 let config = {
+  // Parking
   parkingMode:           "Entrance",
   exitScenario:          1,
   vehiclePresent:        true,
@@ -16,9 +19,18 @@ let config = {
   monthlyEnabled:        false,
   showRates:             true,
   responseCode:          "00",
-  companyCode:           "MarinaParking"
+  companyCode:           "MarinaParking",
+  // TELL Gate Control PRO
+  tellEnabled:           false,
+  tellApiKey:            "f2nIrJ8DBf4Gc8ar99IQeCVVm3pnWrVP",
+  tellHwId:              "",
+  tellHwName:            "ParkingBarrier",
+  tellAppId:             "",
+  tellVehicleInput:      "in1",
+  tellBarrierOutput:     1,
 };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function addLog(req, response) {
   logs.unshift({
     id:       Date.now(),
@@ -32,6 +44,19 @@ function addLog(req, response) {
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.originalUrl}`);
 }
 
+function addTellLog(action, request, response, error) {
+  logs.unshift({
+    id:       Date.now(),
+    time:     new Date().toLocaleTimeString(),
+    endpoint: `[TELL] ${action}`,
+    method:   "TELL",
+    request:  request,
+    response: error ? { error: error.message || String(error) } : response
+  });
+  if (logs.length > 200) logs.pop();
+  console.log(`[${new Date().toLocaleTimeString()}] TELL ${action}`);
+}
+
 function ts() {
   return new Date().toISOString().replace(/[-:T.Z]/g,"").slice(0,14);
 }
@@ -40,81 +65,210 @@ function scenarioName(n) {
   return {1:"Free",2:"Capture Only",3:"TopUp Needed",4:"Barrier Failed"}[n]||"?";
 }
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
+// ── TELL API client ───────────────────────────────────────────────────────────
+function tellRequest(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const options = {
+      hostname: "api.tell.hu",
+      port:     443,
+      path:     path,
+      method:   method,
+      headers:  {
+        "Content-Type":   "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+        "API key":        config.tellApiKey
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error("Invalid JSON from TELL: " + data)); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error("TELL API timeout")); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+// Check vehicle via TELL gc/getgeneral
+async function tellCheckVehicle() {
+  const body = { hwId: config.tellHwId, hwName: config.tellHwName, appId: config.tellAppId };
+  const result = await tellRequest("POST", "/gc/getgeneral", body);
+  addTellLog("getgeneral", body, result, null);
+  if (result.result !== "OK") throw new Error("TELL getgeneral: " + JSON.stringify(result));
+  const status = result.statusResult && result.statusResult.deviceStatus;
+  if (!status) throw new Error("No deviceStatus in TELL response");
+  const val = config.tellVehicleInput === "in2" ? status.in2 : status.in1;
+  return val === 1;
+}
+
+// Open barrier via TELL gc/open
+async function tellOpenBarrier() {
+  const body = { hwid: config.tellHwId, appId: config.tellAppId, data: config.tellBarrierOutput };
+  const result = await tellRequest("GET", "/gc/open", body);
+  addTellLog("open", body, result, null);
+  if (result.result !== "OK") throw new Error("TELL open: " + JSON.stringify(result));
+  return result.data && result.data.status === 0;
+}
+
+// ── Admin endpoints ───────────────────────────────────────────────────────────
 app.get("/logs", (req, res) => res.json(logs));
 app.get("/admin/config", (req, res) => res.json(config));
 app.post("/admin/config", (req, res) => {
   const {key, value} = req.body;
   if (key in config) config[key] = value;
-  res.json({ok:true, config});
+  res.json({ok: true, config});
 });
 app.post("/admin/clear-entries", (req, res) => {
   activeEntries = {};
-  res.json({ok:true});
+  res.json({ok: true});
+});
+app.post("/admin/tell-test", async (req, res) => {
+  if (!config.tellHwId || !config.tellAppId)
+    return res.json({ok:false, error:"hwId and appId must be configured"});
+  try {
+    const body = {hwId:config.tellHwId, hwName:config.tellHwName, appId:config.tellAppId};
+    const result = await tellRequest("POST", "/gc/getgeneral", body);
+    addTellLog("getgeneral [TEST]", body, result, null);
+    if (result.result === "OK") {
+      const s = result.statusResult.deviceStatus;
+      res.json({ok:true, in1:s.in1, in2:s.in2, out1:s.out1, out2:s.out2,
+                fw:result.statusResult.fwVersion, model:result.statusResult.deviceTellApiName});
+    } else {
+      res.json({ok:false, error:JSON.stringify(result)});
+    }
+  } catch(e) {
+    addTellLog("getgeneral [TEST]", {}, null, e);
+    res.json({ok:false, error:e.message});
+  }
+});
+app.post("/admin/tell-open", async (req, res) => {
+  if (!config.tellHwId || !config.tellAppId)
+    return res.json({ok:false, error:"hwId and appId must be configured"});
+  try {
+    const ok = await tellOpenBarrier();
+    res.json({ok});
+  } catch(e) {
+    res.json({ok:false, error:e.message});
+  }
 });
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
+  const sn = scenarioName(config.exitScenario);
   res.send(`<!DOCTYPE html><html><head><title>Parking RPS Mock</title>
 <style>
 body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;margin:0}
-h1{color:#1f6feb}h2{color:#8b949e;margin-top:30px;border-bottom:1px solid #21262d;padding-bottom:6px}
+h1{color:#1f6feb}
+h2{color:#8b949e;margin-top:30px;border-bottom:1px solid #21262d;padding-bottom:6px}
+h3{color:#8b949e;margin-top:16px;margin-bottom:6px;font-size:13px}
 table{border-collapse:collapse;width:100%;margin-bottom:10px}
 th{background:#161b22;color:#8b949e;padding:8px;text-align:left}
-td{padding:6px 8px;border-bottom:1px solid #161b22}
+td{padding:6px 8px;border-bottom:1px solid #161b22;vertical-align:middle}
 .btn{background:#1f6feb;color:#fff;border:none;padding:5px 12px;cursor:pointer;border-radius:4px;margin:2px;font-size:12px}
-.red{background:#c62828}.green{background:#238636}.orange{background:#e65100}.gray{background:#30363d}
+.red{background:#c62828}.green{background:#238636}.orange{background:#e65100}
+.gray{background:#30363d}.yellow{background:#7d5c00;color:#ffd700}
 pre{background:#161b22;padding:8px;border-radius:4px;overflow-x:auto;max-height:150px;font-size:11px}
-input,select{background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:4px 8px;border-radius:4px;width:70px}
-.active{color:#3fb950;font-weight:bold}
-.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px}
+input,select{background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:4px 8px;border-radius:4px}
+input.n{width:60px} input.m{width:160px} input.w{width:280px}
+.active{color:#3fb950;font-weight:bold}.inactive{color:#8b949e}
+.tell-box{background:#161b22;border:2px solid ${config.tellEnabled?'#238636':'#30363d'};border-radius:6px;padding:16px;margin-top:8px}
+#ts{margin-top:8px;padding:8px;border-radius:4px;font-size:12px;display:none}
+.ok{background:#0d2818;color:#3fb950;border:1px solid #238636}
+.err{background:#2d0a0a;color:#ff6b6b;border:1px solid #c62828}
 </style></head><body>
 <h1>&#x1F17F; Parking RPS Mock Server</h1>
-<p style="color:#8b949e">All changes take effect immediately — no restart needed.</p>
+<p style="color:#8b949e">All changes take effect immediately.</p>
 
-<h2>&#9881; Configuration</h2>
+<h2>&#9881; Parking Configuration</h2>
 <table>
 <tr><th>Setting</th><th>Value</th><th>Actions</th></tr>
-<tr><td>Mode</td><td id="parkingMode" class="active">${config.parkingMode}</td>
+<tr><td>Mode</td><td class="active">${config.parkingMode}</td>
 <td><button class="btn" onclick="set('parkingMode','Entrance')">Entrance</button>
 <button class="btn orange" onclick="set('parkingMode','Exit')">Exit</button></td></tr>
-<tr><td>Exit Scenario</td><td id="exitScenario">${config.exitScenario} — ${scenarioName(config.exitScenario)}</td>
-<td>
-<button class="btn green" onclick="set('exitScenario',1)">1 Free</button>
+<tr><td>Exit Scenario</td><td>${config.exitScenario} — ${sn}</td>
+<td><button class="btn green" onclick="set('exitScenario',1)">1 Free</button>
 <button class="btn" onclick="set('exitScenario',2)">2 Capture</button>
 <button class="btn orange" onclick="set('exitScenario',3)">3 TopUp</button>
-<button class="btn red" onclick="set('exitScenario',4)">4 Barrier Fail</button>
-</td></tr>
-<tr><td>Vehicle Present</td><td id="vehiclePresent">${config.vehiclePresent}</td>
+<button class="btn red" onclick="set('exitScenario',4)">4 Barrier Fail</button></td></tr>
+<tr><td>Vehicle Present (mock)</td><td>${config.vehiclePresent}</td>
 <td><button class="btn green" onclick="set('vehiclePresent',true)">YES</button>
 <button class="btn red" onclick="set('vehiclePresent',false)">NO</button></td></tr>
-<tr><td>Normal Spaces</td><td id="availablePlacesNormal">${config.availablePlacesNormal}</td>
-<td><input type="number" id="inpN" value="${config.availablePlacesNormal}">
-<button class="btn" onclick="set('availablePlacesNormal',+document.getElementById('inpN').value)">Set</button></td></tr>
-<tr><td>Monthly Spaces</td><td id="availablePlaceMonthly">${config.availablePlaceMonthly}</td>
-<td><input type="number" id="inpM" value="${config.availablePlaceMonthly}">
-<button class="btn" onclick="set('availablePlaceMonthly',+document.getElementById('inpM').value)">Set</button></td></tr>
-<tr><td>Monthly Cards</td><td id="monthlyEnabled">${config.monthlyEnabled}</td>
+<tr><td>Normal Spaces</td><td>${config.availablePlacesNormal}</td>
+<td><input class="n" type="number" id="inN" value="${config.availablePlacesNormal}">
+<button class="btn" onclick="set('availablePlacesNormal',+document.getElementById('inN').value)">Set</button></td></tr>
+<tr><td>Monthly Spaces</td><td>${config.availablePlaceMonthly}</td>
+<td><input class="n" type="number" id="inM" value="${config.availablePlaceMonthly}">
+<button class="btn" onclick="set('availablePlaceMonthly',+document.getElementById('inM').value)">Set</button></td></tr>
+<tr><td>Monthly Cards</td><td>${config.monthlyEnabled}</td>
 <td><button class="btn green" onclick="set('monthlyEnabled',true)">ON</button>
 <button class="btn red" onclick="set('monthlyEnabled',false)">OFF</button></td></tr>
-<tr><td>Show Rates</td><td id="showRates">${config.showRates}</td>
+<tr><td>Show Rates</td><td>${config.showRates}</td>
 <td><button class="btn green" onclick="set('showRates',true)">YES</button>
 <button class="btn red" onclick="set('showRates',false)">NO</button></td></tr>
-<tr><td>Force Init Error</td><td id="responseCode">${config.responseCode}</td>
+<tr><td>Force Init Error</td><td>${config.responseCode}</td>
 <td><button class="btn green" onclick="set('responseCode','00')">00 OK</button>
-<button class="btn red" onclick="set('responseCode','91')">91 Invalid Outlet</button>
-<button class="btn red" onclick="set('responseCode','92')">92 Invalid Company</button>
-<button class="btn red" onclick="set('responseCode','08')">08 Technical Error</button></td></tr>
+<button class="btn red" onclick="set('responseCode','91')">91 Outlet</button>
+<button class="btn red" onclick="set('responseCode','92')">92 Company</button>
+<button class="btn red" onclick="set('responseCode','08')">08 Technical</button></td></tr>
 </table>
 
-<h2>&#x1F9FE; Active Entries (${Object.keys(activeEntries).length})</h2>
+<h2>&#x1F6A7; TELL Gate Control PRO</h2>
+<div class="tell-box">
+<h3>Mode — currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
+<button class="btn green" onclick="set('tellEnabled',true)">&#x1F7E2; Enable Real TELL API</button>
+<button class="btn gray" onclick="set('tellEnabled',false)">⚫ Use Mock</button>
+<p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; entranceCall/exitPayment/exitCall(free,capture) open real barrier.</p>
+
+<h3>Device Settings</h3>
 <table>
-<tr><th>Token</th><th>Last4</th><th>Auth</th><th>Time</th></tr>
+<tr><th>Parameter</th><th>Value / Input</th><th></th></tr>
+<tr><td>Hardware ID (MAC)</td>
+<td><input class="w" id="hwId" placeholder="11:22:33:44:55:D1" value="${config.tellHwId}"></td>
+<td><button class="btn" onclick="sv('tellHwId','hwId')">Save</button></td></tr>
+<tr><td>Device Name (hwName)</td>
+<td><input class="m" id="hwName" value="${config.tellHwName}"></td>
+<td><button class="btn" onclick="sv('tellHwName','hwName')">Save</button></td></tr>
+<tr><td>App ID (40 chars)</td>
+<td><input class="w" id="appId" placeholder="from gc/addappid" value="${config.tellAppId}"></td>
+<td><button class="btn" onclick="sv('tellAppId','appId')">Save</button></td></tr>
+<tr><td>API Key</td>
+<td><input class="w" id="apiKey" value="${config.tellApiKey}"></td>
+<td><button class="btn" onclick="sv('tellApiKey','apiKey')">Save</button></td></tr>
+</table>
+
+<h3>I/O Mapping</h3>
+<table>
+<tr><th>Function</th><th>Setting</th></tr>
+<tr><td>Vehicle detection input</td>
+<td><select onchange="set('tellVehicleInput',this.value)">
+<option value="in1" ${config.tellVehicleInput==='in1'?'selected':''}>IN1 — dry contact (loop/photocell)</option>
+<option value="in2" ${config.tellVehicleInput==='in2'?'selected':''}>IN2 — dry contact (loop/photocell)</option>
+</select></td></tr>
+<tr><td>Barrier output</td>
+<td><select onchange="set('tellBarrierOutput',+this.value)">
+<option value="1" ${config.tellBarrierOutput===1?'selected':''}>OUT1</option>
+<option value="2" ${config.tellBarrierOutput===2?'selected':''}>OUT2</option>
+</select></td></tr>
+</table>
+
+<h3>Manual Test</h3>
+<button class="btn yellow" onclick="testConn()">&#128268; Test Connection &amp; Read Inputs</button>
+&nbsp;
+<button class="btn orange" onclick="openNow()">&#x1F6AA; Open Barrier NOW</button>
+<div id="ts"></div>
+</div>
+
+<h2>&#x1F9FE; Active Entries (${Object.keys(activeEntries).length})</h2>
+<table><tr><th>Token</th><th>Last4</th><th>Auth</th><th>Time</th></tr>
 ${Object.values(activeEntries).map(e=>`<tr>
-<td>${(e.token||"").slice(0,24)}...</td>
-<td>${e.lastDigits||""}</td>
-<td>${e.authCode||""}</td>
-<td>${e.timeOfInput||""}</td>
+<td>${(e.token||"").slice(0,24)}...</td><td>${e.lastDigits||""}</td>
+<td>${e.authCode||""}</td><td>${e.timeOfInput||""}</td>
 </tr>`).join("")||'<tr><td colspan="4" style="color:#8b949e">No active entries</td></tr>'}
 </table>
 <button class="btn red" onclick="clearE()">Clear All Entries</button>
@@ -127,9 +281,33 @@ async function set(k,v){
   await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
   location.reload();
 }
-async function clearE(){
-  await fetch('/admin/clear-entries',{method:'POST'});
-  location.reload();
+async function sv(key,id){
+  const v=document.getElementById(id).value.trim();
+  await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  showS('Saved '+key+' = '+v.slice(0,30)+(v.length>30?'...':''),false);
+}
+async function clearE(){await fetch('/admin/clear-entries',{method:'POST'});location.reload();}
+function showS(msg,err){
+  const el=document.getElementById('ts');
+  el.style.display='block';el.className=err?'err':'ok';el.textContent=msg;
+}
+async function testConn(){
+  showS('Connecting to TELL API...',false);
+  try{
+    const r=await fetch('/admin/tell-test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    if(d.ok) showS('✓ OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
+    else showS('✗ '+d.error,true);
+  }catch(e){showS('✗ '+e.message,true);}
+}
+async function openNow(){
+  showS('Sending open command...',false);
+  try{
+    const r=await fetch('/admin/tell-open',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    if(d.ok) showS('✓ Barrier open command sent OK',false);
+    else showS('✗ '+d.error,true);
+  }catch(e){showS('✗ '+e.message,true);}
 }
 async function loadLogs(){
   const r=await fetch('/logs');
@@ -141,10 +319,8 @@ async function loadLogs(){
 <tr><td style="color:#3fb950">RES</td><td><pre>\${JSON.stringify(l.response,null,2)}</pre></td></tr>
 </table>\`).join('')||'<p style="color:#8b949e">No requests yet</p>';
 }
-loadLogs();
-setInterval(loadLogs,3000);
-</script>
-</body></html>`);
+loadLogs();setInterval(loadLogs,3000);
+</script></body></html>`);
 });
 
 // ── POST /parkingInit ─────────────────────────────────────────────────────────
@@ -152,17 +328,12 @@ app.post("/parkingInit", (req, res) => {
   if (config.responseCode !== "00") {
     const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
     const response = {responseCode:config.responseCode, responseDescription:errMap[config.responseCode]||"Error"};
-    addLog(req, response);
-    return res.json(response);
+    addLog(req, response); return res.json(response);
   }
-
   const charges = config.showRates ? [
-    {from:"30",to:"120",fee:"200"},
-    {from:"120",to:"180",fee:"400"},
-    {from:"180",to:"240",fee:"500"},
-    {from:"240",fee:"1000"}
+    {from:"30",to:"120",fee:"200"},{from:"120",to:"180",fee:"400"},
+    {from:"180",to:"240",fee:"500"},{from:"240",fee:"1000"}
   ] : [];
-
   const response = {
     outlet:                          req.body.outlet||"0000259010",
     terminal:                        req.body.terminal||"000025901025",
@@ -178,100 +349,120 @@ app.post("/parkingInit", (req, res) => {
     availablePlacesNormal:           String(config.availablePlacesNormal),
     availablePlaceMonthly:           String(config.availablePlaceMonthly),
     monthlyCardsBins:                config.monthlyEnabled ? "434343;232323" : "",
-    controller:                      "0",
+    controller:                      config.tellEnabled ? "A" : "0",
     fixAmountSolution:               "-1",
     charges,
     responseCode:                    "00",
     responseDescription:             "Successful Response"
   };
-  addLog(req, response);
-  res.json(response);
+  addLog(req, response); res.json(response);
 });
 
 // ── POST /entranceCall ────────────────────────────────────────────────────────
-app.post("/entranceCall", (req, res) => {
+app.post("/entranceCall", async (req, res) => {
   const {token, lastDigits, authCode, timeOfInput} = req.body;
   if (token) {
     activeEntries[token] = {token, lastDigits, authCode, timeOfInput};
-    config.availablePlacesNormal = Math.max(0, config.availablePlacesNormal-1);
+    config.availablePlacesNormal = Math.max(0, config.availablePlacesNormal - 1);
+  }
+  let barrier = "mock-ok";
+  if (config.tellEnabled && config.tellHwId && config.tellAppId) {
+    try { barrier = await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
+    catch(e) { barrier = "tell-error: " + e.message; console.error("TELL entrance:", e.message); }
   }
   const response = {
-    outlet:                 req.body.outlet||"0000259010",
-    terminal:               req.body.terminal||"000025901025",
-    availablePlaceMonthly:  String(config.availablePlaceMonthly),
-    availablePlacesRegular: String(config.availablePlacesNormal),
-    installationPoint:      "Entrance",
-    displayMessage:         "Welcome. Have a nice day!!",
-    timeToDisplayMessage:   "5",
-    responseCode:           "00",
-    responseDescription:    "Successful Response"
+    outlet:req.body.outlet||"0000259010", terminal:req.body.terminal||"000025901025",
+    availablePlaceMonthly:String(config.availablePlaceMonthly),
+    availablePlacesRegular:String(config.availablePlacesNormal),
+    installationPoint:"Entrance", displayMessage:"Welcome. Have a nice day!!",
+    timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
+    _barrier:barrier
   };
-  addLog(req, response);
-  res.json(response);
+  addLog(req, response); res.json(response);
 });
 
 // ── POST /exitCall ────────────────────────────────────────────────────────────
-app.post("/exitCall", (req, res) => {
+app.post("/exitCall", async (req, res) => {
   const {token} = req.body;
   let response;
-
-  switch(config.exitScenario) {
-    case 1:
-      response = {barrierOpen:"1",moneyToPay:"0",displayMessage:"Thank you! Have a nice day.",timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response"};
-      if(token) delete activeEntries[token];
-      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1);
-      break;
-    case 2:
-      response = {barrierOpen:"1",moneyToPay:"200",displayMessage:"Thank you! Your card has been charged EUR 2.00.",timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response"};
-      if(token) delete activeEntries[token];
-      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1);
-      break;
-    case 3:
-      response = {barrierOpen:"-2",moneyToPay:"356",recordId:"1234567890ABCDEF1234567890ABCDEF",displayMessage:"Charge is EUR 3.56. Please present your card.",timeToDisplayMessage:"10",responseCode:"31",responseDescription:"TopUp required"};
-      break;
-    case 4:
-    default:
-      response = {barrierOpen:"0",moneyToPay:"0",displayMessage:"Technical issue. Please contact staff.",timeToDisplayMessage:"10",responseCode:"08",responseDescription:"Barrier failed to open"};
-      break;
+  async function openReal() {
+    if (config.tellEnabled && config.tellHwId && config.tellAppId) {
+      try { return await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
+      catch(e) { console.error("TELL exit:", e.message); return "tell-error: "+e.message; }
+    }
+    return "mock-ok";
   }
-  addLog(req, response);
-  res.json(response);
+  switch(config.exitScenario) {
+    case 1: {
+      const b = await openReal();
+      response = {barrierOpen:"1",moneyToPay:"0",displayMessage:"Thank you! Have a nice day.",
+        timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response",_barrier:b};
+      if(token) delete activeEntries[token];
+      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1); break;
+    }
+    case 2: {
+      const b = await openReal();
+      response = {barrierOpen:"1",moneyToPay:"200",displayMessage:"Thank you! Your card has been charged EUR 2.00.",
+        timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response",_barrier:b};
+      if(token) delete activeEntries[token];
+      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1); break;
+    }
+    case 3:
+      response = {barrierOpen:"-2",moneyToPay:"356",recordId:"1234567890ABCDEF1234567890ABCDEF",
+        displayMessage:"Charge is EUR 3.56. Please present your card.",timeToDisplayMessage:"10",
+        responseCode:"31",responseDescription:"TopUp required"}; break;
+    case 4: default:
+      response = {barrierOpen:"0",moneyToPay:"0",displayMessage:"Technical issue. Please contact staff.",
+        timeToDisplayMessage:"10",responseCode:"08",responseDescription:"Barrier failed to open"}; break;
+  }
+  addLog(req, response); res.json(response);
 });
 
 // ── POST /exitPayment ─────────────────────────────────────────────────────────
-app.post("/exitPayment", (req, res) => {
+app.post("/exitPayment", async (req, res) => {
   const {token} = req.body;
   if(token) delete activeEntries[token];
   config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1);
-  const response = {barrierOpen:"1",displayMessage:"Payment successful. Barrier is open.",timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response"};
-  addLog(req, response);
-  res.json(response);
+  let barrier = "mock-ok";
+  if (config.tellEnabled && config.tellHwId && config.tellAppId) {
+    try { barrier = await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
+    catch(e) { barrier = "tell-error: "+e.message; }
+  }
+  const response = {barrierOpen:"1",displayMessage:"Payment successful. Barrier is open.",
+    timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response",_barrier:barrier};
+  addLog(req, response); res.json(response);
 });
 
 // ── POST /vehiclePresent ──────────────────────────────────────────────────────
-app.post("/vehiclePresent", (req, res) => {
+app.post("/vehiclePresent", async (req, res) => {
+  let detected = config.vehiclePresent;
+  if (config.tellEnabled && config.tellHwId && config.tellAppId) {
+    try {
+      detected = await tellCheckVehicle();
+      console.log(`TELL ${config.tellVehicleInput} = ${detected}`);
+    } catch(e) {
+      console.error("TELL vehiclePresent:", e.message);
+      const errRes = {responseCode:"99",responseDescription:"Controller error: "+e.message,vehiclePresent:"0"};
+      addLog(req, errRes); return res.json(errRes);
+    }
+  }
   const response = {
-    outlet:               req.body.outlet||"0000259010",
-    terminal:             req.body.terminal||"000025901025",
-    installationPoint:    config.parkingMode,
-    dayTime:              ts(),
-    vehiclePresent:       config.vehiclePresent?"1":"0",
-    displayMessage:       config.vehiclePresent?"Vehicle detected. Please proceed.":"No vehicle detected at entrance.",
-    timeToDisplayMessage: "3",
-    availablePlaceMonthly: String(config.availablePlaceMonthly),
-    availablePlacesNormal: String(config.availablePlacesNormal),
-    responseCode:         "00",
-    responseDescription:  "Successful Response"
+    outlet:req.body.outlet||"0000259010", terminal:req.body.terminal||"000025901025",
+    installationPoint:config.parkingMode, dayTime:ts(),
+    vehiclePresent:detected?"1":"0",
+    displayMessage:detected?"Vehicle detected. Please proceed.":"No vehicle detected.",
+    timeToDisplayMessage:"3",
+    availablePlaceMonthly:String(config.availablePlaceMonthly),
+    availablePlacesNormal:String(config.availablePlacesNormal),
+    responseCode:"00", responseDescription:"Successful Response"
   };
-  addLog(req, response);
-  res.json(response);
+  addLog(req, response); res.json(response);
 });
 
 // ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
   const response = {responseCode:"00",responseDescription:"Successful Response"};
-  addLog(req, response);
-  res.json(response);
+  addLog(req, response); res.json(response);
 });
 
 // ── START ─────────────────────────────────────────────────────────────────────
