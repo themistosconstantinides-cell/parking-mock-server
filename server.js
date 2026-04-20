@@ -10,8 +10,15 @@ let logs          = [];
 let activeEntries = {};
 
 let config = {
-  // Parking
-  parkingMode:           "Entrance",
+  // ── POS Devices ──────────────────────────────────────────────────────────────
+  // Entrance POS — configured in Android Settings on the entrance device
+  entranceOutlet:   "0000259010",
+  entranceTerminal: "000025901025",
+  // Exit POS — configured in Android Settings on the exit device
+  exitOutlet:       "0000259011",
+  exitTerminal:     "000025901026",
+
+  // ── Parking behaviour ─────────────────────────────────────────────────────────
   exitScenario:          1,
   vehiclePresent:        true,
   availablePlacesNormal: 20,
@@ -20,14 +27,15 @@ let config = {
   showRates:             true,
   responseCode:          "00",
   companyCode:           "MarinaParking",
-  // TELL Gate Control PRO
-  tellEnabled:           false,
-  tellApiKey:            "f2nIrJ8DBf4Gc8ar99IQeCVVm3pnWrVP",
-  tellHwId:              "",
-  tellHwName:            "ParkingBarrier",
-  tellAppId:             "",
-  tellVehicleInput:      "in1",
-  tellBarrierOutput:     1,
+
+  // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
+  tellEnabled:       false,
+  tellApiKey:        "f2nIrJ8DBf4Gc8ar99IQeCVVm3pnWrVP",
+  tellHwId:          "",
+  tellHwName:        "ParkingBarrier",
+  tellAppId:         "",
+  tellVehicleInput:  "in1",
+  tellBarrierOutput: 1,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -65,6 +73,22 @@ function scenarioName(n) {
   return {1:"Free",2:"Capture Only",3:"TopUp Needed",4:"Barrier Failed"}[n]||"?";
 }
 
+/**
+ * Determine which POS is calling based on outlet+terminal in the request body.
+ * Returns "Entrance", "Exit", or "Unknown".
+ * If neither is configured yet, falls back to "Entrance" gracefully.
+ */
+function detectMode(reqBody) {
+  const outlet   = reqBody.outlet   || "";
+  const terminal = reqBody.terminal || "";
+  if (outlet === config.entranceOutlet && terminal === config.entranceTerminal) return "Entrance";
+  if (outlet === config.exitOutlet     && terminal === config.exitTerminal)     return "Exit";
+  // Fallback: if only one POS is configured (e.g. during initial setup) match on outlet alone
+  if (outlet && outlet === config.entranceOutlet) return "Entrance";
+  if (outlet && outlet === config.exitOutlet)     return "Exit";
+  return "Unknown";
+}
+
 // ── TELL API client ───────────────────────────────────────────────────────────
 function tellRequest(method, path, body) {
   return new Promise((resolve, reject) => {
@@ -95,7 +119,6 @@ function tellRequest(method, path, body) {
   });
 }
 
-// Check vehicle via TELL gc/getgeneral
 async function tellCheckVehicle() {
   const body = { hwId: config.tellHwId, hwName: config.tellHwName, appId: config.tellAppId };
   const result = await tellRequest("POST", "/gc/getgeneral", body);
@@ -107,7 +130,6 @@ async function tellCheckVehicle() {
   return val === 1;
 }
 
-// Open barrier via TELL gc/open
 async function tellOpenBarrier() {
   const body = { hwid: config.tellHwId, appId: config.tellAppId, data: config.tellBarrierOutput };
   const result = await tellRequest("GET", "/gc/open", body);
@@ -175,22 +197,69 @@ td{padding:6px 8px;border-bottom:1px solid #161b22;vertical-align:middle}
 .gray{background:#30363d}.yellow{background:#7d5c00;color:#ffd700}
 pre{background:#161b22;padding:8px;border-radius:4px;overflow-x:auto;max-height:150px;font-size:11px}
 input,select{background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:4px 8px;border-radius:4px}
-input.n{width:60px} input.m{width:160px} input.w{width:280px}
+input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140px}
 .active{color:#3fb950;font-weight:bold}.inactive{color:#8b949e}
+.pos-box{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:14px;margin-bottom:14px}
+.entrance-box{border-color:#1f6feb}
+.exit-box{border-color:#e65100}
 .tell-box{background:#161b22;border:2px solid ${config.tellEnabled?'#238636':'#30363d'};border-radius:6px;padding:16px;margin-top:8px}
 #ts{margin-top:8px;padding:8px;border-radius:4px;font-size:12px;display:none}
 .ok{background:#0d2818;color:#3fb950;border:1px solid #238636}
 .err{background:#2d0a0a;color:#ff6b6b;border:1px solid #c62828}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;margin-left:6px}
+.tag-entrance{background:#0d2030;color:#1f6feb;border:1px solid #1f6feb}
+.tag-exit{background:#2d1500;color:#e65100;border:1px solid #e65100}
+.tag-unknown{background:#2d2d2d;color:#8b949e;border:1px solid #555}
 </style></head><body>
 <h1>&#x1F17F; Parking RPS Mock Server</h1>
-<p style="color:#8b949e">All changes take effect immediately.</p>
+<p style="color:#8b949e">All changes take effect immediately — no restart needed.</p>
+
+<h2>&#x1F4F1; POS Device Configuration</h2>
+<p style="color:#8b949e;font-size:12px;margin-top:-8px">
+  The server identifies which POS is calling by matching outlet + terminal from the request.
+  Enter the same values here that you configure in the Android app Settings.
+</p>
+
+<div class="pos-box entrance-box">
+<h3>🔵 Entrance POS</h3>
+<table>
+<tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
+<tr>
+  <td>Outlet Number</td>
+  <td><input class="t" id="enOutlet" placeholder="10 digits" value="${config.entranceOutlet}" maxlength="10"></td>
+  <td><button class="btn" onclick="sv('entranceOutlet','enOutlet')">Save</button></td>
+</tr>
+<tr>
+  <td>Terminal ID</td>
+  <td><input class="t" id="enTerminal" placeholder="12 digits" value="${config.entranceTerminal}" maxlength="12"></td>
+  <td><button class="btn" onclick="sv('entranceTerminal','enTerminal')">Save</button></td>
+</tr>
+</table>
+</div>
+
+<div class="pos-box exit-box">
+<h3>🟠 Exit POS</h3>
+<table>
+<tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
+<tr>
+  <td>Outlet Number</td>
+  <td><input class="t" id="exOutlet" placeholder="10 digits" value="${config.exitOutlet}" maxlength="10"></td>
+  <td><button class="btn" onclick="sv('exitOutlet','exOutlet')">Save</button></td>
+</tr>
+<tr>
+  <td>Terminal ID</td>
+  <td><input class="t" id="exTerminal" placeholder="12 digits" value="${config.exitTerminal}" maxlength="12"></td>
+  <td><button class="btn" onclick="sv('exitTerminal','exTerminal')">Save</button></td>
+</tr>
+</table>
+</div>
 
 <h2>&#9881; Parking Configuration</h2>
 <table>
 <tr><th>Setting</th><th>Value</th><th>Actions</th></tr>
-<tr><td>Mode</td><td class="active">${config.parkingMode}</td>
-<td><button class="btn" onclick="set('parkingMode','Entrance')">Entrance</button>
-<button class="btn orange" onclick="set('parkingMode','Exit')">Exit</button></td></tr>
+<tr><td>Company Code</td><td>${config.companyCode}</td>
+<td><input class="m" id="inCC" value="${config.companyCode}">
+<button class="btn" onclick="sv('companyCode','inCC')">Save</button></td></tr>
 <tr><td>Exit Scenario</td><td>${config.exitScenario} — ${sn}</td>
 <td><button class="btn green" onclick="set('exitScenario',1)">1 Free</button>
 <button class="btn" onclick="set('exitScenario',2)">2 Capture</button>
@@ -223,7 +292,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:280px}
 <h3>Mode — currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
 <button class="btn green" onclick="set('tellEnabled',true)">&#x1F7E2; Enable Real TELL API</button>
 <button class="btn gray" onclick="set('tellEnabled',false)">⚫ Use Mock</button>
-<p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; entranceCall/exitPayment/exitCall(free,capture) open real barrier.</p>
+<p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; barrier opens on entranceCall/exitCall(free,capture)/exitPayment.</p>
 
 <h3>Device Settings</h3>
 <table>
@@ -284,7 +353,7 @@ async function set(k,v){
 async function sv(key,id){
   const v=document.getElementById(id).value.trim();
   await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
-  showS('Saved '+key+' = '+v.slice(0,30)+(v.length>30?'...':''),false);
+  showS('✓ Saved '+key,false);
 }
 async function clearE(){await fetch('/admin/clear-entries',{method:'POST'});location.reload();}
 function showS(msg,err){
@@ -309,12 +378,17 @@ async function openNow(){
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
 }
+function modeTag(m){
+  if(m==='Entrance') return '<span class="tag tag-entrance">ENTRANCE</span>';
+  if(m==='Exit')     return '<span class="tag tag-exit">EXIT</span>';
+  return '<span class="tag tag-unknown">UNKNOWN</span>';
+}
 async function loadLogs(){
   const r=await fetch('/logs');
   const logs=await r.json();
   document.getElementById('logDiv').innerHTML=logs.slice(0,20).map(l=>\`
 <table style="margin-bottom:12px">
-<tr><th style="width:90px">\${l.time}</th><th>\${l.method} \${l.endpoint}</th></tr>
+<tr><th style="width:90px">\${l.time}</th><th>\${l.method} \${l.endpoint}\${l.request&&l.request.outlet?modeTag(l.request.outlet==='${config.entranceOutlet}'?'Entrance':l.request.outlet==='${config.exitOutlet}'?'Exit':'Unknown'):''}</th></tr>
 <tr><td style="color:#8b949e">REQ</td><td><pre>\${JSON.stringify(l.request,null,2)}</pre></td></tr>
 <tr><td style="color:#3fb950">RES</td><td><pre>\${JSON.stringify(l.response,null,2)}</pre></td></tr>
 </table>\`).join('')||'<p style="color:#8b949e">No requests yet</p>';
@@ -330,14 +404,25 @@ app.post("/parkingInit", (req, res) => {
     const response = {responseCode:config.responseCode, responseDescription:errMap[config.responseCode]||"Error"};
     addLog(req, response); return res.json(response);
   }
+
+  // Identify which POS is calling — determines mode returned
+  const mode = detectMode(req.body);
+
+  // Validate outlet — return 91 if unrecognised (both POS configured and neither matches)
+  if (mode === "Unknown" && config.entranceOutlet && config.exitOutlet) {
+    const response = {responseCode:"91", responseDescription:"Invalid Outlet Number"};
+    addLog(req, response); return res.json(response);
+  }
+
   const charges = config.showRates ? [
     {from:"30",to:"120",fee:"200"},{from:"120",to:"180",fee:"400"},
     {from:"180",to:"240",fee:"500"},{from:"240",fee:"1000"}
   ] : [];
+
   const response = {
-    outlet:                          req.body.outlet||"0000259010",
-    terminal:                        req.body.terminal||"000025901025",
-    mode:                            config.parkingMode,
+    outlet:                          req.body.outlet   || config.entranceOutlet,
+    terminal:                        req.body.terminal || config.entranceTerminal,
+    mode:                            mode === "Exit" ? "Exit" : "Entrance",
     companyCode:                     config.companyCode,
     keepAliveFreq:                   "10",
     minimumAmountPreAuth:            "300",
@@ -371,12 +456,16 @@ app.post("/entranceCall", async (req, res) => {
     catch(e) { barrier = "tell-error: " + e.message; console.error("TELL entrance:", e.message); }
   }
   const response = {
-    outlet:req.body.outlet||"0000259010", terminal:req.body.terminal||"000025901025",
-    availablePlaceMonthly:String(config.availablePlaceMonthly),
-    availablePlacesRegular:String(config.availablePlacesNormal),
-    installationPoint:"Entrance", displayMessage:"Welcome. Have a nice day!!",
-    timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
-    _barrier:barrier
+    outlet:                 req.body.outlet   || config.entranceOutlet,
+    terminal:               req.body.terminal || config.entranceTerminal,
+    availablePlaceMonthly:  String(config.availablePlaceMonthly),
+    availablePlacesRegular: String(config.availablePlacesNormal),
+    installationPoint:      "Entrance",
+    displayMessage:         "Welcome. Have a nice day!!",
+    timeToDisplayMessage:   "5",
+    responseCode:           "00",
+    responseDescription:    "Successful Response",
+    _barrier:               barrier
   };
   addLog(req, response); res.json(response);
 });
@@ -395,15 +484,17 @@ app.post("/exitCall", async (req, res) => {
   switch(config.exitScenario) {
     case 1: {
       const b = await openReal();
-      response = {barrierOpen:"1",moneyToPay:"0",displayMessage:"Thank you! Have a nice day.",
-        timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response",_barrier:b};
+      response = {barrierOpen:"1",moneyToPay:"0",
+        displayMessage:"Thank you! Have a nice day.",timeToDisplayMessage:"5",
+        responseCode:"00",responseDescription:"Successful Response",_barrier:b};
       if(token) delete activeEntries[token];
       config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1); break;
     }
     case 2: {
       const b = await openReal();
-      response = {barrierOpen:"1",moneyToPay:"200",displayMessage:"Thank you! Your card has been charged EUR 2.00.",
-        timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response",_barrier:b};
+      response = {barrierOpen:"1",moneyToPay:"200",
+        displayMessage:"Thank you! Your card has been charged EUR 2.00.",timeToDisplayMessage:"5",
+        responseCode:"00",responseDescription:"Successful Response",_barrier:b};
       if(token) delete activeEntries[token];
       config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1); break;
     }
@@ -412,8 +503,9 @@ app.post("/exitCall", async (req, res) => {
         displayMessage:"Charge is EUR 3.56. Please present your card.",timeToDisplayMessage:"10",
         responseCode:"31",responseDescription:"TopUp required"}; break;
     case 4: default:
-      response = {barrierOpen:"0",moneyToPay:"0",displayMessage:"Technical issue. Please contact staff.",
-        timeToDisplayMessage:"10",responseCode:"08",responseDescription:"Barrier failed to open"}; break;
+      response = {barrierOpen:"0",moneyToPay:"0",
+        displayMessage:"Technical issue. Please contact staff.",timeToDisplayMessage:"10",
+        responseCode:"08",responseDescription:"Barrier failed to open"}; break;
   }
   addLog(req, response); res.json(response);
 });
@@ -446,15 +538,19 @@ app.post("/vehiclePresent", async (req, res) => {
       addLog(req, errRes); return res.json(errRes);
     }
   }
+  const mode = detectMode(req.body);
   const response = {
-    outlet:req.body.outlet||"0000259010", terminal:req.body.terminal||"000025901025",
-    installationPoint:config.parkingMode, dayTime:ts(),
-    vehiclePresent:detected?"1":"0",
-    displayMessage:detected?"Vehicle detected. Please proceed.":"No vehicle detected.",
-    timeToDisplayMessage:"3",
-    availablePlaceMonthly:String(config.availablePlaceMonthly),
-    availablePlacesNormal:String(config.availablePlacesNormal),
-    responseCode:"00", responseDescription:"Successful Response"
+    outlet:               req.body.outlet   || config.entranceOutlet,
+    terminal:             req.body.terminal || config.entranceTerminal,
+    installationPoint:    mode,
+    dayTime:              ts(),
+    vehiclePresent:       detected ? "1" : "0",
+    displayMessage:       detected ? "Vehicle detected. Please proceed." : "No vehicle detected.",
+    timeToDisplayMessage: "3",
+    availablePlaceMonthly: String(config.availablePlaceMonthly),
+    availablePlacesNormal: String(config.availablePlacesNormal),
+    responseCode:         "00",
+    responseDescription:  "Successful Response"
   };
   addLog(req, response); res.json(response);
 });
