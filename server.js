@@ -98,7 +98,7 @@ function tellRequest(method, path, body) {
       headers:  {
         "Content-Type":   "application/json",
         "Content-Length": Buffer.byteLength(payload),
-        "API key":        config.tellApiKey
+        "api-key":        config.tellApiKey
       }
     };
     const req = https.request(options, (res) => {
