@@ -18,7 +18,19 @@ let config = {
   exitOutlet:       "0000259011",
   exitTerminal:     "000025901026",
 
-  // ── Parking behaviour ─────────────────────────────────────────────────────────
+  // ── parkingInit fields ────────────────────────────────────────────────────────
+  keepAliveFreq:          10,
+  minimumAmountPreAuth:   300,
+  defaultAmount:          800,
+  phoneForHelp:           "99375545",
+  displayMessageEntrance: "Welcome to Limassol Parking!",
+  displayMessageExit:     "Please prepare the card that was used during Entrance.",
+  charges: [
+    {from:"30",  to:"120", fee:"200"},
+    {from:"120", to:"180", fee:"400"},
+    {from:"180", to:"240", fee:"500"},
+    {from:"240", fee:"1000"}
+  ],
   exitScenario:          1,
   vehiclePresent:        true,
   availablePlacesNormal: 20,
@@ -149,6 +161,22 @@ app.post("/admin/clear-entries", (req, res) => {
 });
 app.post("/admin/clear-logs", (req, res) => {
   logs = [];
+  res.json({ok: true});
+});
+app.post("/admin/add-charge", (req, res) => {
+  const {from, to, fee} = req.body;
+  if (!from || !fee) return res.json({ok:false, error:"from and fee required"});
+  const charge = {from: String(from), fee: String(fee)};
+  if (to) charge.to = String(to);
+  config.charges.push(charge);
+  config.charges.sort((a,b) => parseInt(a.from) - parseInt(b.from));
+  res.json({ok: true});
+});
+app.post("/admin/remove-charge", (req, res) => {
+  const {index} = req.body;
+  if (index >= 0 && index < config.charges.length) {
+    config.charges.splice(index, 1);
+  }
   res.json({ok: true});
 });
 app.post("/admin/tell-test", async (req, res) => {
@@ -287,6 +315,44 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <button class="btn red" onclick="set('responseCode','92')">92 Company</button>
 <button class="btn red" onclick="set('responseCode','08')">08 Technical</button></td></tr>
 </table>
+
+<h2>&#x1F4E1; parkingInit Response Fields</h2>
+<table>
+<tr><th style="width:200px">Field</th><th>Value</th><th style="width:220px">Edit</th></tr>
+<tr><td>Keep Alive (min)</td><td>${config.keepAliveFreq}</td>
+<td><input class="n" type="number" id="inKA" value="${config.keepAliveFreq}">
+<button class="btn" onclick="set('keepAliveFreq',Number(document.getElementById('inKA').value))">Set</button></td></tr>
+<tr><td>Min Pre-Auth (cents)</td><td>${config.minimumAmountPreAuth} = €${(config.minimumAmountPreAuth/100).toFixed(2)}</td>
+<td><input class="n" type="number" id="inPA" value="${config.minimumAmountPreAuth}">
+<button class="btn" onclick="set('minimumAmountPreAuth',Number(document.getElementById('inPA').value))">Set</button></td></tr>
+<tr><td>Default Amount (cents)</td><td>${config.defaultAmount} = €${(config.defaultAmount/100).toFixed(2)}</td>
+<td><input class="n" type="number" id="inDA" value="${config.defaultAmount}">
+<button class="btn" onclick="set('defaultAmount',Number(document.getElementById('inDA').value))">Set</button></td></tr>
+<tr><td>Phone For Help</td><td>${config.phoneForHelp}</td>
+<td><input class="m" id="inPH" value="${config.phoneForHelp}">
+<button class="btn" onclick="sv('phoneForHelp','inPH')">Save</button></td></tr>
+<tr><td>Display Msg Entrance</td><td style="font-size:11px">${config.displayMessageEntrance}</td>
+<td><input class="w" id="inDME" value="${config.displayMessageEntrance}">
+<button class="btn" onclick="sv('displayMessageEntrance','inDME')">Save</button></td></tr>
+<tr><td>Display Msg Exit</td><td style="font-size:11px">${config.displayMessageExit}</td>
+<td><input class="w" id="inDMX" value="${config.displayMessageExit}">
+<button class="btn" onclick="sv('displayMessageExit','inDMX')">Save</button></td></tr>
+</table>
+
+<h3 style="color:#8b949e;margin-top:16px">Charges (parkingInit)</h3>
+<table>
+<tr><th>From (min)</th><th>To (min)</th><th>Fee (cents)</th><th>= Euro</th><th></th></tr>
+${config.charges.map((c,i)=>`<tr>
+<td>${c.from}</td><td>${c.to||'∞'}</td><td>${c.fee}</td><td>€${(parseInt(c.fee)/100).toFixed(2)}</td>
+<td><button class="btn red" onclick="removeCharge(${i})">Remove</button></td>
+</tr>`).join('')}
+</table>
+<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+  <input class="n" type="number" id="chFrom" placeholder="from">
+  <input class="n" type="number" id="chTo" placeholder="to (blank=∞)">
+  <input class="n" type="number" id="chFee" placeholder="fee">
+  <button class="btn green" onclick="addCharge()">+ Add Charge</button>
+</div>
 
 <h2>&#x1F6A7; TELL Gate Control PRO</h2>
 <div class="tell-box">
@@ -501,6 +567,22 @@ async function openNow(){
   }catch(e){showS('✗ '+e.message,true);}
 }
 
+async function addCharge(){
+  const from=document.getElementById('chFrom').value.trim();
+  const to=document.getElementById('chTo').value.trim();
+  const fee=document.getElementById('chFee').value.trim();
+  if(!from||!fee){alert('From and Fee are required');return;}
+  const r=await fetch('/admin/add-charge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from,to,fee})});
+  const d=await r.json();
+  if(d.ok) location.reload();
+  else alert('Error: '+d.error);
+}
+async function removeCharge(i){
+  const r=await fetch('/admin/remove-charge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})});
+  const d=await r.json();
+  if(d.ok) location.reload();
+}
+
 loadLogs();setInterval(loadLogs,3000);
 </script></body></html>`);
 });
@@ -522,22 +604,19 @@ app.post("/parkingInit", (req, res) => {
     addLog(req, response); return res.json(response);
   }
 
-  const charges = config.showRates ? [
-    {from:"30",to:"120",fee:"200"},{from:"120",to:"180",fee:"400"},
-    {from:"180",to:"240",fee:"500"},{from:"240",fee:"1000"}
-  ] : [];
+  const charges = config.showRates ? config.charges : [];
 
   const response = {
     outlet:                          req.body.outlet   || config.entranceOutlet,
     terminal:                        req.body.terminal || config.entranceTerminal,
     mode:                            mode === "Exit" ? "Exit" : "Entrance",
     companyCode:                     config.companyCode,
-    keepAliveFreq:                   "10",
-    minimumAmountPreAuth:            "300",
-    defaultAmount:                   "800",
-    phoneForHelp:                    "99375545",
-    displayMessageOfEntrance:        "Welcome to Limassol Parking!",
-    displayMessageOnExit:            "Please prepare the card that was used during Entrance.",
+    keepAliveFreq:                   String(config.keepAliveFreq),
+    minimumAmountPreAuth:            String(config.minimumAmountPreAuth),
+    defaultAmount:                   String(config.defaultAmount),
+    phoneForHelp:                    config.phoneForHelp,
+    displayMessageOfEntrance:        config.displayMessageEntrance,
+    displayMessageOnExit:            config.displayMessageExit,
     displayMessageOfAvailablePlaces: "There are {availablePlacesRegular} available places for Normal and {availablePlaceMonthly} for Monthly Customers.",
     availablePlacesNormal:           String(config.availablePlacesNormal),
     availablePlaceMonthly:           String(config.availablePlaceMonthly),
