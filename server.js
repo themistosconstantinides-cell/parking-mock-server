@@ -604,7 +604,7 @@ app.post("/parkingInit", (req, res) => {
     addLog(req, response); return res.json(response);
   }
 
-  const charges = config.showRates ? config.charges : [];
+  const charges = config.charges;
 
   const response = {
     outlet:                          req.body.outlet   || config.entranceOutlet,
