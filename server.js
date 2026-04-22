@@ -48,7 +48,7 @@ function addLog(req, response) {
     request:  req.body || {},
     response: response
   });
-  if (logs.length > 200) logs.pop();
+  if (logs.length > 500) logs.pop();
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.originalUrl}`);
 }
 
@@ -61,7 +61,7 @@ function addTellLog(action, request, response, error) {
     request:  request,
     response: error ? { error: error.message || String(error) } : response
   });
-  if (logs.length > 200) logs.pop();
+  if (logs.length > 500) logs.pop();
   console.log(`[${new Date().toLocaleTimeString()}] TELL ${action}`);
 }
 
@@ -145,6 +145,10 @@ app.post("/admin/config", (req, res) => {
 });
 app.post("/admin/clear-entries", (req, res) => {
   activeEntries = {};
+  res.json({ok: true});
+});
+app.post("/admin/clear-logs", (req, res) => {
+  logs = [];
   res.json({ok: true});
 });
 app.post("/admin/tell-test", async (req, res) => {
@@ -339,10 +343,129 @@ ${Object.values(activeEntries).map(e=>`<tr>
 </table>
 <button class="btn red" onclick="clearE()">Clear All Entries</button>
 
-<h2>&#x1F4CB; Request Log (last 20)</h2>
+<h2>&#x1F4CB; Request Log</h2>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+  <span style="color:#8b949e;font-size:12px">Filter:</span>
+  <button class="btn gray" onclick="setFilter('')">All</button>
+  <button class="btn" style="background:#1f6feb" onclick="setFilter('parkingInit')">Init</button>
+  <button class="btn green" onclick="setFilter('entranceCall')">Entrance</button>
+  <button class="btn orange" onclick="setFilter('exitCall')">Exit</button>
+  <button class="btn" style="background:#6e40c9" onclick="setFilter('exitPayment')">Payment</button>
+  <button class="btn yellow" onclick="setFilter('vehiclePresent')">Vehicle</button>
+  <button class="btn gray" onclick="setFilter('help')">Help</button>
+  <button class="btn" style="background:#b08800" onclick="setFilter('TELL')">TELL</button>
+  <span style="margin-left:auto;display:flex;gap:6px">
+    <button class="btn green" onclick="exportLogs()">&#x1F4BE; Export .txt</button>
+    <button class="btn red" onclick="clearLogs()">&#x1F5D1; Clear</button>
+  </span>
+</div>
+<div id="logCount" style="color:#8b949e;font-size:11px;margin-bottom:8px"></div>
 <div id="logDiv"><p style="color:#8b949e">Loading...</p></div>
 
 <script>
+let allLogs=[];
+let activeFilter='';
+
+function setFilter(f){activeFilter=f;renderLogs();}
+
+function epColor(ep){
+  if(ep.includes('parkingInit'))    return '#1f6feb';
+  if(ep.includes('entranceCall'))   return '#238636';
+  if(ep.includes('exitPayment'))    return '#6e40c9';
+  if(ep.includes('exitCall'))       return '#e65100';
+  if(ep.includes('vehiclePresent')) return '#9a7c00';
+  if(ep.includes('help'))           return '#555';
+  if(ep.includes('TELL'))           return '#b08800';
+  return '#30363d';
+}
+function epBg(ep){
+  if(ep.includes('parkingInit'))    return '#0d1a2e';
+  if(ep.includes('entranceCall'))   return '#0d2010';
+  if(ep.includes('exitPayment'))    return '#1a0d2e';
+  if(ep.includes('exitCall'))       return '#2d1500';
+  if(ep.includes('vehiclePresent')) return '#1c1800';
+  if(ep.includes('help'))           return '#1a1a1a';
+  if(ep.includes('TELL'))           return '#2a1e00';
+  return '#161b22';
+}
+function rcColor(rc){
+  if(!rc) return '#8b949e';
+  if(rc==='00') return '#3fb950';
+  return '#ff6b6b';
+}
+function modeTag(outlet){
+  if(outlet==='${config.entranceOutlet}') return '<span class="tag tag-entrance">ENTRANCE</span>';
+  if(outlet==='${config.exitOutlet}')     return '<span class="tag tag-exit">EXIT</span>';
+  return '<span class="tag tag-unknown">UNKNOWN</span>';
+}
+
+function renderLogs(){
+  const filtered=activeFilter
+    ?allLogs.filter(l=>l.endpoint.toLowerCase().includes(activeFilter.toLowerCase()))
+    :allLogs;
+  document.getElementById('logCount').textContent=
+    filtered.length+' of '+allLogs.length+' entries'+(activeFilter?' — filter: '+activeFilter:'');
+  if(!filtered.length){
+    document.getElementById('logDiv').innerHTML='<p style="color:#8b949e">No entries match filter</p>';
+    return;
+  }
+  document.getElementById('logDiv').innerHTML=filtered.map(l=>{
+    const rc=(l.response&&l.response.responseCode)||'';
+    const isTell=l.endpoint.includes('TELL');
+    const col=epColor(l.endpoint);
+    const bg=epBg(l.endpoint);
+    return \`<div style="background:\${bg};border:1px solid \${col};border-radius:6px;padding:10px;margin-bottom:10px">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+  <span style="color:#8b949e;font-size:11px;min-width:130px">\${l.time}</span>
+  <span style="color:\${col};font-weight:bold;font-size:12px">\${isTell?'🔌 ':''}\${l.method} \${l.endpoint}</span>
+  \${l.request&&l.request.outlet?modeTag(l.request.outlet):''}
+  \${rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':''}
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+  <div>
+    <div style="color:#8b949e;font-size:10px;margin-bottom:2px">REQUEST</div>
+    <pre>\${JSON.stringify(l.request,null,2)}</pre>
+  </div>
+  <div>
+    <div style="color:#3fb950;font-size:10px;margin-bottom:2px">RESPONSE</div>
+    <pre style="border-left:3px solid \${rcColor(rc)}">\${JSON.stringify(l.response,null,2)}</pre>
+  </div>
+</div>
+</div>\`;
+  }).join('')||'<p style="color:#8b949e">No requests yet</p>';
+}
+
+async function loadLogs(){
+  const r=await fetch('/logs');
+  allLogs=await r.json();
+  renderLogs();
+}
+
+async function clearLogs(){
+  if(!confirm('Clear all logs?'))return;
+  await fetch('/admin/clear-logs',{method:'POST'});
+  allLogs=[];renderLogs();
+}
+
+function exportLogs(){
+  const filtered=activeFilter
+    ?allLogs.filter(l=>l.endpoint.toLowerCase().includes(activeFilter.toLowerCase()))
+    :allLogs;
+  const lines=filtered.map(l=>[
+    '='.repeat(80),
+    '['+l.time+'] '+l.method+' '+l.endpoint,
+    '--- REQUEST ---',
+    JSON.stringify(l.request,null,2),
+    '--- RESPONSE ---',
+    JSON.stringify(l.response,null,2)
+  ].join('\n')).join('\n\n');
+  const blob=new Blob([lines],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='parking-logs-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.txt';
+  a.click();
+}
+
 async function set(k,v){
   await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
   location.reload();
@@ -375,21 +498,7 @@ async function openNow(){
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
 }
-function modeTag(m){
-  if(m==='Entrance') return '<span class="tag tag-entrance">ENTRANCE</span>';
-  if(m==='Exit')     return '<span class="tag tag-exit">EXIT</span>';
-  return '<span class="tag tag-unknown">UNKNOWN</span>';
-}
-async function loadLogs(){
-  const r=await fetch('/logs');
-  const logs=await r.json();
-  document.getElementById('logDiv').innerHTML=logs.slice(0,20).map(l=>\`
-<table style="margin-bottom:12px">
-<tr><th style="width:90px">\${l.time}</th><th>\${l.method} \${l.endpoint}\${l.request&&l.request.outlet?modeTag(l.request.outlet==='${config.entranceOutlet}'?'Entrance':l.request.outlet==='${config.exitOutlet}'?'Exit':'Unknown'):''}</th></tr>
-<tr><td style="color:#8b949e">REQ</td><td><pre>\${JSON.stringify(l.request,null,2)}</pre></td></tr>
-<tr><td style="color:#3fb950">RES</td><td><pre>\${JSON.stringify(l.response,null,2)}</pre></td></tr>
-</table>\`).join('')||'<p style="color:#8b949e">No requests yet</p>';
-}
+
 loadLogs();setInterval(loadLogs,3000);
 </script></body></html>`);
 });
