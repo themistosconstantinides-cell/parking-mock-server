@@ -271,10 +271,10 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <button class="btn red" onclick="set('vehiclePresent',false)">NO</button></td></tr>
 <tr><td>Normal Spaces</td><td>${config.availablePlacesNormal}</td>
 <td><input class="n" type="number" id="inN" value="${config.availablePlacesNormal}">
-<button class="btn" onclick="set('availablePlacesNormal',+document.getElementById('inN').value)">Set</button></td></tr>
+<button class="btn" onclick="set('availablePlacesNormal',Number(document.getElementById('inN').value))">Set</button></td></tr>
 <tr><td>Monthly Spaces</td><td>${config.availablePlaceMonthly}</td>
 <td><input class="n" type="number" id="inM" value="${config.availablePlaceMonthly}">
-<button class="btn" onclick="set('availablePlaceMonthly',+document.getElementById('inM').value)">Set</button></td></tr>
+<button class="btn" onclick="set('availablePlaceMonthly',Number(document.getElementById('inM').value))">Set</button></td></tr>
 <tr><td>Monthly Cards</td><td>${config.monthlyEnabled}</td>
 <td><button class="btn green" onclick="set('monthlyEnabled',true)">ON</button>
 <button class="btn red" onclick="set('monthlyEnabled',false)">OFF</button></td></tr>
