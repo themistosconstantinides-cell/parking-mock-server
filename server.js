@@ -460,7 +460,7 @@ function exportLogs(){
     JSON.stringify(l.request,null,2),
     '--- RESPONSE ---',
     JSON.stringify(l.response,null,2)
-  ].join('\n')).join('\n\n');
+  ].join('\\n')).join('\\n\\n');
   const blob=new Blob([lines],{type:'text/plain'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
