@@ -409,29 +409,31 @@ function renderLogs(){
     document.getElementById('logDiv').innerHTML='<p style="color:#8b949e">No entries match filter</p>';
     return;
   }
-  document.getElementById('logDiv').innerHTML=filtered.map(l=>{
+  document.getElementById('logDiv').innerHTML=filtered.map(function(l){
     const rc=(l.response&&l.response.responseCode)||'';
     const isTell=l.endpoint.includes('TELL');
     const col=epColor(l.endpoint);
     const bg=epBg(l.endpoint);
-    return \`<div style="background:\${bg};border:1px solid \${col};border-radius:6px;padding:10px;margin-bottom:10px">
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-  <span style="color:#8b949e;font-size:11px;min-width:130px">\${l.time}</span>
-  <span style="color:\${col};font-weight:bold;font-size:12px">\${isTell?'🔌 ':''}\${l.method} \${l.endpoint}</span>
-  \${l.request&&l.request.outlet?modeTag(l.request.outlet):''}
-  \${rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':''}
-</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-  <div>
-    <div style="color:#8b949e;font-size:10px;margin-bottom:2px">REQUEST</div>
-    <pre>\${JSON.stringify(l.request,null,2)}</pre>
-  </div>
-  <div>
-    <div style="color:#3fb950;font-size:10px;margin-bottom:2px">RESPONSE</div>
-    <pre style="border-left:3px solid \${rcColor(rc)}">\${JSON.stringify(l.response,null,2)}</pre>
-  </div>
-</div>
-</div>\`;
+    const reqJson=JSON.stringify(l.request,null,2);
+    const resJson=JSON.stringify(l.response,null,2);
+    return '<div style="background:'+bg+';border:1px solid '+col+';border-radius:6px;padding:10px;margin-bottom:10px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<span style="color:#8b949e;font-size:11px;min-width:130px">'+l.time+'</span>'+
+        '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'🔌 ':'')+l.method+' '+l.endpoint+'</span>'+
+        (l.request&&l.request.outlet?modeTag(l.request.outlet):'')+
+        (rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+        '<div>'+
+          '<div style="color:#8b949e;font-size:10px;margin-bottom:2px">REQUEST</div>'+
+          '<pre>'+reqJson+'</pre>'+
+        '</div>'+
+        '<div>'+
+          '<div style="color:#3fb950;font-size:10px;margin-bottom:2px">RESPONSE</div>'+
+          '<pre style="border-left:3px solid '+rcColor(rc)+'">'+resJson+'</pre>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
   }).join('')||'<p style="color:#8b949e">No requests yet</p>';
 }
 
