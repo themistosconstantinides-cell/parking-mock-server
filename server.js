@@ -321,7 +321,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <option value="in2" ${config.tellVehicleInput==='in2'?'selected':''}>IN2 — dry contact (loop/photocell)</option>
 </select></td></tr>
 <tr><td>Barrier output</td>
-<td><select onchange="set('tellBarrierOutput',+this.value)">
+<td><select onchange="set('tellBarrierOutput',Number(this.value))">
 <option value="1" ${config.tellBarrierOutput===1?'selected':''}>OUT1</option>
 <option value="2" ${config.tellBarrierOutput===2?'selected':''}>OUT2</option>
 </select></td></tr>
