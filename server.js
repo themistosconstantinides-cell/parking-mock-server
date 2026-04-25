@@ -54,14 +54,16 @@ let config = {
 function addLog(req, response) {
   logs.unshift({
     id:       Date.now(),
-    time:     new Date().toLocaleTimeString(),
+    time:     new Date().toLocaleString(),
     endpoint: req.originalUrl,
     method:   req.method,
     request:  req.body || {},
     response: response
   });
   if (logs.length > 500) logs.pop();
-  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.originalUrl}`);
+  console.log(`[${new Date().toLocaleString()}] ${req.method} ${req.originalUrl}`);
+  console.log(`  REQ: ${JSON.stringify(req.body)}`);
+  console.log(`  RES: ${JSON.stringify(response)}`);
 }
 
 function addTellLog(action, request, response, error) {
@@ -624,6 +626,15 @@ app.post("/parkingInit", (req, res) => {
     controller:                      config.tellEnabled ? "A" : "0",
     fixAmountSolution:               "-1",
     charges,
+    // TELL credentials — only included when TELL is enabled
+    // App uses these to poll getStatus directly for vehicle detection
+    ...(config.tellEnabled && config.tellHwId && config.tellAppId ? {
+      tellApiUrl:        "https://api.tell.hu/gc",
+      tellHwId:          config.tellHwId,
+      tellAppId:         config.tellAppId,
+      tellApiKey:        config.tellApiKey,
+      tellVehicleInput:  config.tellVehicleInput
+    } : {}),
     responseCode:                    "00",
     responseDescription:             "Successful Response"
   };
