@@ -43,6 +43,7 @@ let config = {
   // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
   tellEnabled:       false,
   tellApiKey:        "f2nIrJ8DBf4Gc8ar99IQeCVVm3pnWrVP",
+  tellPassword:      "1234",  // device admin password — used by app for addappid
   tellHwId:          "",
   tellHwName:        "ParkingBarrier",
   tellAppId:         "",
@@ -378,6 +379,9 @@ ${config.charges.map((c,i)=>`<tr>
 <tr><td>API Key</td>
 <td><input class="w" id="apiKey" value="${config.tellApiKey}"></td>
 <td><button class="btn" onclick="sv('tellApiKey','apiKey')">Save</button></td></tr>
+<tr><td>Device Password</td>
+<td><input class="m" id="tellPwd" value="${config.tellPassword}"></td>
+<td><button class="btn" onclick="sv('tellPassword','tellPwd')">Save</button></td></tr>
 </table>
 
 <h3>I/O Mapping</h3>
@@ -632,6 +636,7 @@ app.post("/parkingInit", (req, res) => {
       tellApiUrl:        "https://api.tell.hu/gc",
       tellHwId:          config.tellHwId,
       tellApiKey:        config.tellApiKey,
+      tellPassword:      config.tellPassword,
       tellVehicleInput:  config.tellVehicleInput
     } : {}),
     responseCode:                    "00",
