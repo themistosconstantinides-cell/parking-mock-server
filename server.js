@@ -628,10 +628,9 @@ app.post("/parkingInit", (req, res) => {
     charges,
     // TELL credentials — only included when TELL is enabled
     // App uses these to poll getStatus directly for vehicle detection
-    ...(config.tellEnabled && config.tellHwId && config.tellAppId ? {
+    ...(config.tellEnabled && config.tellHwId ? {
       tellApiUrl:        "https://api.tell.hu/gc",
       tellHwId:          config.tellHwId,
-      tellAppId:         config.tellAppId,
       tellApiKey:        config.tellApiKey,
       tellVehicleInput:  config.tellVehicleInput
     } : {}),
