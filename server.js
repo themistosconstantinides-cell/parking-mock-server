@@ -636,6 +636,7 @@ app.post("/parkingInit", (req, res) => {
       tellApiUrl:        "https://api.tell.hu/gc",
       tellHwId:          config.tellHwId,
       tellApiKey:        config.tellApiKey,
+      tellAppId:         config.tellAppId,
       tellPassword:      config.tellPassword,
       tellVehicleInput:  config.tellVehicleInput
     } : {}),
