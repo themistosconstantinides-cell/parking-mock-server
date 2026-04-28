@@ -13,16 +13,16 @@ let config = {
   // ── POS Devices ──────────────────────────────────────────────────────────────
   // Entrance POS — configured in Android Settings on the entrance device
   entranceOutlet:   "0000259010",
-  entranceTerminal: "000025901025",
+  entranceTerminal: "000025901090",
   // Exit POS — configured in Android Settings on the exit device
-  exitOutlet:       "0000259011",
-  exitTerminal:     "000025901026",
+  exitOutlet:       "0000259010",
+  exitTerminal:     "000025901091",
 
   // ── parkingInit fields ────────────────────────────────────────────────────────
   keepAliveFreq:          10,
   minimumAmountPreAuth:   300,
   defaultAmount:          800,
-  phoneForHelp:           "99375545",
+  phoneForHelp:           "99123456",
   displayMessageEntrance: "Welcome to Limassol Parking!",
   displayMessageExit:     "Please prepare the card that was used during Entrance.",
   charges: [
@@ -47,7 +47,8 @@ let config = {
   tellHwId:          "",
   tellHwName:        "ParkingBarrier",
   tellAppId:         "",
-  tellVehicleInput:  "in1",
+  tellVehicleInputEntrance: "in1",  // input pin for entrance vehicle detection
+  tellVehicleInputExit:     "in2",  // input pin for exit vehicle detection
   tellBarrierOutput: 1,
 };
 
@@ -131,14 +132,15 @@ function tellRequest(method, path, body) {
   });
 }
 
-async function tellCheckVehicle() {
+async function tellCheckVehicle(vehicleInput) {
   const body = { hwId: config.tellHwId, hwName: config.tellHwName, appId: config.tellAppId };
   const result = await tellRequest("POST", "/gc/getgeneral", body);
   addTellLog("getgeneral", body, result, null);
   if (result.result !== "OK") throw new Error("TELL getgeneral: " + JSON.stringify(result));
   const status = result.statusResult && result.statusResult.deviceStatus;
   if (!status) throw new Error("No deviceStatus in TELL response");
-  const val = config.tellVehicleInput === "in2" ? status.in2 : status.in1;
+  const input = vehicleInput || config.tellVehicleInputEntrance;
+  const val = input === "in2" ? status.in2 : status.in1;
   return val === 1;
 }
 
@@ -387,10 +389,15 @@ ${config.charges.map((c,i)=>`<tr>
 <h3>I/O Mapping</h3>
 <table>
 <tr><th>Function</th><th>Setting</th></tr>
-<tr><td>Vehicle detection input</td>
-<td><select onchange="set('tellVehicleInput',this.value)">
-<option value="in1" ${config.tellVehicleInput==='in1'?'selected':''}>IN1 — dry contact (loop/photocell)</option>
-<option value="in2" ${config.tellVehicleInput==='in2'?'selected':''}>IN2 — dry contact (loop/photocell)</option>
+<tr><td>🔵 Entrance vehicle input</td>
+<td><select onchange="set('tellVehicleInputEntrance',this.value)">
+<option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 — dry contact</option>
+<option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 — dry contact</option>
+</select></td></tr>
+<tr><td>🟠 Exit vehicle input</td>
+<td><select onchange="set('tellVehicleInputExit',this.value)">
+<option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 — dry contact</option>
+<option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 — dry contact</option>
 </select></td></tr>
 <tr><td>Barrier output</td>
 <td><select onchange="set('tellBarrierOutput',Number(this.value))">
@@ -638,7 +645,7 @@ app.post("/parkingInit", (req, res) => {
       tellApiKey:        config.tellApiKey,
       tellAppId:         config.tellAppId,
       tellPassword:      config.tellPassword,
-      tellVehicleInput:  config.tellVehicleInput
+      tellVehicleInput:  mode === "Exit" ? config.tellVehicleInputExit : config.tellVehicleInputEntrance
     } : {}),
     responseCode:                    "00",
     responseDescription:             "Successful Response"
@@ -732,9 +739,11 @@ app.post("/exitPayment", async (req, res) => {
 app.post("/vehiclePresent", async (req, res) => {
   let detected = config.vehiclePresent;
   if (config.tellEnabled && config.tellHwId && config.tellAppId) {
+    const mode = detectMode(req.body);
+    const vehicleInput = mode === "Exit" ? config.tellVehicleInputExit : config.tellVehicleInputEntrance;
     try {
-      detected = await tellCheckVehicle();
-      console.log(`TELL ${config.tellVehicleInput} = ${detected}`);
+      detected = await tellCheckVehicle(vehicleInput);
+      console.log(`TELL ${vehicleInput} = ${detected}`);
     } catch(e) {
       console.error("TELL vehiclePresent:", e.message);
       const errRes = {responseCode:"99",responseDescription:"Controller error: "+e.message,vehiclePresent:"0"};
