@@ -50,6 +50,12 @@ let config = {
   tellVehicleInputEntrance: "in1",  // input pin for entrance vehicle detection
   tellVehicleInputExit:     "in2",  // input pin for exit vehicle detection
   tellBarrierOutput: 1,
+
+  // ── JCC IPPI ──────────────────────────────────────────────────────────────────
+  jccBaseUrl:   "https://test-apis.jccsecure.com",
+  jccUseMock:   true,   // true = call own mock endpoints, false = call real JCC
+  parkingName:  "ParkTec",
+  topupAmount:  500,    // total exit fee in cents for scenario 3 (TopUp)
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -83,6 +89,148 @@ function addTellLog(action, request, response, error) {
 
 function ts() {
   return new Date().toISOString().replace(/[-:T.Z]/g,"").slice(0,14);
+}
+
+// ── HMAC Header Builder (JCC spec) ───────────────────────────────────────────
+function buildHmacHeader(method, fullUrl, body) {
+  const appId     = jccConfig.appId;
+  const apiKey    = jccConfig.apiKey;
+  const timestamp = Date.now().toString();
+  const nonce     = crypto.randomBytes(16).toString("hex");
+  const bodyStr   = JSON.stringify(body);
+  const bodyHash  = crypto.createHash("sha256").update(bodyStr).digest("base64");
+  const encodedUrl = encodeURIComponent(fullUrl).toLowerCase();
+  const sigRaw    = appId + method.toUpperCase() + encodedUrl + timestamp + nonce + bodyHash;
+  const keyBytes  = Buffer.from(apiKey, "base64");
+  const signature = crypto.createHmac("sha256", keyBytes)
+                          .update(Buffer.from(sigRaw, "utf8"))
+                          .digest("base64");
+  return `hmacauth ${appId}:${signature}:${nonce}:${timestamp}`;
+}
+
+// ── JCC HTTP POST helper ──────────────────────────────────────────────────────
+function jccPost(path, body) {
+  return new Promise((resolve, reject) => {
+    const baseUrl = config.jccUseMock
+      ? "https://parking-mock-server.onrender.com"
+      : config.jccBaseUrl;
+    const fullUrl = baseUrl + path;
+    const auth    = buildHmacHeader("POST", fullUrl, body);
+    const bodyStr = JSON.stringify(body);
+    const isHttps = fullUrl.startsWith("https");
+    const lib     = isHttps ? require("https") : require("http");
+    const url     = new URL(fullUrl);
+    const opts    = {
+      hostname: url.hostname,
+      port:     url.port || (isHttps ? 443 : 80),
+      path:     url.pathname,
+      method:   "POST",
+      headers:  {
+        "Content-Type":  "application/json",
+        "Authorization": auth,
+        "Content-Length": Buffer.byteLength(bodyStr)
+      }
+    };
+    console.log(`[JCC] POST ${fullUrl}`);
+    const reqHttp = lib.request(opts, (r) => {
+      let data = "";
+      r.on("data", c => data += c);
+      r.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch(e) { reject(new Error("JCC parse error: " + data)); }
+      });
+    });
+    reqHttp.on("error", reject);
+    reqHttp.write(bodyStr);
+    reqHttp.end();
+  });
+}
+
+// ── JCC API Calls ─────────────────────────────────────────────────────────────
+async function jccTopup(entry, topupAmountCents) {
+  const body = {
+    amount:       topupAmountCents,
+    currency:     "978",
+    originalRef:  entry.originalRefNum || entry.receiptNumber,
+    authID:       entry.authCode,
+    messageNo:    entry.receiptNumber,
+    messageType:  "topup",
+    dateTime:     new Date().toISOString(),
+    ippiVersion:  "2021-01-06",
+    merchantNo:   entry.outlet,
+    stationID:    config.parkingName,
+    merchantType: "1",
+    posSoftware:  "ParkTec",
+    reasonCode:   "G",
+    userID:       "ParkTec",
+    invoiceNo:    entry.receiptNumber,
+    tokenCode:    entry.tokenCode,
+    cardType:     "02",
+    maskedPAN:    "XXXXXXXXXXXX" + entry.lastDigits,
+    cardExpiry:   entry.expiryDate || "0000"
+  };
+  addJccLog("topup", body, {}, true);
+  const r = await jccPost("/financialservices/v1/ippi/auth/topup", body);
+  addJccLog("topup-response", body, r, true);
+  return r;
+}
+
+async function jccCapture(entry, captureAmountCents) {
+  const body = {
+    messageNo:       entry.receiptNumber,
+    messageType:     "capture",
+    amount:          String(captureAmountCents),
+    surchargeAmount: "000",
+    currency:        "978",
+    originalRef:     entry.originalRefNum || entry.receiptNumber,
+    authID:          entry.authCode,
+    dateTime:        new Date().toISOString(),
+    ippiVersion:     "2021-01-06",
+    merchantNo:      entry.outlet,
+    stationID:       config.parkingName,
+    tokenCode:       entry.tokenCode,
+    merchantType:    "1",
+    posSoftware:     "ParkTec",
+    reasonCode:      "E",
+    userID:          "ParkTec",
+    invoiceNo:       entry.receiptNumber,
+    cardType:        "02",
+    maskedPAN:       "XXXXXXXXXXXX" + entry.lastDigits,
+    cardExpiry:      entry.expiryDate || "0000",
+    citIndicator:    "1234************"
+  };
+  addJccLog("capture", body, {}, true);
+  const r = await jccPost("/financialservices/v1/ippi/auth/capture", body);
+  addJccLog("capture-response", body, r, true);
+  return r;
+}
+
+async function jccRelease(entry) {
+  const body = {
+    messageNo:    entry.receiptNumber,
+    messageType:  "release",
+    amount:       String(entry.preAuthAmountCents || 300),
+    originalRef:  entry.originalRefNum || entry.receiptNumber,
+    authID:       entry.authCode,
+    currency:     "978",
+    dateTime:     new Date().toISOString(),
+    ippiVersion:  "2021-01-06",
+    tokenCode:    entry.tokenCode,
+    merchantNo:   entry.outlet,
+    stationID:    config.parkingName,
+    merchantType: "1",
+    posSoftware:  "ParkTec",
+    reasonCode:   "G",
+    userID:       "ParkTec",
+    invoiceNo:    entry.receiptNumber,
+    cardType:     "02",
+    maskedPAN:    "XXXXXXXXXXXX" + entry.lastDigits,
+    cardExpiry:   entry.expiryDate || "0000"
+  };
+  addJccLog("release", body, {}, true);
+  const r = await jccPost("/financialservices/v1/ippi/auth/release", body);
+  addJccLog("release-response", body, r, true);
+  return r;
 }
 
 function scenarioName(n) {
@@ -448,14 +596,33 @@ ${Object.values(activeEntries).map(e=>`<tr>
     <tr><th>AppId</th><td><input id="jccAppId" value="${jccConfig.appId}" style="width:320px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace"></td></tr>
     <tr><th>ApiKey</th><td><input id="jccApiKey" type="password" value="${jccConfig.apiKey}" style="width:320px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace" placeholder="Base64 key"></td></tr>
     <tr><th>Validate HMAC</th><td><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF — all requests pass through (for testing)</span></td></tr>
+    <tr><th>JCC Target</th><td>
+      <select onchange="set('jccUseMock',this.value==='true')">
+        <option value="true"  ${config.jccUseMock?'selected':''}>🟡 MOCK (this server)</option>
+        <option value="false" ${!config.jccUseMock?'selected':''}>🟢 REAL JCC (${config.jccBaseUrl})</option>
+      </select>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">Mock = calls own /financialservices endpoints</span>
+    </td></tr>
+    <tr><th>Parking Name</th><td><input id="parkingNameInput" value="${config.parkingName}" style="width:200px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('parkingName','parkingNameInput')">Save</button></td></tr>
+    <tr><th>TopUp total amount (cents)</th><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('topupAmount','topupAmountInput')">Save</button>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">Total exit fee for scenario 3 (e.g. 500 = €5.00)</span></td></tr>
   </table>
-  <button class="btn" onclick="saveJccConfig()">💾 Save JCC Config</button>
+  <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">💾 Save JCC HMAC Config</button>
 </div>
 
 <div class="card" style="margin-top:12px">
   <h3>Active Transaction</h3>
   <div id="jccActiveTx"><span style="color:#888">Loading...</span></div>
   <button class="btn red" onclick="clearJccTransaction()" style="margin-top:8px">🗑 Clear Transaction</button>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h3>&#x1F4C5; End of Day — Manual Capture</h3>
+  <p style="color:#8b949e;font-size:12px">Run capture for all active entries at end of day. Each pre-auth will be captured for its pre-auth amount.</p>
+  <button class="btn orange" onclick="runEndOfDayCapture()">&#x1F4B0; Run End of Day Capture</button>
+  <div id="eodStatus" style="margin-top:8px;color:#8b949e;font-size:12px"></div>
 </div>
 
 <div class="card" style="margin-top:12px">
@@ -678,6 +845,16 @@ async function clearJccTransaction(){
   loadJccTransaction();
 }
 
+async function runEndOfDayCapture(){
+  const el=document.getElementById('eodStatus');
+  el.textContent='Running end of day capture...';
+  try{
+    const r=await fetch('/admin/eod-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    el.textContent='✓ EOD Capture done — '+d.processed+' entries processed. '+d.results;
+  }catch(e){el.textContent='✗ Error: '+e.message;}
+}
+
 async function saveJccConfig(){
   const appId=document.getElementById('jccAppId').value.trim();
   const apiKey=document.getElementById('jccApiKey').value.trim();
@@ -744,9 +921,21 @@ app.post("/parkingInit", (req, res) => {
 
 // ── POST /entranceCall ────────────────────────────────────────────────────────
 app.post("/entranceCall", async (req, res) => {
-  const {token, lastDigits, authCode, timeOfInput} = req.body;
+  const { token, lastDigits, authCode, timeOfInput, tokenCode,
+          receiptNumber, referenceNo, preAuthAmount, expiryDate,
+          outlet, terminal } = req.body;
   if (token) {
-    activeEntries[token] = {token, lastDigits, authCode, timeOfInput};
+    activeEntries[token] = {
+      token, lastDigits, authCode, timeOfInput,
+      tokenCode:          tokenCode || token,
+      receiptNumber:      receiptNumber || "",
+      originalRefNum:     referenceNo   || receiptNumber || "",
+      preAuthAmountCents: parseInt(preAuthAmount || config.minimumAmountPreAuth || 300),
+      expiryDate:         expiryDate || "0000",
+      outlet:             outlet     || config.entranceOutlet,
+      terminal:           terminal   || config.entranceTerminal,
+      entryTime:          Date.now()
+    };
     config.availablePlacesNormal = Math.max(0, config.availablePlacesNormal - 1);
   }
   let barrier = "mock-ok";
@@ -771,8 +960,9 @@ app.post("/entranceCall", async (req, res) => {
 
 // ── POST /exitCall ────────────────────────────────────────────────────────────
 app.post("/exitCall", async (req, res) => {
-  const {token} = req.body;
-  let response;
+  const { token } = req.body;
+  const entry = token ? activeEntries[token] : null;
+
   async function openReal() {
     if (config.tellEnabled && config.tellHwId && config.tellAppId) {
       try { return await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
@@ -780,51 +970,194 @@ app.post("/exitCall", async (req, res) => {
     }
     return "mock-ok";
   }
+
+  let response;
   switch(config.exitScenario) {
+
+    // ── Scenario 1: FREE ── JCC PreAuthorisationRelease ──────────────────────
     case 1: {
+      if (entry) {
+        try {
+          const jcc = await jccRelease(entry);
+          console.log("[JCC RELEASE]", JSON.stringify(jcc));
+        } catch(e) { console.error("[JCC RELEASE] Error:", e.message); }
+        delete activeEntries[token];
+      }
       const b = await openReal();
-      response = {barrierOpen:"1",moneyToPay:"0",
-        displayMessage:"Thank you! Have a nice day.",timeToDisplayMessage:"5",
-        responseCode:"00",responseDescription:"Successful Response",_barrier:b};
-      if(token) delete activeEntries[token];
-      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1); break;
+      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+      response = { barrierOpen:"1", moneyToPay:"0",
+        displayMessage:"Thank you! Have a nice day.", timeToDisplayMessage:"5",
+        responseCode:"00", responseDescription:"Successful Response", _barrier:b };
+      break;
     }
+
+    // ── Scenario 2: CAPTURE ── JCC Capture pre-auth amount ───────────────────
     case 2: {
+      const captureAmount = entry ? entry.preAuthAmountCents : config.minimumAmountPreAuth;
+      if (entry) {
+        try {
+          const jcc = await jccCapture(entry, captureAmount);
+          console.log("[JCC CAPTURE]", JSON.stringify(jcc));
+        } catch(e) { console.error("[JCC CAPTURE] Error:", e.message); }
+        delete activeEntries[token];
+      }
       const b = await openReal();
-      response = {barrierOpen:"1",moneyToPay:"200",
-        displayMessage:"Thank you! Your card has been charged EUR 2.00.",timeToDisplayMessage:"5",
-        responseCode:"00",responseDescription:"Successful Response",_barrier:b};
-      if(token) delete activeEntries[token];
-      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1); break;
+      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+      response = { barrierOpen:"1", moneyToPay:String(captureAmount),
+        displayMessage:`Thank you! Your card has been charged €${(captureAmount/100).toFixed(2)}.`,
+        timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
+        _barrier:b };
+      break;
     }
-    case 3:
-      response = {barrierOpen:"-2",moneyToPay:"356",recordId:"1234567890ABCDEF1234567890ABCDEF",
-        displayMessage:"Charge is EUR 3.56. Please present your card.",timeToDisplayMessage:"10",
-        responseCode:"31",responseDescription:"TopUp required"}; break;
+
+    // ── Scenario 3: TOPUP ── JCC Topup diff then Capture total ───────────────
+    case 3: {
+      const totalAmount   = config.topupAmount || 500;  // total fee in cents
+      const preAuthAmount = entry ? entry.preAuthAmountCents : config.minimumAmountPreAuth;
+      const topupAmount   = Math.max(0, totalAmount - preAuthAmount);
+      const recordId      = require("crypto").randomBytes(16).toString("hex").toUpperCase();
+
+      if (topupAmount > 0) {
+        // TopUp required — ask app to present card for topup
+        response = { barrierOpen:"-2", moneyToPay:String(topupAmount), recordId,
+          displayMessage:`Charge is €${(totalAmount/100).toFixed(2)}. Please present your card.`,
+          timeToDisplayMessage:"10", responseCode:"31", responseDescription:"TopUp required" };
+      } else {
+        // No topup needed — just capture pre-auth amount
+        if (entry) {
+          try {
+            const jcc = await jccCapture(entry, preAuthAmount);
+            console.log("[JCC CAPTURE no-topup]", JSON.stringify(jcc));
+          } catch(e) { console.error("[JCC CAPTURE]:", e.message); }
+          delete activeEntries[token];
+        }
+        const b = await openReal();
+        config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+        response = { barrierOpen:"1", moneyToPay:String(preAuthAmount),
+          displayMessage:`Thank you! Your card has been charged €${(preAuthAmount/100).toFixed(2)}.`,
+          timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
+          _barrier:b };
+      }
+      break;
+    }
+
+    // ── Scenario 4: BARRIER FAILED ────────────────────────────────────────────
     case 4: default:
-      response = {barrierOpen:"0",moneyToPay:"0",
-        displayMessage:"Technical issue. Please contact staff.",timeToDisplayMessage:"10",
-        responseCode:"08",responseDescription:"Barrier failed to open"}; break;
+      response = { barrierOpen:"0", moneyToPay:"0",
+        displayMessage:"Technical issue. Please contact staff.", timeToDisplayMessage:"10",
+        responseCode:"08", responseDescription:"Barrier failed to open" };
+      break;
   }
   addLog(req, response); res.json(response);
 });
 
 // ── POST /exitPayment ─────────────────────────────────────────────────────────
 app.post("/exitPayment", async (req, res) => {
-  const {token} = req.body;
-  if(token) delete activeEntries[token];
-  config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal+1);
-  let barrier = "mock-ok";
-  if (config.tellEnabled && config.tellHwId && config.tellAppId) {
-    try { barrier = await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
-    catch(e) { barrier = "tell-error: "+e.message; }
+  const { token, authCode, originalRefNum, amountPayed, lastDigits,
+          recordId, outlet, terminal } = req.body;
+  const entry = token ? activeEntries[token] : null;
+
+  async function openReal() {
+    if (config.tellEnabled && config.tellHwId && config.tellAppId) {
+      try { return await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
+      catch(e) { return "tell-error: " + e.message; }
+    }
+    return "mock-ok";
   }
-  const response = {barrierOpen:"1",displayMessage:"Payment successful. Barrier is open.",
-    timeToDisplayMessage:"5",responseCode:"00",responseDescription:"Successful Response",_barrier:barrier};
+
+  let response;
+
+  if (!entry) {
+    // No entry found — this is the second call after a declined topup separate sale
+    // ECR already completed the sale — just open barrier
+    console.log("[exitPayment] No entry — second call after separate sale, opening barrier");
+    const b = await openReal();
+    config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+    response = { barrierOpen:"1", displayMessage:"Payment successful. Barrier is open.",
+      timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
+      _barrier:b, _note:"Separate sale completed" };
+    addLog(req, response); return res.json(response);
+  }
+
+  const topupAmountCents  = parseInt(amountPayed) || 0;
+  const preAuthAmountCents = entry.preAuthAmountCents || config.minimumAmountPreAuth || 300;
+  const totalAmountCents  = preAuthAmountCents + topupAmountCents;
+
+  try {
+    // Step 1: Call JCC Topup with the difference amount
+    console.log(`[exitPayment] Topup €${(topupAmountCents/100).toFixed(2)} + capture €${(totalAmountCents/100).toFixed(2)}`);
+    const topupResult = await jccTopup(entry, topupAmountCents);
+
+    if (topupResult.responseCode === "00") {
+      // Topup approved → call Capture for total amount
+      console.log("[exitPayment] Topup approved — calling Capture");
+      const captureResult = await jccCapture(entry, totalAmountCents);
+
+      delete activeEntries[token];
+      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+      const b = await openReal();
+
+      response = {
+        barrierOpen:          "1",
+        displayMessage:       `Payment successful. Total €${(totalAmountCents/100).toFixed(2)}.`,
+        timeToDisplayMessage: "5",
+        responseCode:         "00",
+        responseDescription:  "Successful Response",
+        _barrier:             b,
+        _jccTopup:            topupResult.responseCode,
+        _jccCapture:          captureResult.responseCode
+      };
+    } else {
+      // Topup declined → release pre-auth, ask driver for separate sale
+      console.warn("[exitPayment] Topup DECLINED — releasing pre-auth, requesting separate sale");
+      try { await jccRelease(entry); } catch(e) { console.error("[RELEASE]", e.message); }
+
+      // Return barrierOpen:-2 so app asks driver to tap card again for full amount
+      response = {
+        barrierOpen:          "-2",
+        moneyToPay:           String(totalAmountCents),
+        recordId:             recordId || require("crypto").randomBytes(16).toString("hex").toUpperCase(),
+        displayMessage:       `Card declined. Please tap card again for €${(totalAmountCents/100).toFixed(2)}.`,
+        timeToDisplayMessage: "10",
+        responseCode:         "31",
+        responseDescription:  "TopUp declined — separate sale required",
+        _jccTopup:            topupResult.responseCode,
+        _jccReleased:         true
+      };
+    }
+  } catch(e) {
+    console.error("[exitPayment] JCC error:", e.message);
+    response = {
+      barrierOpen:          "0",
+      displayMessage:       "Technical issue. Please contact staff.",
+      timeToDisplayMessage: "10",
+      responseCode:         "99",
+      responseDescription:  "JCC communication error: " + e.message
+    };
+  }
+
   addLog(req, response); res.json(response);
 });
 
-// ── POST /vehiclePresent ──────────────────────────────────────────────────────
+// ── POST /admin/eod-capture ── End of Day Capture ─────────────────────────────
+app.post("/admin/eod-capture", async (req, res) => {
+  const entries = Object.values(activeEntries);
+  if (entries.length === 0) return res.json({ processed: 0, results: "No active entries." });
+
+  const results = [];
+  for (const entry of entries) {
+    try {
+      const captureAmt = entry.preAuthAmountCents || config.minimumAmountPreAuth || 300;
+      const r = await jccCapture(entry, captureAmt);
+      results.push(`${entry.lastDigits}:${r.responseCode}`);
+      if (r.responseCode === "00") delete activeEntries[entry.token];
+    } catch(e) {
+      results.push(`${entry.lastDigits}:ERROR`);
+      console.error("[EOD CAPTURE]", e.message);
+    }
+  }
+  res.json({ processed: entries.length, results: results.join(", ") });
+});
 app.post("/vehiclePresent", async (req, res) => {
   let detected = config.vehiclePresent;
   if (config.tellEnabled && config.tellHwId && config.tellAppId) {
@@ -1080,3 +1413,2497 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Parking RPS Mock running on http://0.0.0.0:${PORT}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
