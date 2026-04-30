@@ -37,7 +37,7 @@ let config = {
   availablePlacesNormal: 20,
   availablePlaceMonthly: -1,
   monthlyEnabled:        false,
-  monthlyCardsBins:      "",   // semicolon-separated full card numbers e.g. "123456;789012"
+  monthlyCardsBins:      "123456;12345678910111213453",   // semicolon-separated full card numbers
   showRates:             true,
   responseCode:          "00",
   companyCode:           "MarinaParking",
@@ -599,13 +599,18 @@ ${config.charges.map((c,i)=>`<tr>
 <div id="ts"></div>
 </div>
 
-<h2>&#x1F9FE; Active Entries (${Object.keys(activeEntries).length})</h2>
-<table><tr><th>Token</th><th>Last4</th><th>Auth</th><th>Time</th></tr>
-${Object.values(activeEntries).map(e=>`<tr>
-<td>${(e.token||"").slice(0,24)}...</td><td>${e.lastDigits||""}</td>
-<td>${e.authCode||""}</td><td>${e.timeOfInput||""}</td>
-</tr>`).join("")||'<tr><td colspan="4" style="color:#8b949e">No active entries</td></tr>'}
-</table>
+<!-- TELL Live Status -->
+<div class="card" style="margin-bottom:12px">
+  <h3>&#x1F6A6; TELL Gate Status <span id="tellStatusTime" style="font-size:11px;color:#8b949e;margin-left:8px"></span></h3>
+  <div id="tellStatusDiv" style="display:flex;gap:16px;flex-wrap:wrap;padding:8px 0">
+    <span style="color:#8b949e">Loading...</span>
+  </div>
+</div>
+
+<h2>&#x1F9FE; Active Entries <span id="activeEntriesCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="activeEntriesDiv">
+  <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
+</div>
 <button class="btn red" onclick="clearE()">Clear All Entries</button>
 
 <h2>&#x1F4CB; Request Log</h2>
@@ -849,6 +854,82 @@ async function removeCharge(i){
 loadLogs();setInterval(loadLogs,3000);
 loadJccLogs();setInterval(loadJccLogs,3000);
 loadJccTransaction();setInterval(loadJccTransaction,3000);
+loadActiveEntries();setInterval(loadActiveEntries,5000);
+loadTellStatus();setInterval(loadTellStatus,5000);
+
+async function loadActiveEntries(){
+  try{
+    const r=await fetch('/admin/entries');
+    const entries=await r.json();
+    const el=document.getElementById('activeEntriesDiv');
+    const cnt=document.getElementById('activeEntriesCount');
+    if(!el) return;
+    cnt.textContent='('+entries.length+')';
+    if(entries.length===0){
+      el.innerHTML='<table><tr><td colspan="5" style="color:#8b949e">No active entries</td></tr></table>';
+      return;
+    }
+    const now=Date.now();
+    el.innerHTML='<table><tr><th>Type</th><th>Last4</th><th>Auth/Card</th><th>Entry Time</th><th>Duration</th></tr>'+
+      entries.map(function(e){
+        const mins=Math.floor((now-(e.entryTime||now))/60000);
+        const dur=mins+'m';
+        const bg=e.inputType==='Monthly Card'?'#0d2010':'#0a1628';
+        return '<tr style="background:'+bg+'">'+
+          '<td style="color:'+(e.inputType==='Monthly Card'?'#3fb950':'#58a6ff')+'">'+( e.inputType||'Bank Card')+'</td>'+
+          '<td>*'+( e.lastDigits||'')+'</td>'+
+          '<td style="font-family:monospace;font-size:11px">'+(e.authCode||e.lastDigits||'')+'</td>'+
+          '<td>'+(e.timeOfInput||'').substring(8,14)+'</td>'+
+          '<td>'+dur+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
+async function loadTellStatus(){
+  try{
+    const r=await fetch('/admin/tell-status');
+    const d=await r.json();
+    const el=document.getElementById('tellStatusDiv');
+    const te=document.getElementById('tellStatusTime');
+    if(!el) return;
+    te.textContent=new Date().toLocaleTimeString();
+    if(!d.available){
+      el.innerHTML='<span style="color:#8b949e">TELL not configured or unavailable: '+( d.reason||'')+'</span>';
+      return;
+    }
+    const s=d.status||{};
+    const in1Color=s.in1===1?'#E65100':'#238636';
+    const in1Text=s.in1===1?'🟠 Car Present':'🟢 No Car';
+    const in2Color=s.in2===1?'#E65100':'#238636';
+    const in2Text=s.in2===1?'🟠 Car Present':'🟢 No Car';
+    const barrierColor=s.in4!==0?'#C62828':'#238636';
+    const barrierText=s.in4!==0?'🔴 Barrier OPEN':'🟢 Barrier Closed';
+    const out1Color=s.out1===1?'#1F6FEB':'#30363d';
+    el.innerHTML=
+      '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in1Color+'">'+
+        '<div style="font-size:11px;color:#8b949e">IN1 — Entrance</div>'+
+        '<div style="font-size:14px;font-weight:500;color:'+in1Color+'">'+in1Text+'</div>'+
+      '</div>'+
+      '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in2Color+'">'+
+        '<div style="font-size:11px;color:#8b949e">IN2 — Exit</div>'+
+        '<div style="font-size:14px;font-weight:500;color:'+in2Color+'">'+in2Text+'</div>'+
+      '</div>'+
+      '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+barrierColor+'">'+
+        '<div style="font-size:11px;color:#8b949e">IN4 — Barrier</div>'+
+        '<div style="font-size:14px;font-weight:500;color:'+barrierColor+'">'+barrierText+'</div>'+
+      '</div>'+
+      '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+out1Color+'">'+
+        '<div style="font-size:11px;color:#8b949e">OUT1 — Relay</div>'+
+        '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'🔵 Active':'⚪ Idle')+'</div>'+
+      '</div>'+
+      '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid #30363d">'+
+        '<div style="font-size:11px;color:#8b949e">Ping / IP</div>'+
+        '<div style="font-size:13px;color:#c9d1d9">'+(d.pingMs||'?')+'ms</div>'+
+        '<div style="font-size:11px;color:#8b949e">'+(d.lastIp||'')+'</div>'+
+      '</div>';
+  }catch(e){}
+}
 
 async function loadJccLogs(){
   try{
@@ -1028,7 +1109,11 @@ app.post("/entranceCall", async (req, res) => {
       inputType:          inputType  || "Bank Card",
       entryTime:          Date.now()
     };
-    config.availablePlacesNormal = Math.max(0, config.availablePlacesNormal - 1);
+    if (inputType === "Monthly Card") {
+      config.availablePlaceMonthly = Math.max(0, config.availablePlaceMonthly - 1);
+    } else {
+      config.availablePlacesNormal = Math.max(0, config.availablePlacesNormal - 1);
+    }
   }
   let barrier = "mock-ok";
   if (config.tellEnabled && config.tellHwId && config.tellAppId) {
@@ -1049,6 +1134,14 @@ app.post("/entranceCall", async (req, res) => {
   };
   addLog(req, response); res.json(response);
 });
+
+function releaseSpace(entry) {
+  if (entry && entry.inputType === "Monthly Card") {
+    config.availablePlaceMonthly = Math.min(config.availablePlaceMonthly + 1, 99);
+  } else {
+    config.availablePlacesNormal = Math.min(config.availablePlacesNormal + 1, 99);
+  }
+}
 
 // ── POST /exitCall ────────────────────────────────────────────────────────────
 app.post("/exitCall", async (req, res) => {
@@ -1076,7 +1169,7 @@ app.post("/exitCall", async (req, res) => {
         delete activeEntries[token];
       }
       const b = await openReal();
-      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+      releaseSpace(entry);
       response = { barrierOpen:"1", moneyToPay:"0",
         displayMessage:"Thank you! Have a nice day.", timeToDisplayMessage:"5",
         responseCode:"00", responseDescription:"Successful Response", _barrier:b };
@@ -1094,7 +1187,7 @@ app.post("/exitCall", async (req, res) => {
         delete activeEntries[token];
       }
       const b = await openReal();
-      config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+      releaseSpace(entry);
       response = { barrierOpen:"1", moneyToPay:String(captureAmount),
         displayMessage:`Thank you! Your card has been charged €${(captureAmount/100).toFixed(2)}.`,
         timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
@@ -1124,7 +1217,7 @@ app.post("/exitCall", async (req, res) => {
           delete activeEntries[token];
         }
         const b = await openReal();
-        config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+        releaseSpace(entry);
         response = { barrierOpen:"1", moneyToPay:String(preAuthAmount),
           displayMessage:`Thank you! Your card has been charged €${(preAuthAmount/100).toFixed(2)}.`,
           timeToDisplayMessage:"5", responseCode:"00", responseDescription:"Successful Response",
@@ -1157,8 +1250,9 @@ app.post("/exitPayment", async (req, res) => {
 
   // ECR SALE already processed the extra amount as a standalone transaction
   // Server just needs to open the barrier
+  const exitEntry = token ? activeEntries[token] : null;
   if (token) delete activeEntries[token];
-  config.availablePlacesNormal = Math.min(20, config.availablePlacesNormal + 1);
+  releaseSpace(exitEntry);
   const barrier = await openReal();
 
   const response = {
@@ -1170,6 +1264,27 @@ app.post("/exitPayment", async (req, res) => {
     _barrier:             barrier
   };
   addLog(req, response); res.json(response);
+});
+
+// ── GET /admin/entries ── active entries ──────────────────────────────────────
+app.get("/admin/entries", (req, res) => {
+  res.json(Object.values(activeEntries));
+});
+
+// ── GET /admin/tell-status ── live TELL device status ─────────────────────────
+app.get("/admin/tell-status", async (req, res) => {
+  if (!config.tellEnabled || !config.tellHwId || !config.tellAppId) {
+    return res.json({ available: false, reason: "TELL not configured" });
+  }
+  try {
+    const body = { hwId: config.tellHwId, hwName: config.tellHwName, appId: config.tellAppId };
+    const result = await tellRequest("POST", "/gc/getgeneral", body);
+    const status = result.statusResult && result.statusResult.deviceStatus;
+    res.json({ available: true, status, lastIp: result.statusResult && result.statusResult.lastIp,
+      pingMs: result.statusResult && result.statusResult.pingTimeMs });
+  } catch(e) {
+    res.json({ available: false, reason: e.message });
+  }
 });
 
 // ── POST /admin/eod-capture ── End of Day Capture ─────────────────────────────
@@ -1446,6 +1561,1453 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Parking RPS Mock running on http://0.0.0.0:${PORT}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
