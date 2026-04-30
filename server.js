@@ -92,16 +92,17 @@ function ts() {
 }
 
 // ── HMAC Header Builder (JCC spec) ───────────────────────────────────────────
-function buildHmacHeader(method, fullUrl, body) {
-  const appId     = jccConfig.appId;
-  const apiKey    = jccConfig.apiKey;
+function buildHmacHeader(method, fullUrl, body, endpointType) {
+  const creds    = jccConfig[endpointType] || jccConfig.topup;
+  const appId    = creds.appId;
+  const apiKey   = creds.apiKey;
   const timestamp = Date.now().toString();
-  const nonce     = crypto.randomBytes(16).toString("hex");
-  const bodyStr   = JSON.stringify(body);
-  const bodyHash  = crypto.createHash("sha256").update(bodyStr).digest("base64");
+  const nonce    = crypto.randomBytes(16).toString("hex");
+  const bodyStr  = JSON.stringify(body);
+  const bodyHash = crypto.createHash("sha256").update(bodyStr).digest("base64");
   const encodedUrl = encodeURIComponent(fullUrl).toLowerCase();
-  const sigRaw    = appId + method.toUpperCase() + encodedUrl + timestamp + nonce + bodyHash;
-  const keyBytes  = Buffer.from(apiKey, "base64");
+  const sigRaw   = appId + method.toUpperCase() + encodedUrl + timestamp + nonce + bodyHash;
+  const keyBytes = Buffer.from(apiKey, "base64");
   const signature = crypto.createHmac("sha256", keyBytes)
                           .update(Buffer.from(sigRaw, "utf8"))
                           .digest("base64");
@@ -109,13 +110,13 @@ function buildHmacHeader(method, fullUrl, body) {
 }
 
 // ── JCC HTTP POST helper ──────────────────────────────────────────────────────
-function jccPost(path, body) {
+function jccPost(path, body, endpointType) {
   return new Promise((resolve, reject) => {
     const baseUrl = config.jccUseMock
       ? "https://parking-mock-server.onrender.com"
       : config.jccBaseUrl;
     const fullUrl = baseUrl + path;
-    const auth    = buildHmacHeader("POST", fullUrl, body);
+    const auth    = buildHmacHeader("POST", fullUrl, body, endpointType);
     const bodyStr = JSON.stringify(body);
     const isHttps = fullUrl.startsWith("https");
     const lib     = isHttps ? require("https") : require("http");
@@ -170,7 +171,7 @@ async function jccTopup(entry, topupAmountCents) {
     cardExpiry:   entry.expiryDate || "0000"
   };
   addJccLog("topup", body, {}, true);
-  const r = await jccPost("/financialservices/v1/ippi/auth/topup", body);
+  const r = await jccPost("/financialservices/v1/ippi/auth/topup", body, "topup");
   addJccLog("topup-response", body, r, true);
   return r;
 }
@@ -200,7 +201,7 @@ async function jccCapture(entry, captureAmountCents) {
     citIndicator:    "1234************"
   };
   addJccLog("capture", body, {}, true);
-  const r = await jccPost("/financialservices/v1/ippi/auth/capture", body);
+  const r = await jccPost("/financialservices/v1/ippi/auth/capture", body, "capture");
   addJccLog("capture-response", body, r, true);
   return r;
 }
@@ -228,7 +229,7 @@ async function jccRelease(entry) {
     cardExpiry:   entry.expiryDate || "0000"
   };
   addJccLog("release", body, {}, true);
-  const r = await jccPost("/financialservices/v1/ippi/auth/release", body);
+  const r = await jccPost("/financialservices/v1/ippi/auth/release", body, "release");
   addJccLog("release-response", body, r, true);
   return r;
 }
@@ -591,23 +592,31 @@ ${Object.values(activeEntries).map(e=>`<tr>
 
 <h2>&#x1F4B3; JCC IPPI Financial Services</h2>
 <div class="card">
-  <h3>HMAC Configuration</h3>
+  <h3>HMAC Configuration (per endpoint)</h3>
   <table>
-    <tr><th>AppId</th><td><input id="jccAppId" value="${jccConfig.appId}" style="width:320px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace"></td></tr>
-    <tr><th>ApiKey</th><td><input id="jccApiKey" type="password" value="${jccConfig.apiKey}" style="width:320px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace" placeholder="Base64 key"></td></tr>
-    <tr><th>Validate HMAC</th><td><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF — all requests pass through (for testing)</span></td></tr>
-    <tr><th>JCC Target</th><td>
+    <tr><th>Endpoint</th><th>AppId</th><th>ApiKey</th></tr>
+    <tr><td>Topup</td>
+      <td><input id="topupAppId" value="${jccConfig.topup.appId}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td>
+      <td><input id="topupApiKey" type="password" value="${jccConfig.topup.apiKey}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td></tr>
+    <tr><td>Capture</td>
+      <td><input id="captureAppId" value="${jccConfig.capture.appId}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td>
+      <td><input id="captureApiKey" type="password" value="${jccConfig.capture.apiKey}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td></tr>
+    <tr><td>Release</td>
+      <td><input id="releaseAppId" value="${jccConfig.release.appId}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td>
+      <td><input id="releaseApiKey" type="password" value="${jccConfig.release.apiKey}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td></tr>
+    <tr><th colspan="3">Global Settings</th></tr>
+    <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF — all requests pass through</span></td></tr>
+    <tr><td>JCC Target</td><td colspan="2">
       <select onchange="set('jccUseMock',this.value==='true')">
         <option value="true"  ${config.jccUseMock?'selected':''}>🟡 MOCK (this server)</option>
         <option value="false" ${!config.jccUseMock?'selected':''}>🟢 REAL JCC (${config.jccBaseUrl})</option>
       </select>
-      <span style="color:#8b949e;font-size:11px;margin-left:8px">Mock = calls own /financialservices endpoints</span>
     </td></tr>
-    <tr><th>Parking Name</th><td><input id="parkingNameInput" value="${config.parkingName}" style="width:200px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
-      <button class="btn" style="margin-left:6px" onclick="sv('parkingName','parkingNameInput')">Save</button></td></tr>
-    <tr><th>TopUp total amount (cents)</th><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+    <tr><td>Parking Name</td><td><input id="parkingNameInput" value="${config.parkingName}" style="width:200px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('parkingName','parkingNameInput')">Save</button></td><td></td></tr>
+    <tr><td>TopUp total amount (cents)</td><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('topupAmount','topupAmountInput')">Save</button>
-      <span style="color:#8b949e;font-size:11px;margin-left:8px">Total exit fee for scenario 3 (e.g. 500 = €5.00)</span></td></tr>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = €5.00</span></td><td></td></tr>
   </table>
   <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">💾 Save JCC HMAC Config</button>
 </div>
@@ -814,13 +823,15 @@ async function loadJccLogs(){
       var bg=l.hmacValid?'#1a2a1a':'#2a1a1a';
       var col=l.hmacValid?'#4caf50':'#f44336';
       var chk=l.hmacValid?'&#10003;':'&#10007;';
-      var ref=l.request.tokenCode||l.request.originalRef||'';
+      var ref=(l.request&&(l.request.tokenCode||l.request.originalRef))||'';
+      var respCode=(l.response&&l.response.responseCode)||'?';
+      var respDesc=(l.response&&l.response.responseDescription)||JSON.stringify(l.response||{}).substring(0,40);
       return '<tr style="background:'+bg+'">'+
         '<td>'+l.time.substring(11,19)+'</td>'+
         '<td><b>'+l.endpoint+'</b></td>'+
         '<td style="color:'+col+'">'+chk+'</td>'+
         '<td>'+ref+'</td>'+
-        '<td>'+l.response.responseCode+' '+l.response.responseDescription+'</td>'+
+        '<td>'+respCode+' '+respDesc+'</td>'+
         '</tr>';
     }).join('');
   }catch(e){}
@@ -856,10 +867,16 @@ async function runEndOfDayCapture(){
 }
 
 async function saveJccConfig(){
-  const appId=document.getElementById('jccAppId').value.trim();
-  const apiKey=document.getElementById('jccApiKey').value.trim();
-  const validate=document.getElementById('jccValidate').checked;
-  const r=await fetch('/jcc/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appId,apiKey,validateHmac:validate})});
+  const body = {
+    topupAppId:    document.getElementById('topupAppId').value.trim(),
+    topupApiKey:   document.getElementById('topupApiKey').value.trim(),
+    captureAppId:  document.getElementById('captureAppId').value.trim(),
+    captureApiKey: document.getElementById('captureApiKey').value.trim(),
+    releaseAppId:  document.getElementById('releaseAppId').value.trim(),
+    releaseApiKey: document.getElementById('releaseApiKey').value.trim(),
+    validateHmac:  document.getElementById('jccValidate').checked
+  };
+  const r=await fetch('/jcc/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json();
   if(d.ok) alert('JCC config saved');
 }
@@ -1204,11 +1221,14 @@ app.post("/help", (req, res) => {
 
 const crypto = require("crypto");
 
-// ── HMAC credentials (configure via dashboard) ────────────────────────────────
+// ── HMAC credentials per endpoint ─────────────────────────────────────────────
 let jccConfig = {
-  appId:  "1cbb351c501647ef8f855335d2017dbc",
-  apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=",
-  validateHmac: false  // set true to enforce signature validation
+  topup:   { appId: "1cbb351c501647ef8f855335d2017dbc", apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=" },
+  capture: { appId: "c677c1ba0bc349cfb04e2d10d67763f6", apiKey: "jzHup+gUjZo4XDKm54DtoIE9oK51THQ+Vp1AStzIfvI=" },
+  release: { appId: "df4124bcd39a42ffb1b375c8d7af4bf8", apiKey: "a6t7zeZ9l+QqwZh9cQyQjCzqIFzwbWtCp62LijGe76L=" },
+  void:    { appId: "1cbb351c501647ef8f855335d2017dbc", apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=" },
+  reversal:{ appId: "1cbb351c501647ef8f855335d2017dbc", apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=" },
+  validateHmac: false
 };
 
 // ── In-memory transaction store (one at a time) ───────────────────────────────
@@ -1221,11 +1241,11 @@ function addJccLog(endpoint, req, res, hmacValid) {
     endpoint,
     hmacValid,
     request:   req,
-    response:  res
+    response:  res || {}
   };
   jccLogs.unshift(entry);
   if (jccLogs.length > 100) jccLogs.pop();
-  console.log(`[JCC] ${endpoint} | HMAC:${hmacValid} | ${JSON.stringify(req).substring(0,80)}`);
+  console.log(`[JCC] ${endpoint} | HMAC:${hmacValid} | res=${JSON.stringify(res).substring(0,80)}`);
 }
 
 // ── HMAC Validation ───────────────────────────────────────────────────────────
@@ -1233,36 +1253,26 @@ function validateHmac(req) {
   try {
     const auth = req.headers["authorization"] || "";
     if (!auth.startsWith("hmacauth ")) return { valid: false, reason: "Missing hmacauth prefix" };
-
     const parts = auth.substring(9).split(":");
     if (parts.length < 4) return { valid: false, reason: "Invalid auth format" };
-
     const [appId, signature, nonce, timestamp] = parts;
-
-    // Check timestamp within 5 minutes
     const now = Date.now();
     const ts  = parseInt(timestamp);
     if (Math.abs(now - ts) > 300000) return { valid: false, reason: `Timestamp too old: ${ts}` };
-
-    // Hash request body with SHA256
-    const bodyStr = JSON.stringify(req.body);
+    const bodyStr  = JSON.stringify(req.body);
     const bodyHash = crypto.createHash("sha256").update(bodyStr).digest("base64");
-
-    // Build raw URL — match Postman: full URL encoded lowercase
     const fullUrl  = `https://parking-mock-server.onrender.com${req.path}`;
     const encodedUrl = encodeURIComponent(fullUrl).toLowerCase();
-
-    // Build signature string: appId + method + url + timestamp + nonce + bodyHash
+    // Find matching credentials by appId
+    const creds = Object.values(jccConfig).find(c => c && c.appId === appId);
+    if (!creds) return { valid: false, reason: `Unknown appId: ${appId}` };
     const sigRaw  = appId + req.method.toUpperCase() + encodedUrl + timestamp + nonce + bodyHash;
-
-    // Compute HMAC-SHA256
-    const keyBytes = Buffer.from(jccConfig.apiKey, "base64");
+    const keyBytes = Buffer.from(creds.apiKey, "base64");
     const computed = crypto.createHmac("sha256", keyBytes)
                            .update(Buffer.from(sigRaw, "utf8"))
                            .digest("base64");
-
     const valid = computed === signature;
-    return { valid, reason: valid ? "OK" : `Sig mismatch. Expected: ${computed}` };
+    return { valid, reason: valid ? "OK" : `Sig mismatch` };
   } catch(e) {
     return { valid: false, reason: e.message };
   }
@@ -1401,11 +1411,16 @@ app.get("/jcc/config", (req, res) => {
 
 // ── POST /jcc/config ── update JCC HMAC config ───────────────────────────────
 app.post("/jcc/config", (req, res) => {
-  const { appId, apiKey, validateHmac } = req.body;
-  if (appId !== undefined) jccConfig.appId = appId;
-  if (apiKey !== undefined) jccConfig.apiKey = apiKey;
+  const { topupAppId, topupApiKey, captureAppId, captureApiKey,
+          releaseAppId, releaseApiKey, validateHmac } = req.body;
+  if (topupAppId)    jccConfig.topup.appId    = topupAppId;
+  if (topupApiKey)   jccConfig.topup.apiKey   = topupApiKey;
+  if (captureAppId)  jccConfig.capture.appId  = captureAppId;
+  if (captureApiKey) jccConfig.capture.apiKey = captureApiKey;
+  if (releaseAppId)  jccConfig.release.appId  = releaseAppId;
+  if (releaseApiKey) jccConfig.release.apiKey = releaseApiKey;
   if (validateHmac !== undefined) jccConfig.validateHmac = validateHmac;
-  res.json({ ok: true, jccConfig: { appId: jccConfig.appId, validateHmac: jccConfig.validateHmac } });
+  res.json({ ok: true });
 });
 
 // ── START ─────────────────────────────────────────────────────────────────────
@@ -1413,6 +1428,1420 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Parking RPS Mock running on http://0.0.0.0:${PORT}`);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
