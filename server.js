@@ -13,16 +13,16 @@ let config = {
   // ── POS Devices ──────────────────────────────────────────────────────────────
   // Entrance POS — configured in Android Settings on the entrance device
   entranceOutlet:   "0000259010",
-  entranceTerminal: "000025901090",
+  entranceTerminal: "000025901025",
   // Exit POS — configured in Android Settings on the exit device
-  exitOutlet:       "0000259010",
-  exitTerminal:     "000025901091",
+  exitOutlet:       "0000259011",
+  exitTerminal:     "000025901026",
 
   // ── parkingInit fields ────────────────────────────────────────────────────────
   keepAliveFreq:          10,
   minimumAmountPreAuth:   300,
   defaultAmount:          800,
-  phoneForHelp:           "99123456",
+  phoneForHelp:           "99375545",
   displayMessageEntrance: "Welcome to Limassol Parking!",
   displayMessageExit:     "Please prepare the card that was used during Entrance.",
   charges: [
@@ -441,6 +441,43 @@ ${Object.values(activeEntries).map(e=>`<tr>
 <div id="logCount" style="color:#8b949e;font-size:11px;margin-bottom:8px"></div>
 <div id="logDiv"><p style="color:#8b949e">Loading...</p></div>
 
+<h2>&#x1F4B3; JCC IPPI Financial Services</h2>
+<div class="card">
+  <h3>HMAC Configuration</h3>
+  <table>
+    <tr><th>AppId</th><td><input id="jccAppId" value="${jccConfig.appId}" style="width:320px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace"></td></tr>
+    <tr><th>ApiKey</th><td><input id="jccApiKey" type="password" value="${jccConfig.apiKey}" style="width:320px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace" placeholder="Base64 key"></td></tr>
+    <tr><th>Validate HMAC</th><td><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF — all requests pass through (for testing)</span></td></tr>
+  </table>
+  <button class="btn" onclick="saveJccConfig()">💾 Save JCC Config</button>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h3>Active Transaction</h3>
+  <div id="jccActiveTx"><span style="color:#888">Loading...</span></div>
+  <button class="btn red" onclick="clearJccTransaction()" style="margin-top:8px">🗑 Clear Transaction</button>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h3>JCC API Endpoints (base: /financialservices/v1/ippi)</h3>
+  <table>
+    <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/topup</td><td>POST</td><td>TopUp — charge additional amount</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/capture</td><td>POST</td><td>Capture — finalise pre-auth amount</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/release</td><td>POST</td><td>PreAuthorisationRelease — release pre-auth</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/void</td><td>POST</td><td>Void — cancel a transaction</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/reversal</td><td>POST</td><td>Reversal — reverse a previous operation</td></tr>
+  </table>
+</div>
+
+<div class="card" style="margin-top:12px">
+  <h3>JCC Transaction Log</h3>
+  <table>
+    <tr><th>Time</th><th>Endpoint</th><th>HMAC</th><th>Token/Ref</th><th>Response</th></tr>
+    <tbody id="jccLogs"><tr><td colspan="5" style="color:#8b949e">No transactions yet</td></tr></tbody>
+  </table>
+</div>
+
 <script>
 let allLogs=[];
 let activeFilter='';
@@ -597,6 +634,58 @@ async function removeCharge(i){
 }
 
 loadLogs();setInterval(loadLogs,3000);
+loadJccLogs();setInterval(loadJccLogs,3000);
+loadJccTransaction();setInterval(loadJccTransaction,3000);
+
+async function loadJccLogs(){
+  try{
+    const r=await fetch('/jcc/logs');
+    const logs=await r.json();
+    const el=document.getElementById('jccLogs');
+    if(!el) return;
+    el.innerHTML=logs.slice(0,20).map(function(l){
+      var bg=l.hmacValid?'#1a2a1a':'#2a1a1a';
+      var col=l.hmacValid?'#4caf50':'#f44336';
+      var chk=l.hmacValid?'&#10003;':'&#10007;';
+      var ref=l.request.tokenCode||l.request.originalRef||'';
+      return '<tr style="background:'+bg+'">'+
+        '<td>'+l.time.substring(11,19)+'</td>'+
+        '<td><b>'+l.endpoint+'</b></td>'+
+        '<td style="color:'+col+'">'+chk+'</td>'+
+        '<td>'+ref+'</td>'+
+        '<td>'+l.response.responseCode+' '+l.response.responseDescription+'</td>'+
+        '</tr>';
+    }).join('');
+  }catch(e){}
+}
+
+async function loadJccTransaction(){
+  try{
+    const r=await fetch('/jcc/transaction');
+    const d=await r.json();
+    const el=document.getElementById('jccActiveTx');
+    if(!el) return;
+    if(d.activeTransaction){
+      el.innerHTML='<pre style="color:#4caf50;font-size:11px">'+JSON.stringify(d.activeTransaction,null,2)+'</pre>';
+    } else {
+      el.innerHTML='<span style="color:#888">No active transaction</span>';
+    }
+  }catch(e){}
+}
+
+async function clearJccTransaction(){
+  await fetch('/jcc/transaction',{method:'DELETE'});
+  loadJccTransaction();
+}
+
+async function saveJccConfig(){
+  const appId=document.getElementById('jccAppId').value.trim();
+  const apiKey=document.getElementById('jccApiKey').value.trim();
+  const validate=document.getElementById('jccValidate').checked;
+  const r=await fetch('/jcc/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appId,apiKey,validateHmac:validate})});
+  const d=await r.json();
+  if(d.ok) alert('JCC config saved');
+}
 </script></body></html>`);
 });
 
@@ -771,6 +860,219 @@ app.post("/vehiclePresent", async (req, res) => {
 app.post("/help", (req, res) => {
   const response = {responseCode:"00",responseDescription:"Successful Response"};
   addLog(req, response); res.json(response);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JCC IPPI Financial Services API  (mirroring test-apis.jccsecure.com)
+// Base path: /financialservices/v1/ippi
+// Auth: HMAC as per JCC spec (Authorization: hmacauth appId:sig:nonce:ts)
+// One active transaction stored in memory — cleared per transaction
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const crypto = require("crypto");
+
+// ── HMAC credentials (configure via dashboard) ────────────────────────────────
+let jccConfig = {
+  appId:  "1cbb351c501647ef8f855335d2017dbc",
+  apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=",
+  validateHmac: false  // set true to enforce signature validation
+};
+
+// ── In-memory transaction store (one at a time) ───────────────────────────────
+let activeTransaction = null;
+let jccLogs = [];
+
+function addJccLog(endpoint, req, res, hmacValid) {
+  const entry = {
+    time:      new Date().toISOString(),
+    endpoint,
+    hmacValid,
+    request:   req,
+    response:  res
+  };
+  jccLogs.unshift(entry);
+  if (jccLogs.length > 100) jccLogs.pop();
+  console.log(`[JCC] ${endpoint} | HMAC:${hmacValid} | ${JSON.stringify(req).substring(0,80)}`);
+}
+
+// ── HMAC Validation ───────────────────────────────────────────────────────────
+function validateHmac(req) {
+  try {
+    const auth = req.headers["authorization"] || "";
+    if (!auth.startsWith("hmacauth ")) return { valid: false, reason: "Missing hmacauth prefix" };
+
+    const parts = auth.substring(9).split(":");
+    if (parts.length < 4) return { valid: false, reason: "Invalid auth format" };
+
+    const [appId, signature, nonce, timestamp] = parts;
+
+    // Check timestamp within 5 minutes
+    const now = Date.now();
+    const ts  = parseInt(timestamp);
+    if (Math.abs(now - ts) > 300000) return { valid: false, reason: `Timestamp too old: ${ts}` };
+
+    // Hash request body with SHA256
+    const bodyStr = JSON.stringify(req.body);
+    const bodyHash = crypto.createHash("sha256").update(bodyStr).digest("base64");
+
+    // Build raw URL — match Postman: full URL encoded lowercase
+    const fullUrl  = `https://parking-mock-server.onrender.com${req.path}`;
+    const encodedUrl = encodeURIComponent(fullUrl).toLowerCase();
+
+    // Build signature string: appId + method + url + timestamp + nonce + bodyHash
+    const sigRaw  = appId + req.method.toUpperCase() + encodedUrl + timestamp + nonce + bodyHash;
+
+    // Compute HMAC-SHA256
+    const keyBytes = Buffer.from(jccConfig.apiKey, "base64");
+    const computed = crypto.createHmac("sha256", keyBytes)
+                           .update(Buffer.from(sigRaw, "utf8"))
+                           .digest("base64");
+
+    const valid = computed === signature;
+    return { valid, reason: valid ? "OK" : `Sig mismatch. Expected: ${computed}` };
+  } catch(e) {
+    return { valid: false, reason: e.message };
+  }
+}
+
+function jccAuth(req, res, next) {
+  const check = validateHmac(req);
+  req.hmacValid = check.valid;
+  req.hmacReason = check.reason;
+  if (jccConfig.validateHmac && !check.valid) {
+    const r = { responseCode: "401", responseDescription: `HMAC validation failed: ${check.reason}` };
+    addJccLog(req.path, req.body, r, false);
+    return res.status(401).json(r);
+  }
+  next();
+}
+
+// ── Standard JCC success response ─────────────────────────────────────────────
+function jccOk(extra = {}) {
+  return { responseCode: "00", responseDescription: "Successful Response", ...extra };
+}
+
+function jccErr(code, desc) {
+  return { responseCode: code, responseDescription: desc };
+}
+
+// ── POST /financialservices/v1/ippi/auth/topup ────────────────────────────────
+app.post("/financialservices/v1/ippi/auth/topup", jccAuth, (req, res) => {
+  const b = req.body;
+  const response = jccOk({
+    messageType:    "topup",
+    messageNo:      b.messageNo,
+    originalRef:    b.originalRef,
+    authID:         b.authID,
+    amount:         b.amount,
+    currency:       b.currency,
+    tokenCode:      b.tokenCode,
+    dateTime:       new Date().toISOString()
+  });
+  // Store as active transaction
+  activeTransaction = { type: "topup", ...b, processedAt: new Date().toISOString() };
+  addJccLog("topup", b, response, req.hmacValid);
+  res.json(response);
+});
+
+// ── POST /financialservices/v1/ippi/auth/capture ──────────────────────────────
+app.post("/financialservices/v1/ippi/auth/capture", jccAuth, (req, res) => {
+  const b = req.body;
+  const response = jccOk({
+    messageType:    "capture",
+    messageNo:      b.messageNo,
+    originalRef:    b.originalRef,
+    authID:         b.authID,
+    amount:         b.amount,
+    currency:       b.currency,
+    tokenCode:      b.tokenCode,
+    dateTime:       new Date().toISOString()
+  });
+  activeTransaction = { type: "capture", ...b, processedAt: new Date().toISOString() };
+  addJccLog("capture", b, response, req.hmacValid);
+  res.json(response);
+});
+
+// ── POST /financialservices/v1/ippi/auth/release (PreAuthorisationRelease) ────
+app.post("/financialservices/v1/ippi/auth/release", jccAuth, (req, res) => {
+  const b = req.body;
+  const response = jccOk({
+    messageType:    "release",
+    messageNo:      b.messageNo,
+    originalRef:    b.originalRef,
+    authID:         b.authID,
+    amount:         b.amount,
+    currency:       b.currency,
+    tokenCode:      b.tokenCode,
+    dateTime:       new Date().toISOString()
+  });
+  activeTransaction = null;  // release clears the transaction
+  addJccLog("release", b, response, req.hmacValid);
+  res.json(response);
+});
+
+// ── POST /financialservices/v1/ippi/void ─────────────────────────────────────
+app.post("/financialservices/v1/ippi/void", jccAuth, (req, res) => {
+  const b = req.body;
+  const response = jccOk({
+    messageType:    "void",
+    messageNo:      b.messageNo,
+    originalRef:    b.originalRef,
+    originalAmount: b.originalAmount,
+    currency:       b.currency,
+    tokenCode:      b.tokenCode,
+    dateTime:       new Date().toISOString()
+  });
+  activeTransaction = null;  // void clears the transaction
+  addJccLog("void", b, response, req.hmacValid);
+  res.json(response);
+});
+
+// ── POST /financialservices/v1/ippi/reversal ──────────────────────────────────
+app.post("/financialservices/v1/ippi/reversal", jccAuth, (req, res) => {
+  const b = req.body;
+  const response = jccOk({
+    messageType:         "reversal",
+    messageNo:           b.messageNo,
+    originalMessageNo:   b.originalMessageNo,
+    originalType:        b.originalType,
+    amount:              b.amount,
+    currency:            b.currency,
+    dateTime:            new Date().toISOString()
+  });
+  activeTransaction = null;
+  addJccLog("reversal", b, response, req.hmacValid);
+  res.json(response);
+});
+
+// ── GET /jcc/transaction ── current active transaction ────────────────────────
+app.get("/jcc/transaction", (req, res) => {
+  res.json({ activeTransaction });
+});
+
+// ── DELETE /jcc/transaction ── clear active transaction ───────────────────────
+app.delete("/jcc/transaction", (req, res) => {
+  activeTransaction = null;
+  res.json({ cleared: true });
+});
+
+// ── GET /jcc/logs ── JCC transaction logs ─────────────────────────────────────
+app.get("/jcc/logs", (req, res) => {
+  res.json(jccLogs);
+});
+
+// ── GET /jcc/config ── get JCC HMAC config ───────────────────────────────────
+app.get("/jcc/config", (req, res) => {
+  res.json({ appId: jccConfig.appId, validateHmac: jccConfig.validateHmac });
+});
+
+// ── POST /jcc/config ── update JCC HMAC config ───────────────────────────────
+app.post("/jcc/config", (req, res) => {
+  const { appId, apiKey, validateHmac } = req.body;
+  if (appId !== undefined) jccConfig.appId = appId;
+  if (apiKey !== undefined) jccConfig.apiKey = apiKey;
+  if (validateHmac !== undefined) jccConfig.validateHmac = validateHmac;
+  res.json({ ok: true, jccConfig: { appId: jccConfig.appId, validateHmac: jccConfig.validateHmac } });
 });
 
 // ── START ─────────────────────────────────────────────────────────────────────
