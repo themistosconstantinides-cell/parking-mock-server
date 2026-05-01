@@ -862,13 +862,6 @@ async function removeCharge(i){
   if(d.ok) location.reload();
 }
 
-loadLogs();setInterval(loadLogs,3000);
-loadJccLogs();setInterval(loadJccLogs,3000);
-loadJccTransaction();setInterval(loadJccTransaction,3000);
-loadActiveEntries();setInterval(loadActiveEntries,5000);
-loadTellStatus();setInterval(loadTellStatus,5000);
-loadRejections();setInterval(loadRejections,5000);
-
 async function loadRejections(){
   try{
     const r=await fetch('/admin/rejections');
@@ -1038,6 +1031,13 @@ async function saveJccConfig(){
   const d=await r.json();
   if(d.ok) alert('JCC config saved');
 }
+
+loadLogs();setInterval(loadLogs,3000);
+loadJccLogs();setInterval(loadJccLogs,3000);
+loadJccTransaction();setInterval(loadJccTransaction,3000);
+loadActiveEntries();setInterval(loadActiveEntries,5000);
+loadTellStatus();setInterval(loadTellStatus,5000);
+loadRejections();setInterval(loadRejections,5000);
 </script></body></html>`);
 });
 
