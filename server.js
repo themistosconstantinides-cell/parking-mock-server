@@ -339,6 +339,29 @@ async function tellOpenBarrier() {
 // ── Admin endpoints ───────────────────────────────────────────────────────────
 app.get("/logs", (req, res) => res.json(logs));
 app.get("/admin/config", (req, res) => res.json(config));
+
+// ── GET /admin/entries ────────────────────────────────────────────────────────
+app.get("/admin/entries", (req, res) => res.json(Object.values(activeEntries)));
+
+// ── GET /admin/rejections ─────────────────────────────────────────────────────
+app.get("/admin/rejections", (req, res) => res.json(rejectionLog));
+
+// ── GET /admin/tell-status ────────────────────────────────────────────────────
+app.get("/admin/tell-status", async (req, res) => {
+  if (!config.tellEnabled || !config.tellHwId || !config.tellAppId) {
+    return res.json({ available: false, reason: "TELL not configured" });
+  }
+  try {
+    const body = { hwId: config.tellHwId, hwName: config.tellHwName, appId: config.tellAppId };
+    const result = await tellRequest("POST", "/gc/getgeneral", body);
+    const status = result.statusResult && result.statusResult.deviceStatus;
+    res.json({ available: true, status,
+      lastIp: result.statusResult && result.statusResult.lastIp,
+      pingMs: result.statusResult && result.statusResult.pingTimeMs });
+  } catch(e) {
+    res.json({ available: false, reason: e.message });
+  }
+});
 app.post("/admin/config", (req, res) => {
   const {key, value} = req.body;
   if (key in config) config[key] = value;
