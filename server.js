@@ -1,69 +1,77 @@
-const express  = require("express");
-const https    = require("https");
-const app      = express();
+const express = require("express");
+const https   = require("https");
+const app     = express();
 
 app.use(express.json());
 
-// ── Email alerts via Nodemailer + Gmail ───────────────────────────────────────
-// Set SMTP_USER, SMTP_PASS, ALERT_EMAIL in Render environment variables
-let transporter = null;
-try {
-  const nodemailer = require("nodemailer");
-  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    transporter = nodemailer.createTransport({
-      host:   "smtp.gmail.com",
-      port:   465,
-      secure: true,   // SSL — port 465, not STARTTLS 587 which Render blocks
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-    console.log("[EMAIL] Gmail ready — alerts will be sent to:", process.env.ALERT_EMAIL || process.env.SMTP_USER);
-  } else {
-    console.log("[EMAIL] SMTP_USER/SMTP_PASS not set — email alerts disabled");
-  }
-} catch(e) {
-  console.log("[EMAIL] nodemailer not installed — email alerts disabled");
-}
-
+// ── Email alerts via Resend HTTP API ─────────────────────────────────────────
+// Set RESEND_KEY and ALERT_EMAIL in Render environment variables
+// No npm packages needed — uses built-in https module
 async function sendHelpAlert(req) {
-  if (!transporter) { console.log("[EMAIL] No transporter — skipping"); return; }
-  const to = config.alertEmail || process.env.SMTP_USER;
-  if (!to) { console.log("[EMAIL] No alert email configured — skipping"); return; }
-  console.log(`[EMAIL] Sending help alert to: ${to}`);
+  const apiKey = process.env.RESEND_KEY;
+  const to     = config.alertEmail || process.env.ALERT_EMAIL;
+  if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set — skipping"); return; }
+  if (!to)     { console.log("[EMAIL] No alert email configured — skipping"); return; }
+
   const outlet   = req.body.outlet           || "?";
   const terminal = req.body.terminal         || "?";
   const point    = req.body.intallationPoint || "?";
   const action   = req.body.action           || "Help Button";
   const company  = req.body.companyCode      || config.companyCode;
   const time     = new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" });
-  try {
-    await transporter.sendMail({
-      from:    `"ParkTec Alerts" <${process.env.SMTP_USER}>`,
-      to,
-      subject: `\uD83D\uDEA8 ParkTec Help Alert \u2014 ${point} (${outlet})`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:500px">
-          <h2 style="color:#c0392b">\uD83D\uDEA8 Help Called at ${point}</h2>
-          <table style="width:100%;border-collapse:collapse">
-            <tr><td style="padding:6px;color:#666">Company</td><td style="padding:6px"><b>${company}</b></td></tr>
-            <tr><td style="padding:6px;color:#666">Outlet</td><td style="padding:6px"><b>${outlet}</b></td></tr>
-            <tr><td style="padding:6px;color:#666">Terminal</td><td style="padding:6px"><b>${terminal}</b></td></tr>
-            <tr><td style="padding:6px;color:#666">Location</td><td style="padding:6px"><b>${point}</b></td></tr>
-            <tr><td style="padding:6px;color:#666">Action</td><td style="padding:6px"><b>${action}</b></td></tr>
-            <tr><td style="padding:6px;color:#666">Time</td><td style="padding:6px"><b>${time}</b></td></tr>
-          </table>
-          <p style="color:#888;font-size:12px;margin-top:16px">ParkTec Parking System</p>
-        </div>
-      `
+
+  console.log(`[EMAIL] Sending help alert to: ${to}`);
+
+  const payload = JSON.stringify({
+    from:    "ParkTec Alerts <onboarding@resend.dev>",
+    to:      [to],
+    subject: `ParkTec Help Alert - ${point} (${outlet})`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:500px">
+        <h2 style="color:#c0392b">Help Called at ${point}</h2>
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:6px;color:#666">Company</td><td style="padding:6px"><b>${company}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Outlet</td><td style="padding:6px"><b>${outlet}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Terminal</td><td style="padding:6px"><b>${terminal}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Location</td><td style="padding:6px"><b>${point}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Action</td><td style="padding:6px"><b>${action}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Time</td><td style="padding:6px"><b>${time}</b></td></tr>
+        </table>
+        <p style="color:#888;font-size:12px;margin-top:16px">ParkTec Parking System</p>
+      </div>
+    `
+  });
+
+  return new Promise((resolve) => {
+    const req2 = https.request({
+      hostname: "api.resend.com",
+      path:     "/emails",
+      method:   "POST",
+      headers:  {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type":  "application/json",
+        "Content-Length": Buffer.byteLength(payload)
+      }
+    }, (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => {
+        if (res.statusCode === 200 || res.statusCode === 201) {
+          console.log(`[EMAIL] Alert sent -> ${to}`);
+          config.lastAlertSent = time;
+        } else {
+          console.error(`[EMAIL] Failed: HTTP ${res.statusCode} — ${data}`);
+        }
+        resolve();
+      });
     });
-    console.log(`[EMAIL] Alert sent \u2192 ${to}`);
-    config.lastAlertSent = time;
-  } catch(e) {
-    console.error("[EMAIL] Failed to send alert:", e.message);
-    console.error("[EMAIL] Error details:", JSON.stringify(e.response?.body || e.code || e));
-  }
+    req2.on("error", e => {
+      console.error("[EMAIL] Request error:", e.message);
+      resolve();
+    });
+    req2.write(payload);
+    req2.end();
+  });
 }
 app.use(express.static("public"));
 
@@ -661,7 +669,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <td><input class="m" id="inHDT" value="${config.helpDisplayTime}" style="width:60px">
 <button class="btn" onclick="sv('helpDisplayTime','inHDT')">Save</button></td></tr>
 <tr><td>Email Alerts</td>
-<td>${process.env.SMTP_USER ? '✅ Sending from: <b>' + process.env.SMTP_USER + '</b>' : '⚠️ Not configured (set SMTP_USER + SMTP_PASS in Render)'}</td>
+<td>${process.env.RESEND_KEY ? '✅ Resend active' : '⚠️ Not configured (set RESEND_KEY in Render)'}</td>
 <td style="font-size:11px;color:#8b949e">${config.lastAlertSent ? 'Last sent: '+config.lastAlertSent : 'No alerts sent yet'}</td></tr>
 <tr><td>Alert Email (recipient)</td>
 <td><input class="w" id="inAlertEmail" placeholder="recipient@email.com" value="${config.alertEmail}"></td>
