@@ -271,7 +271,7 @@ async function jccRelease(entry) {
 }
 
 function scenarioName(n) {
-  return {1:"Free",2:"Capture Only",3:"TopUp Needed",4:"Barrier Failed"}[n]||"?";
+  return {1:"Free",2:"Capture Only",3:"TopUp Approved",4:"TopUp Declined",5:"Barrier Failed"}[n]||"?";
 }
 
 /**
@@ -505,8 +505,9 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Exit Scenario</td><td>${config.exitScenario} — ${sn}</td>
 <td><button class="btn green" onclick="set('exitScenario',1)">1 Free</button>
 <button class="btn" onclick="set('exitScenario',2)">2 Capture</button>
-<button class="btn orange" onclick="set('exitScenario',3)">3 TopUp</button>
-<button class="btn red" onclick="set('exitScenario',4)">4 Barrier Fail</button></td></tr>
+<button class="btn orange" onclick="set('exitScenario',3)">3 TopUp OK</button>
+<button class="btn red" onclick="set('exitScenario',4)">4 TopUp Declined</button>
+<button class="btn red" onclick="set('exitScenario',5)">5 Barrier Fail</button></td></tr>
 <tr><td>Vehicle Present (mock)</td><td>${config.vehiclePresent}</td>
 <td><button class="btn green" onclick="set('vehiclePresent',true)">YES</button>
 <button class="btn red" onclick="set('vehiclePresent',false)">NO</button></td></tr>
@@ -1283,98 +1284,83 @@ app.post("/exitCall", async (req, res) => {
   let response;
   switch(config.exitScenario) {
 
-    // Scenario 1: FREE
+    // ── Scenario 1: FREE ──────────────────────────────────────────────────────
+    // Release pre-auth, open barrier, no charge
     case 1: {
-      if (entry) {
-        try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-        delete activeEntries[token];
-        releaseSpace(entry);
-      }
-      const b = await openBarrierWithRetry();
-      response = b === "failed"
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
+      delete activeEntries[token];
+      releaseSpace(entry);
+      const b1 = await openBarrierWithRetry();
+      response = b1 === "failed"
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:"0",
             displayMessage:"Thank you! Have a nice day.", timeToDisplayMessage:"5",
-            responseCode:"00", responseDescription:"Successful Response", _barrier:b };
+            responseCode:"00", responseDescription:"Successful Response" };
       break;
     }
 
-    // Scenario 2: CAPTURE (fee <= preAuth)
+    // ── Scenario 2: CAPTURE ───────────────────────────────────────────────────
+    // Capture the calculated fee (must be <= preAuth), open barrier
     case 2: {
-      const captureAmt = feeCents > 0 ? Math.min(feeCents, preAuthCents) : preAuthCents;
-      if (entry) {
-        try { await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
-        delete activeEntries[token];
-        releaseSpace(entry);
-      }
-      const b = await openBarrierWithRetry();
-      response = b === "failed"
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      const captureAmt = feeCents > 0 ? feeCents : preAuthCents;
+      try { await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
+      delete activeEntries[token];
+      releaseSpace(entry);
+      const b2 = await openBarrierWithRetry();
+      response = b2 === "failed"
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:String(captureAmt),
             displayMessage:`Thank you! Charged €${(captureAmt/100).toFixed(2)}.`,
             timeToDisplayMessage:"5", responseCode:"00",
-            responseDescription:"Successful Response", _barrier:b };
+            responseDescription:"Successful Response" };
       break;
     }
 
-    // Scenario 3: TOPUP (fee > preAuth)
+    // ── Scenario 3: TOPUP APPROVED ────────────────────────────────────────────
+    // TopUp succeeds → Capture full fee → open barrier
     case 3: {
-      const totalFee = feeCents > 0 ? feeCents : (config.topupAmount || 500);
-      const topupAmt = Math.max(0, totalFee - preAuthCents);
-      const recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
-
-      if (topupAmt <= 0) {
-        // Fee <= preAuth — just capture
-        if (entry) {
-          try { await jccCapture(entry, totalFee); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
-          delete activeEntries[token];
-          releaseSpace(entry);
-        }
-        const b = await openBarrierWithRetry();
-        response = b === "failed"
-          ? staffResponse("Technical issue. Please contact staff.")
-          : { barrierOpen:"1", moneyToPay:String(totalFee),
-              displayMessage:`Thank you! Charged €${(totalFee/100).toFixed(2)}.`,
-              timeToDisplayMessage:"5", responseCode:"00",
-              responseDescription:"Successful Response", _barrier:b };
-        break;
-      }
-
-      // TopUp needed
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      const totalFee3  = feeCents > 0 ? feeCents : (config.topupAmount || 500);
+      const topupAmt3  = Math.max(0, totalFee3 - preAuthCents);
       try {
-        const topupResult = await jccTopup(entry, topupAmt);
-        if (topupResult.responseCode === "00") {
-          // TopUp APPROVED -> Capture full amount -> open barrier
-          try { await jccCapture(entry, totalFee); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
-          delete activeEntries[token];
-          releaseSpace(entry);
-          const b = await openBarrierWithRetry();
-          // Barrier failed after approved payment -- do NOT ask re-tap
-          response = b === "failed"
-            ? staffResponse(`Payment €${(totalFee/100).toFixed(2)} processed. Barrier failed - staff called.`)
-            : { barrierOpen:"1", moneyToPay:String(totalFee),
-                displayMessage:`Thank you! Total €${(totalFee/100).toFixed(2)}.`,
-                timeToDisplayMessage:"5", responseCode:"00",
-                responseDescription:"Successful Response", _barrier:b,
-                _jccTopup:"00", _jccCapture:"00" };
-        } else {
-          // TopUp DECLINED -> Release pre-auth -> ask for full SALE
-          try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-          response = { barrierOpen:"-2", moneyToPay:String(totalFee), recordId,
-            displayMessage:`Card declined. Please tap card for full €${(totalFee/100).toFixed(2)}.`,
-            timeToDisplayMessage:"10", responseCode:"31",
-            responseDescription:"TopUp declined - full SALE required",
-            _jccTopup: topupResult.responseCode };
-        }
-      } catch(e) {
-        console.error("[JCC TOPUP ERROR]", e.message);
-        response = staffResponse("JCC error. Please contact staff.");
-      }
+        // TopUp the extra amount
+        await jccTopup(entry, topupAmt3);
+        // Capture full fee
+        await jccCapture(entry, totalFee3);
+      } catch(e) { console.error("[JCC TOPUP/CAPTURE]", e.message); }
+      delete activeEntries[token];
+      releaseSpace(entry);
+      const b3 = await openBarrierWithRetry();
+      response = b3 === "failed"
+        ? staffResponse(`Payment €${(totalFee3/100).toFixed(2)} processed. Barrier failed — staff called.`)
+        : { barrierOpen:"1", moneyToPay:String(totalFee3),
+            displayMessage:`Thank you! Total €${(totalFee3/100).toFixed(2)}.`,
+            timeToDisplayMessage:"5", responseCode:"00",
+            responseDescription:"Successful Response" };
       break;
     }
 
-    // Scenario 4: BARRIER FAILED
-    case 4: default:
+    // ── Scenario 4: TOPUP DECLINED ────────────────────────────────────────────
+    // TopUp declined → Release pre-auth → ask app for full SALE (barrierOpen:"-2")
+    case 4: {
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      const totalFee4 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
+      // Generate recordId once and store it on the entry so it is stable across retries
+      if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
+      try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
+      // Do NOT delete entry — app needs it alive to send exitPayment
+      response = { barrierOpen:"-2", moneyToPay:String(totalFee4),
+        recordId: entry.recordId,
+        displayMessage:`Card declined. Please tap card for full €${(totalFee4/100).toFixed(2)}.`,
+        timeToDisplayMessage:"10", responseCode:"31",
+        responseDescription:"TopUp declined — full SALE required" };
+      break;
+    }
+
+    // ── Scenario 5: BARRIER FAILED ────────────────────────────────────────────
+    case 5: default:
       response = staffResponse("Technical issue. Please contact staff.");
       break;
   }
@@ -1386,7 +1372,7 @@ app.post("/exitPayment", async (req, res) => {
   const { token } = req.body;
   const exitEntry = token ? activeEntries[token] : null;
   if (token) delete activeEntries[token];
-  releaseSpace(exitEntry);
+  if (exitEntry) releaseSpace(exitEntry);
   const b = await openBarrierWithRetry();
   let response;
   if (b === "failed") {
