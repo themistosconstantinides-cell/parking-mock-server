@@ -30,6 +30,8 @@ let config = {
   defaultAmount:          800,
   fixAmountSolution:      -1,   // -1 = off, >0 = fixed SALE amount in cents (entrance only)
   phoneForHelp:           "99123456",
+  helpMessage:            "Help has been called. Staff will assist you shortly. For immediate assistance call: 99123456",
+  helpDisplayTime:        "10",
   displayMessageEntrance: "Welcome to Limassol Parking!",
   displayMessageExit:     "Please prepare the card that was used during Entrance.",
   charges: [
@@ -588,6 +590,12 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Phone For Help</td><td>${config.phoneForHelp}</td>
 <td><input class="m" id="inPH" value="${config.phoneForHelp}">
 <button class="btn" onclick="sv('phoneForHelp','inPH')">Save</button></td></tr>
+<tr><td>Help Message</td><td style="font-size:11px">${config.helpMessage}</td>
+<td><input class="w" id="inHM" value="${config.helpMessage}">
+<button class="btn" onclick="sv('helpMessage','inHM')">Save</button></td></tr>
+<tr><td>Help Display Time (sec)</td><td>${config.helpDisplayTime}</td>
+<td><input class="m" id="inHDT" value="${config.helpDisplayTime}" style="width:60px">
+<button class="btn" onclick="sv('helpDisplayTime','inHDT')">Save</button></td></tr>
 <tr><td>Display Msg Entrance</td><td style="font-size:11px">${config.displayMessageEntrance}</td>
 <td><input class="w" id="inDME" value="${config.displayMessageEntrance}">
 <button class="btn" onclick="sv('displayMessageEntrance','inDME')">Save</button></td></tr>
@@ -1493,7 +1501,18 @@ app.post("/vehiclePresent", async (req, res) => {
 
 // ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
-  const response = {responseCode:"00",responseDescription:"Successful Response"};
+  const response = {
+    outlet:               req.body.outlet   || config.entranceOutlet,
+    terminal:             req.body.terminal || config.entranceTerminal,
+    installationPoint:    req.body.intallationPoint || "",
+    daytime:              ts(),
+    displayMessage:       config.helpMessage,
+    timeToDisplayMessage: config.helpDisplayTime,
+    availablePlacesNormal: String(config.availablePlacesNormal),
+    availablePlaceMonthly: String(config.availablePlaceMonthly),
+    responseCode:         "00",
+    responseDescription:  "Successful Response"
+  };
   addLog(req, response); res.json(response);
 });
 
