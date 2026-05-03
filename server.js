@@ -1568,8 +1568,13 @@ app.post("/vehiclePresent", async (req, res) => {
 });
 
 // ── POST /help ────────────────────────────────────────────────────────────────
-app.post("/help", async (req, res) => {
-  await sendHelpAlert(req);
+app.post("/help", (req, res) => {
+  // Fire email in background — never block the response to the app
+  Promise.race([
+    sendHelpAlert(req),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000))
+  ]).catch(e => console.error("[EMAIL] Alert error:", e.message));
+
   const response = {
     outlet:               req.body.outlet   || config.entranceOutlet,
     terminal:             req.body.terminal || config.entranceTerminal,
