@@ -422,6 +422,25 @@ app.post("/admin/tell-open", async (req, res) => {
   }
 });
 
+// ── POST /admin/tell-register ─────────────────────────────────────────────────
+// Calls TELL /gc/addappid using hwId + hwName + password → saves appId to config
+app.post("/admin/tell-register", async (req, res) => {
+  if (!config.tellHwId)
+    return res.json({ok:false, error:"hwId must be configured first"});
+  try {
+    const body = { hwId: config.tellHwId, hwName: config.tellHwName, password: config.tellPassword };
+    const result = await tellRequest("POST", "/gc/addappid", body);
+    if (result.result === "OK" && result.appId) {
+      config.tellAppId = result.appId;
+      res.json({ok:true, appId: result.appId});
+    } else {
+      res.json({ok:false, error: JSON.stringify(result)});
+    }
+  } catch(e) {
+    res.json({ok:false, error:e.message});
+  }
+});
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const sn = scenarioName(config.exitScenario);
@@ -597,8 +616,12 @@ ${config.charges.map((c,i)=>`<tr>
 <td><input class="m" id="hwName" value="${config.tellHwName}"></td>
 <td><button class="btn" onclick="sv('tellHwName','hwName')">Save</button></td></tr>
 <tr><td>App ID (40 chars)</td>
-<td><input class="w" id="appId" placeholder="from gc/addappid" value="${config.tellAppId}"></td>
-<td><button class="btn" onclick="sv('tellAppId','appId')">Save</button></td></tr>
+<td><input class="w" id="appId" placeholder="paste manually or click Get from TELL" value="${config.tellAppId}"></td>
+<td>
+  <button class="btn" onclick="sv('tellAppId','appId')">Save</button>
+  <button class="btn green" onclick="registerAppId()" style="margin-left:4px">&#x1F4E1; Get from TELL</button>
+</td></tr>
+<tr><td></td><td colspan="2"><span id="regResult" style="font-size:12px"></span></td></tr>
 <tr><td>API Key</td>
 <td><input class="w" id="apiKey" value="${config.tellApiKey}"></td>
 <td><button class="btn" onclick="sv('tellApiKey','apiKey')">Save</button></td></tr>
@@ -873,6 +896,25 @@ async function openNow(){
     if(d.ok) showS('✓ Barrier open command sent OK',false);
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
+}
+async function registerAppId(){
+  const el=document.getElementById('regResult');
+  el.style.color='#8b949e'; el.textContent='Calling /gc/addappid...';
+  try{
+    const r=await fetch('/admin/tell-register',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    if(d.ok){
+      document.getElementById('appId').value=d.appId;
+      el.style.color='#3fb950';
+      el.textContent='✓ App ID registered and saved: '+d.appId;
+    } else {
+      el.style.color='#f85149';
+      el.textContent='✗ '+d.error;
+    }
+  }catch(e){
+    el.style.color='#f85149';
+    el.textContent='✗ '+e.message;
+  }
 }
 
 async function addCharge(){
