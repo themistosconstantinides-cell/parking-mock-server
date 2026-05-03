@@ -47,6 +47,8 @@ let config = {
   showRates:             true,
   responseCode:          "00",
   flagsForAction:        "0000",  // "1000"=restart app, "0100"=update available, "0000"=none
+  voiceAssistant:        true,    // true = app plays audio; false = silent
+  defaultLanguage:       "EN",    // EN, EL, RU, IW
   companyCode:           "MarinaParking",
 
   // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
@@ -555,6 +557,14 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <td><button class="btn green" onclick="set('flagsForAction','0000')">0000 None</button>
 <button class="btn orange" onclick="set('flagsForAction','1000')">1000 Restart App</button>
 <button class="btn" onclick="set('flagsForAction','0100')">0100 Update</button></td></tr>
+<tr><td>Voice Assistant</td><td>${config.voiceAssistant ? '🔊 ON' : '🔇 OFF'}</td>
+<td><button class="btn green" onclick="set('voiceAssistant',true)">🔊 ON</button>
+<button class="btn red" onclick="set('voiceAssistant',false)">🔇 OFF</button></td></tr>
+<tr><td>Default Language</td><td>${config.defaultLanguage}</td>
+<td><button class="btn green" onclick="set('defaultLanguage','EN')">🇬🇧 EN</button>
+<button class="btn" onclick="set('defaultLanguage','EL')">🇬🇷 EL</button>
+<button class="btn" onclick="set('defaultLanguage','RU')">🇷🇺 RU</button>
+<button class="btn" onclick="set('defaultLanguage','IW')">🇮🇱 IW</button></td></tr>
 </table>
 
 <h2>&#x1F4E1; parkingInit Response Fields</h2>
@@ -1161,8 +1171,10 @@ app.post("/parkingInit", (req, res) => {
     } : {}),
     responseCode:                    "00",
     responseDescription:             "Successful Response",
-    timeOfServer:                    ts(),          // P8: current server time YYYYMMDDHHmmss
-    flagsForAction:                  config.flagsForAction  // P8: dashboard-controlled — "1000"=restart, "0000"=none
+    timeOfServer:                    ts(),
+    flagsForAction:                  config.flagsForAction,
+    voiceAssistant:                  config.voiceAssistant ? "1" : "0",  // "1"=enabled, "0"=silent
+    defaultLanguage:                 config.defaultLanguage               // "EN","EL","RU","IW"
   };
   addLog(req, response); res.json(response);
 });
