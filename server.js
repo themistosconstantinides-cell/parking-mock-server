@@ -56,10 +56,11 @@ async function sendHelpAlert(req) {
         </div>
       `
     });
-    console.log(`[EMAIL] Alert sent \u2192 ${to} (${point} ${outlet})`);
+    console.log(`[EMAIL] Alert sent \u2192 ${to}`);
     config.lastAlertSent = time;
   } catch(e) {
     console.error("[EMAIL] Failed to send alert:", e.message);
+    console.error("[EMAIL] Error details:", JSON.stringify(e.response?.body || e.code || e));
   }
 }
 app.use(express.static("public"));
@@ -1567,9 +1568,8 @@ app.post("/vehiclePresent", async (req, res) => {
 });
 
 // ── POST /help ────────────────────────────────────────────────────────────────
-app.post("/help", (req, res) => {
-  // Fire email alert in background — don't wait for it
-  sendHelpAlert(req);
+app.post("/help", async (req, res) => {
+  await sendHelpAlert(req);
   const response = {
     outlet:               req.body.outlet   || config.entranceOutlet,
     terminal:             req.body.terminal || config.entranceTerminal,
