@@ -26,9 +26,10 @@ try {
 }
 
 async function sendHelpAlert(req) {
-  if (!transporter) return;
+  if (!transporter) { console.log("[EMAIL] No transporter — skipping"); return; }
   const to = config.alertEmail || process.env.SMTP_USER;
   if (!to) { console.log("[EMAIL] No alert email configured — skipping"); return; }
+  console.log(`[EMAIL] Sending help alert to: ${to}`);
   const outlet   = req.body.outlet           || "?";
   const terminal = req.body.terminal         || "?";
   const point    = req.body.intallationPoint || "?";
