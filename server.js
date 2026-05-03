@@ -46,7 +46,7 @@ let config = {
   monthlyCardsBins:      "123456;12345678910111213453",   // semicolon-separated full card numbers
   showRates:             true,
   responseCode:          "00",
-  flagsForAction:        "0000",  // "1000"=restart app, "0100"=force full init, "0000"=none
+  flagsForAction:        "0000",  // "1000"=restart app, "0100"=force full init, "1100"=both, "0000"=none
   voiceAssistant:        true,    // true = app plays audio; false = silent
   defaultLanguage:       "EN",    // EN, EL, RU, IW
   companyCode:           "MarinaParking",
@@ -556,7 +556,8 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>flagsForAction</td><td>${config.flagsForAction}</td>
 <td><button class="btn green" onclick="set('flagsForAction','0000')">0000 None</button>
 <button class="btn orange" onclick="set('flagsForAction','1000')">1000 Restart App</button>
-<button class="btn" onclick="set('flagsForAction','0100')">0100 Force Init</button></td></tr>
+<button class="btn" onclick="set('flagsForAction','0100')">0100 Force Init</button>
+<button class="btn red" onclick="set('flagsForAction','1100')">1100 Init + Restart</button></td></tr>
 <tr><td>Voice Assistant</td><td>${config.voiceAssistant ? '🔊 ON' : '🔇 OFF'}</td>
 <td><button class="btn green" onclick="set('voiceAssistant',true)">🔊 ON</button>
 <button class="btn red" onclick="set('voiceAssistant',false)">🔇 OFF</button></td></tr>
