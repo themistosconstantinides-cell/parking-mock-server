@@ -1112,7 +1112,9 @@ app.post("/parkingInit", (req, res) => {
       tellVehicleInput:  mode === "Exit" ? config.tellVehicleInputExit : config.tellVehicleInputEntrance
     } : {}),
     responseCode:                    "00",
-    responseDescription:             "Successful Response"
+    responseDescription:             "Successful Response",
+    timeOfServer:                    ts(),          // P8: current server time YYYYMMDDHHmmss
+    flagsForAction:                  "0000"         // P8: positions: [0]=restart [1]=update — "0000" = no action
   };
   addLog(req, response); res.json(response);
 });
