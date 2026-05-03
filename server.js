@@ -11,7 +11,9 @@ try {
   const nodemailer = require("nodemailer");
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     transporter = nodemailer.createTransport({
-      service: "gmail",
+      host:   "smtp.gmail.com",
+      port:   465,
+      secure: true,   // SSL — port 465, not STARTTLS 587 which Render blocks
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
@@ -1572,7 +1574,7 @@ app.post("/help", (req, res) => {
   // Fire email in background — never block the response to the app
   Promise.race([
     sendHelpAlert(req),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000))
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000))
   ]).catch(e => console.error("[EMAIL] Alert error:", e.message));
 
   const response = {
