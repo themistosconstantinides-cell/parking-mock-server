@@ -1,8 +1,66 @@
-const express = require("express");
-const https   = require("https");
-const app     = express();
+const express  = require("express");
+const https    = require("https");
+const app      = express();
 
 app.use(express.json());
+
+// ── Email alerts via Nodemailer + Gmail ───────────────────────────────────────
+// Set SMTP_USER, SMTP_PASS, ALERT_EMAIL in Render environment variables
+let transporter = null;
+try {
+  const nodemailer = require("nodemailer");
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+    console.log("[EMAIL] Gmail ready — alerts will be sent to:", process.env.ALERT_EMAIL || process.env.SMTP_USER);
+  } else {
+    console.log("[EMAIL] SMTP_USER/SMTP_PASS not set — email alerts disabled");
+  }
+} catch(e) {
+  console.log("[EMAIL] nodemailer not installed — email alerts disabled");
+}
+
+async function sendHelpAlert(req) {
+  if (!transporter) return;
+  const to = config.alertEmail || process.env.SMTP_USER;
+  if (!to) { console.log("[EMAIL] No alert email configured — skipping"); return; }
+  const outlet   = req.body.outlet           || "?";
+  const terminal = req.body.terminal         || "?";
+  const point    = req.body.intallationPoint || "?";
+  const action   = req.body.action           || "Help Button";
+  const company  = req.body.companyCode      || config.companyCode;
+  const time     = new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" });
+  try {
+    await transporter.sendMail({
+      from:    `"ParkTec Alerts" <${process.env.SMTP_USER}>`,
+      to,
+      subject: `\uD83D\uDEA8 ParkTec Help Alert \u2014 ${point} (${outlet})`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:500px">
+          <h2 style="color:#c0392b">\uD83D\uDEA8 Help Called at ${point}</h2>
+          <table style="width:100%;border-collapse:collapse">
+            <tr><td style="padding:6px;color:#666">Company</td><td style="padding:6px"><b>${company}</b></td></tr>
+            <tr><td style="padding:6px;color:#666">Outlet</td><td style="padding:6px"><b>${outlet}</b></td></tr>
+            <tr><td style="padding:6px;color:#666">Terminal</td><td style="padding:6px"><b>${terminal}</b></td></tr>
+            <tr><td style="padding:6px;color:#666">Location</td><td style="padding:6px"><b>${point}</b></td></tr>
+            <tr><td style="padding:6px;color:#666">Action</td><td style="padding:6px"><b>${action}</b></td></tr>
+            <tr><td style="padding:6px;color:#666">Time</td><td style="padding:6px"><b>${time}</b></td></tr>
+          </table>
+          <p style="color:#888;font-size:12px;margin-top:16px">ParkTec Parking System</p>
+        </div>
+      `
+    });
+    console.log(`[EMAIL] Alert sent \u2192 ${to} (${point} ${outlet})`);
+    config.lastAlertSent = time;
+  } catch(e) {
+    console.error("[EMAIL] Failed to send alert:", e.message);
+  }
+}
 app.use(express.static("public"));
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -32,6 +90,8 @@ let config = {
   phoneForHelp:           "99123456",
   helpMessage:            "Help has been called. Staff will assist you shortly. For immediate assistance call: 99123456",
   helpDisplayTime:        "10",
+  lastAlertSent:          null,
+  alertEmail:             process.env.ALERT_EMAIL || "",
   displayMessageEntrance: "Welcome to Limassol Parking!",
   displayMessageExit:     "Please prepare the card that was used during Entrance.",
   charges: [
@@ -596,6 +656,12 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Help Display Time (sec)</td><td>${config.helpDisplayTime}</td>
 <td><input class="m" id="inHDT" value="${config.helpDisplayTime}" style="width:60px">
 <button class="btn" onclick="sv('helpDisplayTime','inHDT')">Save</button></td></tr>
+<tr><td>Email Alerts</td>
+<td>${process.env.SMTP_USER ? '✅ Sending from: <b>' + process.env.SMTP_USER + '</b>' : '⚠️ Not configured (set SMTP_USER + SMTP_PASS in Render)'}</td>
+<td style="font-size:11px;color:#8b949e">${config.lastAlertSent ? 'Last sent: '+config.lastAlertSent : 'No alerts sent yet'}</td></tr>
+<tr><td>Alert Email (recipient)</td>
+<td><input class="w" id="inAlertEmail" placeholder="recipient@email.com" value="${config.alertEmail}"></td>
+<td><button class="btn" onclick="sv('alertEmail','inAlertEmail')">Save</button></td></tr>
 <tr><td>Display Msg Entrance</td><td style="font-size:11px">${config.displayMessageEntrance}</td>
 <td><input class="w" id="inDME" value="${config.displayMessageEntrance}">
 <button class="btn" onclick="sv('displayMessageEntrance','inDME')">Save</button></td></tr>
@@ -1501,6 +1567,8 @@ app.post("/vehiclePresent", async (req, res) => {
 
 // ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
+  // Fire email alert in background — don't wait for it
+  sendHelpAlert(req);
   const response = {
     outlet:               req.body.outlet   || config.entranceOutlet,
     terminal:             req.body.terminal || config.entranceTerminal,
