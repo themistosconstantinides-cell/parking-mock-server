@@ -46,6 +46,7 @@ let config = {
   monthlyCardsBins:      "123456;12345678910111213453",   // semicolon-separated full card numbers
   showRates:             true,
   responseCode:          "00",
+  flagsForAction:        "0000",  // "1000"=restart app, "0100"=update available, "0000"=none
   companyCode:           "MarinaParking",
 
   // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
@@ -530,6 +531,10 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <button class="btn red" onclick="set('responseCode','91')">91 Outlet</button>
 <button class="btn red" onclick="set('responseCode','92')">92 Company</button>
 <button class="btn red" onclick="set('responseCode','08')">08 Technical</button></td></tr>
+<tr><td>flagsForAction</td><td>${config.flagsForAction}</td>
+<td><button class="btn green" onclick="set('flagsForAction','0000')">0000 None</button>
+<button class="btn orange" onclick="set('flagsForAction','1000')">1000 Restart App</button>
+<button class="btn" onclick="set('flagsForAction','0100')">0100 Update</button></td></tr>
 </table>
 
 <h2>&#x1F4E1; parkingInit Response Fields</h2>
@@ -1114,7 +1119,7 @@ app.post("/parkingInit", (req, res) => {
     responseCode:                    "00",
     responseDescription:             "Successful Response",
     timeOfServer:                    ts(),          // P8: current server time YYYYMMDDHHmmss
-    flagsForAction:                  "0000"         // P8: positions: [0]=restart [1]=update — "0000" = no action
+    flagsForAction:                  config.flagsForAction  // P8: dashboard-controlled — "1000"=restart, "0000"=none
   };
   addLog(req, response); res.json(response);
 });
