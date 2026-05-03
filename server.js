@@ -520,6 +520,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <h2>&#9881; Parking Configuration</h2>
 <table>
 <tr><th>Setting</th><th>Value</th><th>Actions</th></tr>
+<tr><td>App Version</td><td>${config.lastAppVersionName ? config.lastAppVersionName + ' (build ' + config.lastAppVersionNumber + ')' : '<span style="color:#8b949e">not yet received</span>'}</td><td></td></tr>
 <tr><td>Company Code</td><td>${config.companyCode}</td>
 <td><input class="m" id="inCC" value="${config.companyCode}">
 <button class="btn" onclick="sv('companyCode','inCC')">Save</button></td></tr>
@@ -829,6 +830,7 @@ function renderLogs(){
         '<span style="color:#8b949e;font-size:11px;min-width:130px">'+l.time+'</span>'+
         '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'🔌 ':'')+l.method+' '+l.endpoint+'</span>'+
         (l.request&&l.request.outlet?modeTag(l.request.outlet):'')+
+        (l.request&&l.request.versionName?'<span style="color:#8b949e;font-size:11px;margin-left:4px">v'+l.request.versionName+'</span>':'')+
         (rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
@@ -1125,6 +1127,15 @@ loadRejections();setInterval(loadRejections,5000);
 
 // ── POST /parkingInit ─────────────────────────────────────────────────────────
 app.post("/parkingInit", (req, res) => {
+  // Track app version for dashboard display
+  const versionName = req.body.versionName || "";
+  const versionNumber = req.body.versionNumber || "";
+  if (versionName) {
+    config.lastAppVersionName   = versionName;
+    config.lastAppVersionNumber = versionNumber;
+    console.log(`[parkingInit] App version: ${versionName} (${versionNumber})`);
+  }
+
   if (config.responseCode !== "00") {
     const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
     const response = {responseCode:config.responseCode, responseDescription:errMap[config.responseCode]||"Error"};
