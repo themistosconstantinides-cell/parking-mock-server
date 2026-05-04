@@ -151,10 +151,61 @@ let config = {
 
   // ── JCC IPPI ──────────────────────────────────────────────────────────────────
   jccBaseUrl:   "https://test-apis.jccsecure.com",
-  jccUseMock:   true,   // true = call own mock endpoints, false = call real JCC
-  parkingName:  "ParkTec",
-  topupAmount:  500,    // total exit fee in cents for scenario 3 (TopUp)
+  jccUseMock:          true,   // true = call own mock endpoints, false = call real JCC
+  parkingName:         "ParkTec",
+  topupAmount:         500,    // total exit fee in cents for scenario 3 (TopUp)
+  captureRetryMins:    15,     // retry interval in minutes for failed captures
+  captureMaxRetries:   5,      // max retry attempts before marking as FAILED
 };
+
+// ── Pending Captures (capture declined at exit — retry in background) ─────────
+let pendingCaptures = [];  // { id, entry, amountCents, createdAt, retries, status, lastAttempt, lastError }
+
+function addPendingCapture(entry, amountCents) {
+  const id = require("crypto").randomBytes(8).toString("hex").toUpperCase();
+  pendingCaptures.unshift({
+    id, entry, amountCents,
+    createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
+    retries:     0,
+    status:      "PENDING",
+    lastAttempt: null,
+    lastError:   null
+  });
+  console.log(`[PENDING_CAPTURE] Added ${id} — €${(amountCents/100).toFixed(2)} last4=${entry.lastDigits}`);
+}
+
+async function retrySingleCapture(pc) {
+  pc.lastAttempt = new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" });
+  pc.retries++;
+  try {
+    const r = await jccCapture(pc.entry, pc.amountCents);
+    if (r && r.responseCode === "00") {
+      pc.status = "RESOLVED";
+      console.log(`[PENDING_CAPTURE] ${pc.id} RESOLVED on retry ${pc.retries}`);
+    } else {
+      pc.lastError = r ? `${r.responseCode} ${r.responseText}` : "No response";
+      if (pc.retries >= config.captureMaxRetries) {
+        pc.status = "FAILED";
+        console.log(`[PENDING_CAPTURE] ${pc.id} FAILED after ${pc.retries} retries — manual action required`);
+      } else {
+        console.log(`[PENDING_CAPTURE] ${pc.id} retry ${pc.retries}/${config.captureMaxRetries} failed: ${pc.lastError}`);
+      }
+    }
+  } catch(e) {
+    pc.lastError = e.message;
+    console.error(`[PENDING_CAPTURE] ${pc.id} retry error:`, e.message);
+  }
+}
+
+// Background retry loop — runs every captureRetryMins
+function startCaptureRetryLoop() {
+  setInterval(async () => {
+    const pending = pendingCaptures.filter(pc => pc.status === "PENDING");
+    if (pending.length === 0) return;
+    console.log(`[PENDING_CAPTURE] Background retry — ${pending.length} pending`);
+    for (const pc of pending) await retrySingleCapture(pc);
+  }, (config.captureRetryMins || 15) * 60 * 1000);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function addLog(req, response) {
@@ -436,6 +487,25 @@ app.get("/admin/entries", (req, res) => res.json(Object.values(activeEntries)));
 // ── GET /admin/rejections ─────────────────────────────────────────────────────
 app.get("/admin/rejections", (req, res) => res.json(rejectionLog));
 app.get("/admin/ecr-declines", (req, res) => res.json(ecrDeclineLog));
+
+// ── Pending Captures endpoints ────────────────────────────────────────────────
+app.get("/admin/pending-captures", (req, res) => res.json(pendingCaptures));
+
+app.post("/admin/retry-capture/:id", async (req, res) => {
+  const pc = pendingCaptures.find(p => p.id === req.params.id);
+  if (!pc) return res.json({ ok: false, error: "Not found" });
+  if (pc.status === "RESOLVED") return res.json({ ok: false, error: "Already resolved" });
+  pc.status = "PENDING"; // reset FAILED to allow manual retry
+  await retrySingleCapture(pc);
+  res.json({ ok: true, status: pc.status, retries: pc.retries, lastError: pc.lastError });
+});
+
+app.delete("/admin/pending-captures/:id", (req, res) => {
+  const idx = pendingCaptures.findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.json({ ok: false, error: "Not found" });
+  pendingCaptures.splice(idx, 1);
+  res.json({ ok: true });
+});
 
 // ── GET /admin/tell-status ────────────────────────────────────────────────────
 app.get("/admin/tell-status", async (req, res) => {
@@ -793,6 +863,11 @@ ${config.charges.map((c,i)=>`<tr>
   <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
 </div>
 
+<h2>&#x26A0;&#xFE0F; Pending Captures <span id="pendingCaptureCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="pendingCaptureDiv">
+  <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
+</div>
+
 <h2>&#x1F4CB; Request Log</h2>
 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
   <span style="color:#8b949e;font-size:12px">Filter:</span>
@@ -839,6 +914,12 @@ ${config.charges.map((c,i)=>`<tr>
     <tr><td>TopUp total amount (cents)</td><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('topupAmount','topupAmountInput')">Save</button>
       <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = €5.00</span></td><td></td></tr>
+    <tr><td>Capture Retry Interval (min)</td><td><input id="captureRetryMinsInput" value="${config.captureRetryMins}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('captureRetryMins','captureRetryMinsInput')">Save</button>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">background retry every X minutes</span></td><td></td></tr>
+    <tr><td>Capture Max Retries</td><td><input id="captureMaxRetriesInput" value="${config.captureMaxRetries}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('captureMaxRetries','captureMaxRetriesInput')">Save</button>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">mark as FAILED after N retries</span></td><td></td></tr>
   </table>
   <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">💾 Save JCC HMAC Config</button>
 </div>
@@ -1103,6 +1184,54 @@ async function loadEcrDeclines(){
   }catch(e){}
 }
 
+async function loadPendingCaptures(){
+  try{
+    const r=await fetch('/admin/pending-captures');
+    const items=await r.json();
+    const el=document.getElementById('pendingCaptureDiv');
+    const cnt=document.getElementById('pendingCaptureCount');
+    if(!el) return;
+    const pending=items.filter(i=>i.status!=='RESOLVED');
+    cnt.textContent='('+pending.length+' active)';
+    if(items.length===0){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No pending captures</td></tr></table>';
+      return;
+    }
+    const statusColor={'PENDING':'#e3b341','FAILED':'#f85149','RESOLVED':'#3fb950'};
+    el.innerHTML='<table><tr><th>ID</th><th>Time</th><th>Card</th><th>Amount</th><th>Retries</th><th>Status</th><th>Last Error</th><th>Actions</th></tr>'+
+      items.map(function(p){
+        const sc=statusColor[p.status]||'#8b949e';
+        const retryBtn=p.status!=='RESOLVED'?'<button class="btn orange" style="font-size:11px;padding:2px 8px" onclick="retryCapture(\''+p.id+'\')">↺ Retry</button>':'';
+        const deleteBtn='<button class="btn red" style="font-size:11px;padding:2px 8px;margin-left:4px" onclick="deleteCapture(\''+p.id+'\')">✕</button>';
+        const tokenCode=p.entry&&p.entry.tokenCode?'<br><span style="font-family:monospace;font-size:10px;color:#8b949e">'+p.entry.tokenCode+'</span>':'';
+        return '<tr style="background:'+(p.status==='RESOLVED'?'#0d2010':p.status==='FAILED'?'#2a0d0d':'#1a1200')+'">'+
+          '<td style="font-family:monospace;font-size:11px">'+p.id+'</td>'+
+          '<td style="font-size:11px">'+p.createdAt+'</td>'+
+          '<td style="font-family:monospace">****'+( p.entry&&p.entry.lastDigits||'????')+tokenCode+'</td>'+
+          '<td style="color:#3fb950">€'+(p.amountCents/100).toFixed(2)+'</td>'+
+          '<td>'+p.retries+'</td>'+
+          '<td style="color:'+sc+';font-weight:bold">'+p.status+'</td>'+
+          '<td style="font-size:11px;color:#f85149">'+(p.lastError||'—')+'</td>'+
+          '<td>'+retryBtn+deleteBtn+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
+async function retryCapture(id){
+  const r=await fetch('/admin/retry-capture/'+id,{method:'POST'});
+  const d=await r.json();
+  if(d.ok) alert('Retry result: '+d.status+(d.lastError?' — '+d.lastError:''));
+  else alert('Error: '+d.error);
+  loadPendingCaptures();
+}
+
+async function deleteCapture(id){
+  if(!confirm('Remove this pending capture record?')) return;
+  await fetch('/admin/pending-captures/'+id,{method:'DELETE'});
+  loadPendingCaptures();
+}
+
 async function loadActiveEntries(){
   try{
     const r=await fetch('/admin/entries');
@@ -1252,6 +1381,7 @@ loadActiveEntries();setInterval(loadActiveEntries,5000);
 loadTellStatus();setInterval(loadTellStatus,5000);
 loadRejections();setInterval(loadRejections,5000);
 loadEcrDeclines();setInterval(loadEcrDeclines,5000);
+loadPendingCaptures();setInterval(loadPendingCaptures,10000);
 </script></body></html>`);
 });
 
@@ -1506,14 +1636,23 @@ app.post("/exitCall", async (req, res) => {
     case 2: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
       const captureAmt = feeCents > 0 ? feeCents : preAuthCents;
-      try { await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
+      let captureResult2 = null;
+      try { captureResult2 = await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
+      const captureOk2 = captureResult2 && captureResult2.responseCode === "00";
+      if (!captureOk2) {
+        // Capture declined — open barrier anyway, store for retry
+        console.log(`[JCC] Capture declined (${captureResult2?.responseCode}) — storing for retry`);
+        addPendingCapture(entry, captureAmt);
+      }
       delete activeEntries[token];
       releaseSpace(entry);
       const b2 = await openBarrierWithRetry();
       response = b2 === "failed"
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:String(captureAmt),
-            displayMessage:`Thank you! Charged €${(captureAmt/100).toFixed(2)}.`,
+            displayMessage: captureOk2
+              ? `Thank you! Charged €${(captureAmt/100).toFixed(2)}.`
+              : `Thank you! Charged €${(captureAmt/100).toFixed(2)}. (Payment pending)`,
             timeToDisplayMessage:"5", responseCode:"00",
             responseDescription:"Successful Response" };
       break;
@@ -1521,25 +1660,49 @@ app.post("/exitCall", async (req, res) => {
 
     // ── Scenario 3: TOPUP APPROVED ────────────────────────────────────────────
     // TopUp succeeds → Capture full fee → open barrier
+    // If TopUp is declined by JCC → fall back to Scenario 4 behaviour (release + barrierOpen:"-2")
     case 3: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
-      const totalFee3  = feeCents > 0 ? feeCents : (config.topupAmount || 500);
-      const topupAmt3  = Math.max(0, totalFee3 - preAuthCents);
-      try {
-        // TopUp the extra amount
-        await jccTopup(entry, topupAmt3);
-        // Capture full fee
-        await jccCapture(entry, totalFee3);
-      } catch(e) { console.error("[JCC TOPUP/CAPTURE]", e.message); }
-      delete activeEntries[token];
-      releaseSpace(entry);
-      const b3 = await openBarrierWithRetry();
-      response = b3 === "failed"
-        ? staffResponse(`Payment €${(totalFee3/100).toFixed(2)} processed. Barrier failed — staff called.`)
-        : { barrierOpen:"1", moneyToPay:String(totalFee3),
-            displayMessage:`Thank you! Total €${(totalFee3/100).toFixed(2)}.`,
-            timeToDisplayMessage:"5", responseCode:"00",
-            responseDescription:"Successful Response" };
+      const totalFee3 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
+      const topupAmt3 = Math.max(0, totalFee3 - preAuthCents);
+      let topupResult3 = null;
+      try { topupResult3 = await jccTopup(entry, topupAmt3); } catch(e) { console.error("[JCC TOPUP]", e.message); }
+
+      const topupApproved = topupResult3 && topupResult3.responseCode === "00";
+      console.log(`[JCC] topup result: ${topupResult3?.responseCode} ${topupResult3?.responseText} → ${topupApproved ? "APPROVED" : "DECLINED"}`);
+
+      if (topupApproved) {
+        // TopUp approved → Capture full fee → open barrier
+        let captureResult3 = null;
+        try { captureResult3 = await jccCapture(entry, totalFee3); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
+        const captureOk3 = captureResult3 && captureResult3.responseCode === "00";
+        if (!captureOk3) {
+          console.log(`[JCC] Capture declined after TopUp (${captureResult3?.responseCode}) — storing for retry`);
+          addPendingCapture(entry, totalFee3);
+        }
+        delete activeEntries[token];
+        releaseSpace(entry);
+        const b3 = await openBarrierWithRetry();
+        response = b3 === "failed"
+          ? staffResponse(`Payment €${(totalFee3/100).toFixed(2)} processed. Barrier failed — staff called.`)
+          : { barrierOpen:"1", moneyToPay:String(totalFee3),
+              displayMessage: captureOk3
+                ? `Thank you! Total €${(totalFee3/100).toFixed(2)}.`
+                : `Thank you! Total €${(totalFee3/100).toFixed(2)}. (Payment pending)`,
+              timeToDisplayMessage:"5", responseCode:"00",
+              responseDescription:"Successful Response" };
+      } else {
+        // TopUp declined by JCC → Release pre-auth → ask app for full SALE
+        console.log("[JCC] TopUp declined — falling back to full SALE flow");
+        if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
+        try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
+        // Do NOT delete entry — app needs it alive to send exitPayment
+        response = { barrierOpen:"-2", moneyToPay:String(totalFee3),
+          recordId: entry.recordId,
+          displayMessage:`Card declined. Please tap card for full €${(totalFee3/100).toFixed(2)}.`,
+          timeToDisplayMessage:"10", responseCode:"31",
+          responseDescription:"TopUp declined — full SALE required" };
+      }
       break;
     }
 
@@ -1876,4 +2039,6 @@ app.post("/jcc/config", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Parking RPS Mock running on http://0.0.0.0:${PORT}`);
+  startCaptureRetryLoop();
+  console.log(`[PENDING_CAPTURE] Retry loop started — every ${config.captureRetryMins} min, max ${config.captureMaxRetries} retries`);
 });
