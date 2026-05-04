@@ -1748,6 +1748,27 @@ function calculateFee(entryTime) {
 app.post("/exitCall", async (req, res) => {
   const { token } = req.body;
   const entry = token ? activeEntries[token] : null;
+  const inputType = req.body.inputType || (entry && entry.inputType) || "Bank Card";
+
+  // ── Monthly Card exit — always free, no JCC calls, open barrier immediately ──
+  if (inputType === "Monthly Card") {
+    console.log(`[exitCall] Monthly Card exit — free, no JCC`);
+    if (token && activeEntries[token]) {
+      releaseSpace(activeEntries[token]);
+      delete activeEntries[token];
+    }
+    const bm = await openBarrierWithRetry();
+    const response = bm === "failed"
+      ? { barrierOpen:"0", moneyToPay:"0",
+          displayMessage:"Technical issue. Please contact staff.",
+          timeToDisplayMessage:"10", responseCode:"08",
+          responseDescription:"Barrier failed — staff called" }
+      : { barrierOpen:"1", moneyToPay:"0",
+          displayMessage:"Thank you! Have a nice day.",
+          timeToDisplayMessage:"5", responseCode:"00",
+          responseDescription:"Successful Response" };
+    addLog(req, response); return res.json(response);
+  }
 
   const feeCents     = entry ? calculateFee(entry.entryTime) : 0;
   const preAuthCents = entry ? (entry.preAuthAmountCents || config.minimumAmountPreAuth || 300) : 0;
