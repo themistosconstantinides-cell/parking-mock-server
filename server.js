@@ -650,7 +650,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 .tag-unknown{background:#2d2d2d;color:#8b949e;border:1px solid #555}
 </style></head><body>
 <h1>&#x1F17F; Parking RPS Mock Server</h1>
-<p style="color:#8b949e">All changes take effect immediately — no restart needed.</p>
+<p style="color:#8b949e">All changes take effect immediately - no restart needed.</p>
 
 <h2>&#x1F4F1; POS Device Configuration</h2>
 <p style="color:#8b949e;font-size:12px;margin-top:-8px">
@@ -699,7 +699,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Company Code</td><td>${config.companyCode}</td>
 <td><input class="m" id="inCC" value="${config.companyCode}">
 <button class="btn" onclick="sv('companyCode','inCC')">Save</button></td></tr>
-<tr><td>Exit Scenario</td><td>${config.exitScenario} — ${sn}</td>
+<tr><td>Exit Scenario</td><td>${config.exitScenario} - ${sn}</td>
 <td><button class="btn green" onclick="set('exitScenario',1)">1 Free</button>
 <button class="btn" onclick="set('exitScenario',2)">2 Capture</button>
 <button class="btn orange" onclick="set('exitScenario',3)">3 TopUp OK</button>
@@ -717,7 +717,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Monthly Cards</td><td>${config.monthlyEnabled}</td>
 <td><button class="btn green" onclick="set('monthlyEnabled',true)">ON</button>
 <button class="btn red" onclick="set('monthlyEnabled',false)">OFF</button></td></tr>
-<tr><td>Monthly Card Numbers</td><td style="font-size:11px">${config.monthlyCardsBins||'—'}</td>
+<tr><td>Monthly Card Numbers</td><td style="font-size:11px">${config.monthlyCardsBins||'-'}</td>
 <td><input class="t" id="inBins" value="${config.monthlyCardsBins||''}" placeholder="e.g. 123456;789012" style="width:220px">
 <button class="btn" onclick="sv('monthlyCardsBins','inBins')">Save</button>
 <span style="color:#8b949e;font-size:11px;margin-left:6px">Semicolon-separated full card numbers</span></td></tr>
@@ -800,7 +800,7 @@ ${config.charges.map((c,i)=>`<tr>
 
 <h2>&#x1F6A7; TELL Gate Control PRO</h2>
 <div class="tell-box">
-<h3>Mode — currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
+<h3>Mode - currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
 <button class="btn green" onclick="set('tellEnabled',true)">&#x1F7E2; Enable Real TELL API</button>
 <button class="btn gray" onclick="set('tellEnabled',false)">⚫ Use Mock</button>
 <p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; barrier opens on entranceCall/exitCall(free,capture)/exitPayment.</p>
@@ -834,13 +834,13 @@ ${config.charges.map((c,i)=>`<tr>
 <tr><th>Function</th><th>Setting</th></tr>
 <tr><td>🔵 Entrance vehicle input</td>
 <td><select onchange="set('tellVehicleInputEntrance',this.value)">
-<option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 — dry contact</option>
-<option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 — dry contact</option>
+<option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 - dry contact</option>
+<option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 - dry contact</option>
 </select></td></tr>
 <tr><td>🟠 Exit vehicle input</td>
 <td><select onchange="set('tellVehicleInputExit',this.value)">
-<option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 — dry contact</option>
-<option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 — dry contact</option>
+<option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 - dry contact</option>
+<option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 - dry contact</option>
 </select></td></tr>
 <tr><td>Barrier output</td>
 <td><select onchange="set('tellBarrierOutput',Number(this.value))">
@@ -919,7 +919,7 @@ ${config.charges.map((c,i)=>`<tr>
       <td><input id="releaseAppId" value="${jccConfig.release.appId}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td>
       <td><input id="releaseApiKey" type="password" value="${jccConfig.release.apiKey}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td></tr>
     <tr><th colspan="3">Global Settings</th></tr>
-    <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF — all requests pass through</span></td></tr>
+    <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF - all requests pass through</span></td></tr>
     <tr><td>JCC Target</td><td colspan="2">
       <select onchange="set('jccUseMock',this.value==='true')">
         <option value="true"  ${config.jccUseMock?'selected':''}>🟡 MOCK (this server)</option>
@@ -948,7 +948,7 @@ ${config.charges.map((c,i)=>`<tr>
 </div>
 
 <div class="card" style="margin-top:12px">
-  <h3>&#x1F4C5; End of Day — Manual Capture</h3>
+  <h3>&#x1F4C5; End of Day - Manual Capture</h3>
   <p style="color:#8b949e;font-size:12px">Run capture for all active entries at end of day. Each pre-auth will be captured for its pre-auth amount.</p>
   <button class="btn orange" onclick="runEndOfDayCapture()">&#x1F4B0; Run End of Day Capture</button>
   <div id="eodStatus" style="margin-top:8px;color:#8b949e;font-size:12px"></div>
@@ -958,11 +958,11 @@ ${config.charges.map((c,i)=>`<tr>
   <h3>JCC API Endpoints (base: /financialservices/v1/ippi)</h3>
   <table>
     <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/auth/topup</td><td>POST</td><td>TopUp — charge additional amount</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/auth/capture</td><td>POST</td><td>Capture — finalise pre-auth amount</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/auth/release</td><td>POST</td><td>PreAuthorisationRelease — release pre-auth</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/void</td><td>POST</td><td>Void — cancel a transaction</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/reversal</td><td>POST</td><td>Reversal — reverse a previous operation</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/topup</td><td>POST</td><td>TopUp - charge additional amount</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/capture</td><td>POST</td><td>Capture - finalise pre-auth amount</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/release</td><td>POST</td><td>PreAuthorisationRelease - release pre-auth</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/void</td><td>POST</td><td>Void - cancel a transaction</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/reversal</td><td>POST</td><td>Reversal - reverse a previous operation</td></tr>
   </table>
 </div>
 
@@ -1016,7 +1016,7 @@ function renderLogs(){
     ?allLogs.filter(l=>l.endpoint.toLowerCase().includes(activeFilter.toLowerCase()))
     :allLogs;
   document.getElementById('logCount').textContent=
-    filtered.length+' of '+allLogs.length+' entries'+(activeFilter?' — filter: '+activeFilter:'');
+    filtered.length+' of '+allLogs.length+' entries'+(activeFilter?' - filter: '+activeFilter:'');
   if(!filtered.length){
     document.getElementById('logDiv').innerHTML='<p style="color:#8b949e">No entries match filter</p>';
     return;
@@ -1102,7 +1102,7 @@ async function testConn(){
   try{
     const r=await fetch('/admin/tell-test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
-    if(d.ok) showS('✓ OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
+    if(d.ok) showS('OK OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
 }
@@ -1111,7 +1111,7 @@ async function openNow(){
   try{
     const r=await fetch('/admin/tell-open',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
-    if(d.ok) showS('✓ Barrier open command sent OK',false);
+    if(d.ok) showS('OK Barrier open command sent OK',false);
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
 }
@@ -1124,7 +1124,7 @@ async function registerAppId(){
     if(d.ok){
       document.getElementById('appId').value=d.appId;
       el.style.color='#3fb950';
-      el.textContent='✓ App ID registered and saved: '+d.appId;
+      el.textContent='OK App ID registered and saved: '+d.appId;
     } else {
       el.style.color='#f85149';
       el.textContent='✗ '+d.error;
@@ -1219,33 +1219,35 @@ async function loadPendingCaptures(){
     const statusColor={'PENDING':'#e3b341','FAILED':'#f85149','RESOLVED':'#3fb950'};
     el.innerHTML='<table><tr><th>ID</th><th>Time</th><th>Card</th><th>Amount</th><th>Retries</th><th>Status</th><th>Last Error</th><th>Actions</th></tr>'+
       items.map(function(p){
-        const sc=statusColor[p.status]||'#8b949e';
-        const retryBtn=p.status!=='RESOLVED'?'<button class="btn orange" style="font-size:11px;padding:2px 8px" onclick="retryCapture(\''+p.id+'\')">↺ Retry</button>':'';
-        const deleteBtn='<button class="btn red" style="font-size:11px;padding:2px 8px;margin-left:4px" onclick="deleteCapture(\''+p.id+'\')">✕</button>';
-        const tokenCode=p.entry&&p.entry.tokenCode?'<br><span style="font-family:monospace;font-size:10px;color:#8b949e">'+p.entry.tokenCode+'</span>':'';
+        var sc=statusColor[p.status]||'#8b949e';
+        var retryBtn=p.status!=='RESOLVED'?'<button class="btn orange" style="font-size:11px" onclick="retryCapture(this.dataset.id)" data-id="'+p.id+'">Retry</button>':'';
+        var deleteBtn='<button class="btn red" style="font-size:11px;margin-left:4px" onclick="deleteCapture(this.dataset.id)" data-id="'+p.id+'">Remove</button>';
+        var tok=p.entry&&p.entry.tokenCode?'<br><small style="color:#8b949e">'+p.entry.tokenCode+'</small>':'';
         return '<tr style="background:'+(p.status==='RESOLVED'?'#0d2010':p.status==='FAILED'?'#2a0d0d':'#1a1200')+'">'+
           '<td style="font-family:monospace;font-size:11px">'+p.id+'</td>'+
           '<td style="font-size:11px">'+p.createdAt+'</td>'+
-          '<td style="font-family:monospace">****'+( p.entry&&p.entry.lastDigits||'????')+tokenCode+'</td>'+
-          '<td style="color:#3fb950">€'+(p.amountCents/100).toFixed(2)+'</td>'+
+          '<td style="font-family:monospace">****'+(p.entry&&p.entry.lastDigits||'????')+tok+'</td>'+
+          '<td style="color:#3fb950">EUR '+(p.amountCents/100).toFixed(2)+'</td>'+
           '<td>'+p.retries+'</td>'+
           '<td style="color:'+sc+';font-weight:bold">'+p.status+'</td>'+
-          '<td style="font-size:11px;color:#f85149">'+(p.lastError||'—')+'</td>'+
+          '<td style="font-size:11px;color:#f85149">'+(p.lastError||'-')+'</td>'+
           '<td>'+retryBtn+deleteBtn+'</td>'+
           '</tr>';
       }).join('')+'</table>';
   }catch(e){}
 }
 
-async function retryCapture(id){
+async function retryCapture(el){
+  var id=el.dataset?el.dataset.id:el;
   const r=await fetch('/admin/retry-capture/'+id,{method:'POST'});
   const d=await r.json();
-  if(d.ok) alert('Retry result: '+d.status+(d.lastError?' — '+d.lastError:''));
+  if(d.ok) alert('Retry result: '+d.status+(d.lastError?' - '+d.lastError:''));
   else alert('Error: '+d.error);
   loadPendingCaptures();
 }
 
-async function deleteCapture(id){
+async function deleteCapture(el){
+  var id=el.dataset?el.dataset.id:el;
   if(!confirm('Remove this pending capture record?')) return;
   await fetch('/admin/pending-captures/'+id,{method:'DELETE'});
   loadPendingCaptures();
@@ -1302,19 +1304,19 @@ async function loadTellStatus(){
     const out1Color=s.out1===1?'#1F6FEB':'#30363d';
     el.innerHTML=
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in1Color+'">'+
-        '<div style="font-size:11px;color:#8b949e">IN1 — Entrance</div>'+
+        '<div style="font-size:11px;color:#8b949e">IN1 - Entrance</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+in1Color+'">'+in1Text+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in2Color+'">'+
-        '<div style="font-size:11px;color:#8b949e">IN2 — Exit</div>'+
+        '<div style="font-size:11px;color:#8b949e">IN2 - Exit</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+in2Color+'">'+in2Text+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+barrierColor+'">'+
-        '<div style="font-size:11px;color:#8b949e">IN4 — Barrier</div>'+
+        '<div style="font-size:11px;color:#8b949e">IN4 - Barrier</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+barrierColor+'">'+barrierText+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+out1Color+'">'+
-        '<div style="font-size:11px;color:#8b949e">OUT1 — Relay</div>'+
+        '<div style="font-size:11px;color:#8b949e">OUT1 - Relay</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'🔵 Active':'⚪ Idle')+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid #30363d">'+
@@ -1374,7 +1376,7 @@ async function runEndOfDayCapture(){
   try{
     const r=await fetch('/admin/eod-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
-    el.textContent='✓ EOD Capture done — '+d.processed+' entries processed. '+d.results;
+    el.textContent='OK EOD Capture done - '+d.processed+' entries processed. '+d.results;
   }catch(e){el.textContent='✗ Error: '+e.message;}
 }
 
