@@ -529,8 +529,10 @@ app.get("/admin/tell-status", async (req, res) => {
 });
 app.post("/admin/config", (req, res) => {
   const {key, value} = req.body;
-  if (!(key in config)) return res.json({ok: false, error: "Unknown key"});
-  // Coerce type to match the existing config value type
+  if (!(key in config)) {
+    console.log(`[CONFIG] Unknown key: "${key}"`);
+    return res.json({ok: false, error: `Unknown key: ${key}`});
+  }
   const existing = config[key];
   if (typeof existing === "boolean") {
     config[key] = value === true || value === "true" || value === 1;
@@ -540,6 +542,7 @@ app.post("/admin/config", (req, res) => {
   } else {
     config[key] = value;
   }
+  console.log(`[CONFIG] ${key} = ${JSON.stringify(config[key])} (was ${JSON.stringify(existing)})`);
   res.json({ok: true, config});
 });
 app.post("/admin/clear-entries", (req, res) => {
@@ -1084,8 +1087,10 @@ async function set(k,v){
 }
 async function sv(key,id){
   const v=document.getElementById(id).value.trim();
-  await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
-  showS('✓ Saved '+key,false);
+  const r=await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const d=await r.json();
+  if(d.ok) location.reload();
+  else showS('✗ Error: '+d.error,true);
 }
 async function clearE(){await fetch('/admin/clear-entries',{method:'POST'});location.reload();}
 function showS(msg,err){
