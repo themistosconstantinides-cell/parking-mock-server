@@ -79,10 +79,23 @@ app.use(express.static("public"));
 let logs          = [];
 let activeEntries = {};
 let rejectionLog  = [];  // track rejected entrance attempts
+let ecrDeclineLog = [];  // track ECR declines (no email sent)
 
 function addRejection(reason, cardType, cardId, code) {
   rejectionLog.unshift({ time: Date.now(), reason, cardType, cardId, code });
   if (rejectionLog.length > 50) rejectionLog.pop();
+}
+
+function addEcrDecline(outlet, terminal, point, action) {
+  ecrDeclineLog.unshift({
+    time:     Date.now(),
+    outlet,
+    terminal,
+    point,
+    action,
+    ts:       new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" })
+  });
+  if (ecrDeclineLog.length > 100) ecrDeclineLog.pop();
 }
 
 let config = {
@@ -422,6 +435,7 @@ app.get("/admin/entries", (req, res) => res.json(Object.values(activeEntries)));
 
 // ── GET /admin/rejections ─────────────────────────────────────────────────────
 app.get("/admin/rejections", (req, res) => res.json(rejectionLog));
+app.get("/admin/ecr-declines", (req, res) => res.json(ecrDeclineLog));
 
 // ── GET /admin/tell-status ────────────────────────────────────────────────────
 app.get("/admin/tell-status", async (req, res) => {
@@ -774,6 +788,11 @@ ${config.charges.map((c,i)=>`<tr>
   <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
 </div>
 
+<h2>&#x1F4B3; ECR Declines <span id="ecrDeclineCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="ecrDeclineDiv">
+  <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
+</div>
+
 <h2>&#x1F4CB; Request Log</h2>
 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
   <span style="color:#8b949e;font-size:12px">Filter:</span>
@@ -1060,6 +1079,30 @@ async function loadRejections(){
   }catch(e){}
 }
 
+async function loadEcrDeclines(){
+  try{
+    const r=await fetch('/admin/ecr-declines');
+    const items=await r.json();
+    const el=document.getElementById('ecrDeclineDiv');
+    const cnt=document.getElementById('ecrDeclineCount');
+    if(!el) return;
+    cnt.textContent='('+items.length+')';
+    if(items.length===0){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No ECR declines recorded</td></tr></table>';
+      return;
+    }
+    el.innerHTML='<table><tr><th>Time</th><th>Location</th><th>Terminal</th><th>Reason</th></tr>'+
+      items.map(function(e){
+        return '<tr style="background:#1a1200">'+
+          '<td>'+e.ts+'</td>'+
+          '<td style="color:#f85149">'+e.point+'</td>'+
+          '<td style="font-family:monospace;font-size:11px">'+e.terminal+'</td>'+
+          '<td style="color:#e3b341">'+e.action+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
 async function loadActiveEntries(){
   try{
     const r=await fetch('/admin/entries');
@@ -1208,6 +1251,7 @@ loadJccTransaction();setInterval(loadJccTransaction,3000);
 loadActiveEntries();setInterval(loadActiveEntries,5000);
 loadTellStatus();setInterval(loadTellStatus,5000);
 loadRejections();setInterval(loadRejections,5000);
+loadEcrDeclines();setInterval(loadEcrDeclines,5000);
 </script></body></html>`);
 });
 
@@ -1579,11 +1623,26 @@ app.post("/vehiclePresent", async (req, res) => {
 
 // ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
-  // Fire email in background — never block the response to the app
-  Promise.race([
-    sendHelpAlert(req),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000))
-  ]).catch(e => console.error("[EMAIL] Alert error:", e.message));
+  const action = req.body.action || "";
+  const isManualHelp = action === "Help Button";
+  const isEcrDecline = action.toLowerCase().includes("ecr decline") || action.toLowerCase().includes("ecr_decline");
+
+  if (isManualHelp) {
+    // Only send email for manual Help button press
+    Promise.race([
+      sendHelpAlert(req),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000))
+    ]).catch(e => console.error("[EMAIL] Alert error:", e.message));
+  } else if (isEcrDecline) {
+    // Store ECR decline silently — no email
+    addEcrDecline(
+      req.body.outlet           || "?",
+      req.body.terminal         || "?",
+      req.body.intallationPoint || "?",
+      action
+    );
+    console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} — ${action}`);
+  }
 
   const response = {
     outlet:               req.body.outlet   || config.entranceOutlet,
