@@ -197,14 +197,18 @@ async function retrySingleCapture(pc) {
   }
 }
 
-// Background retry loop — runs every captureRetryMins
+// Background retry loop — checks every 60s, fires when interval elapsed
 function startCaptureRetryLoop() {
+  let lastRun = Date.now();
   setInterval(async () => {
+    const intervalMs = (config.captureRetryMins || 15) * 60 * 1000;
+    if (Date.now() - lastRun < intervalMs) return;
+    lastRun = Date.now();
     const pending = pendingCaptures.filter(pc => pc.status === "PENDING");
     if (pending.length === 0) return;
     console.log(`[PENDING_CAPTURE] Background retry — ${pending.length} pending`);
     for (const pc of pending) await retrySingleCapture(pc);
-  }, (config.captureRetryMins || 15) * 60 * 1000);
+  }, 60 * 1000); // checks every 60s
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -525,7 +529,17 @@ app.get("/admin/tell-status", async (req, res) => {
 });
 app.post("/admin/config", (req, res) => {
   const {key, value} = req.body;
-  if (key in config) config[key] = value;
+  if (!(key in config)) return res.json({ok: false, error: "Unknown key"});
+  // Coerce type to match the existing config value type
+  const existing = config[key];
+  if (typeof existing === "boolean") {
+    config[key] = value === true || value === "true" || value === 1;
+  } else if (typeof existing === "number") {
+    const n = parseFloat(value);
+    config[key] = isNaN(n) ? existing : n;
+  } else {
+    config[key] = value;
+  }
   res.json({ok: true, config});
 });
 app.post("/admin/clear-entries", (req, res) => {
