@@ -1591,9 +1591,6 @@ app.post("/entranceCall", async (req, res) => {
     addRejection("Already inside since "+entryTime, "Monthly Card", existing.lastDigits, "41");
     addLog(req, response); return res.json(response);
   }
-    addRejection("Already inside since "+entryTime, "Monthly Card", existing.lastDigits, "41");
-    addLog(req, response); return res.json(response);
-  }
 
   if (inputType === "Bank Card") {
     const { lastDigits: ld, expiryDate: exp } = req.body;
