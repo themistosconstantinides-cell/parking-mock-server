@@ -967,11 +967,8 @@ ${config.charges.map((c,i)=>`<tr>
 </div>
 
 <div class="card" style="margin-top:12px">
-  <h3>JCC Transaction Log</h3>
-  <table>
-    <tr><th>Time</th><th>Endpoint</th><th>HMAC</th><th>Token/Ref</th><th>Response</th></tr>
-    <tbody id="jccLogs"><tr><td colspan="5" style="color:#8b949e">No transactions yet</td></tr></tbody>
-  </table>
+  <h3>JCC Transaction Log <span id="jccLogCount" style="font-size:12px;color:#8b949e"></span></h3>
+  <div id="jccLogDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
 </div>
 
 <script>
@@ -1331,24 +1328,101 @@ async function loadJccLogs(){
   try{
     const r=await fetch('/jcc/logs');
     const logs=await r.json();
-    const el=document.getElementById('jccLogs');
+    const el=document.getElementById('jccLogDiv');
+    const cnt=document.getElementById('jccLogCount');
     if(!el) return;
-    el.innerHTML=logs.slice(0,20).map(function(l){
-      var bg=l.hmacValid?'#1a2a1a':'#2a1a1a';
-      var col=l.hmacValid?'#4caf50':'#f44336';
-      var chk=l.hmacValid?'&#10003;':'&#10007;';
-      var ref=(l.request&&(l.request.tokenCode||l.request.originalRef))||'';
-      var respCode=(l.response&&l.response.responseCode)||'?';
-      var respDesc=(l.response&&l.response.responseDescription)||JSON.stringify(l.response||{}).substring(0,40);
-      return '<tr style="background:'+bg+'">'+
-        '<td>'+l.time.substring(11,19)+'</td>'+
-        '<td><b>'+l.endpoint+'</b></td>'+
-        '<td style="color:'+col+'">'+chk+'</td>'+
-        '<td>'+ref+'</td>'+
-        '<td>'+respCode+' '+respDesc+'</td>'+
-        '</tr>';
+    cnt.textContent='('+logs.length+' entries)';
+    if(logs.length===0){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No JCC calls yet</td></tr></table>';
+      return;
+    }
+
+    // Field labels for each JCC call type
+    var reqLabels={
+      amount:'Amount (cents)', currency:'Currency', originalRef:'Original Ref',
+      authID:'Auth ID', messageNo:'Message No', messageType:'Message Type',
+      dateTime:'DateTime', merchantNo:'Merchant No', stationID:'Station ID',
+      tokenCode:'Token Code', maskedPAN:'Masked PAN', cardExpiry:'Card Expiry',
+      cardType:'Card Type', invoiceNo:'Invoice No', reasonCode:'Reason Code',
+      userID:'User ID', posSoftware:'POS Software', merchantType:'Merchant Type',
+      surchargeAmount:'Surcharge', citIndicator:'CIT Indicator', ippiVersion:'IPPI Version'
+    };
+    var resLabels={
+      responseCode:'Response Code', responseText:'Response Text',
+      messageNo:'Message No', messageType:'Message Type',
+      mid:'MID', tid:'TID', authID:'Auth ID',
+      retrievalRef:'Retrieval Ref', receiptString:'Receipt',
+      citIndicator:'CIT Indicator'
+    };
+
+    var typeColor={'topup':'#e3b341','capture':'#3fb950','release':'#58a6ff',
+                   'topup-response':'#7a5c00','capture-response':'#1a5c1a','release-response':'#1a3a5c'};
+
+    el.innerHTML=logs.slice(0,50).map(function(l,idx){
+      var isResp=l.endpoint.includes('-response');
+      var baseType=l.endpoint.replace('-response','');
+      var col=typeColor[l.endpoint]||'#8b949e';
+      var hmacCol=l.hmacValid?'#3fb950':'#f85149';
+      var hmacTxt=l.hmacValid?'HMAC OK':'HMAC FAIL';
+      var rc=(l.response&&l.response.responseCode)||'';
+      var rcCol=rc==='00'?'#3fb950':rc?'#f85149':'#8b949e';
+      var rt=(l.response&&(l.response.responseText||l.response.responseDescription))||'';
+
+      // Build request fields table
+      var reqFields='';
+      if(l.request && !isResp){
+        reqFields='<table style="width:100%;font-size:11px;margin:4px 0">';
+        Object.keys(l.request).forEach(function(k){
+          var v=l.request[k];
+          if(v===undefined||v===null||v==='') return;
+          var label=reqLabels[k]||k;
+          var valCol='#c9d1d9';
+          if(k==='tokenCode') valCol='#e3b341';
+          if(k==='maskedPAN') valCol='#58a6ff';
+          if(k==='amount') valCol='#3fb950';
+          if(k==='authID'||k==='originalRef') valCol='#d2a8ff';
+          reqFields+='<tr><td style="color:#8b949e;width:140px;padding:1px 6px">'+label+'</td>'+
+            '<td style="font-family:monospace;color:'+valCol+';padding:1px 6px">'+v+'</td></tr>';
+        });
+        reqFields+='</table>';
+      }
+
+      // Build response fields table
+      var resFields='';
+      if(l.response && Object.keys(l.response).length>0){
+        resFields='<table style="width:100%;font-size:11px;margin:4px 0">';
+        Object.keys(l.response).forEach(function(k){
+          var v=l.response[k];
+          if(v===undefined||v===null||v==='') return;
+          var label=resLabels[k]||k;
+          var valCol='#c9d1d9';
+          if(k==='responseCode') valCol=rc==='00'?'#3fb950':'#f85149';
+          if(k==='responseText') valCol=rc==='00'?'#3fb950':'#f85149';
+          if(k==='authID') valCol='#d2a8ff';
+          if(k==='retrievalRef') valCol='#e3b341';
+          resFields+='<tr><td style="color:#8b949e;width:140px;padding:1px 6px">'+label+'</td>'+
+            '<td style="font-family:monospace;color:'+valCol+';padding:1px 6px">'+v+'</td></tr>';
+        });
+        resFields+='</table>';
+      }
+
+      var bg=isResp?(rc==='00'?'#0d1e0d':'#1e0d0d'):'#0d1117';
+      var border=isResp?'border-left:3px solid '+(rc==='00'?'#3fb950':'#f85149'):'border-left:3px solid '+col;
+
+      return '<div style="'+border+';background:'+bg+';margin-bottom:4px;padding:8px 12px;border-radius:4px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+          '<span style="color:'+col+';font-weight:bold;font-size:13px">'+l.endpoint.toUpperCase()+'</span>'+
+          '<span style="display:flex;gap:12px;font-size:11px">'+
+            '<span style="color:'+hmacCol+'">'+hmacTxt+'</span>'+
+            (rc?'<span style="color:'+rcCol+';font-weight:bold">RC: '+rc+' '+rt+'</span>':'')+
+            '<span style="color:#8b949e">'+l.time.substring(11,19)+'</span>'+
+          '</span>'+
+        '</div>'+
+        (reqFields?'<div style="color:#8b949e;font-size:11px;margin-bottom:2px">REQUEST</div>'+reqFields:'')+
+        (resFields?'<div style="color:#8b949e;font-size:11px;margin-bottom:2px;margin-top:4px">RESPONSE</div>'+resFields:'')+
+      '</div>';
     }).join('');
-  }catch(e){}
+  }catch(e){ console.error('loadJccLogs error',e); }
 }
 
 async function loadJccTransaction(){
