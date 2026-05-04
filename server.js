@@ -3,16 +3,99 @@ const https   = require("https");
 const app     = express();
 
 app.use(express.json());
+
+// ── Email alerts via Resend HTTP API ─────────────────────────────────────────
+// Set RESEND_KEY and ALERT_EMAIL in Render environment variables
+// No npm packages needed — uses built-in https module
+async function sendHelpAlert(req) {
+  const apiKey = process.env.RESEND_KEY;
+  const to     = config.alertEmail || process.env.ALERT_EMAIL;
+  if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set — skipping"); return; }
+  if (!to)     { console.log("[EMAIL] No alert email configured — skipping"); return; }
+
+  const outlet   = req.body.outlet           || "?";
+  const terminal = req.body.terminal         || "?";
+  const point    = req.body.intallationPoint || "?";
+  const action   = req.body.action           || "Help Button";
+  const company  = req.body.companyCode      || config.companyCode;
+  const time     = new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" });
+
+  console.log(`[EMAIL] Sending help alert to: ${to}`);
+
+  const payload = JSON.stringify({
+    from:    "ParkTec Alerts <onboarding@resend.dev>",
+    to:      [to],
+    subject: `ParkTec Help Alert - ${point} (${outlet})`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:500px">
+        <h2 style="color:#c0392b">Help Called at ${point}</h2>
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:6px;color:#666">Company</td><td style="padding:6px"><b>${company}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Outlet</td><td style="padding:6px"><b>${outlet}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Terminal</td><td style="padding:6px"><b>${terminal}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Location</td><td style="padding:6px"><b>${point}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Action</td><td style="padding:6px"><b>${action}</b></td></tr>
+          <tr><td style="padding:6px;color:#666">Time</td><td style="padding:6px"><b>${time}</b></td></tr>
+        </table>
+        <p style="color:#888;font-size:12px;margin-top:16px">ParkTec Parking System</p>
+      </div>
+    `
+  });
+
+  return new Promise((resolve) => {
+    const req2 = https.request({
+      hostname: "api.resend.com",
+      path:     "/emails",
+      method:   "POST",
+      headers:  {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type":  "application/json",
+        "Content-Length": Buffer.byteLength(payload)
+      }
+    }, (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => {
+        if (res.statusCode === 200 || res.statusCode === 201) {
+          console.log(`[EMAIL] Alert sent -> ${to}`);
+          config.lastAlertSent = time;
+        } else {
+          console.error(`[EMAIL] Failed: HTTP ${res.statusCode} — ${data}`);
+        }
+        resolve();
+      });
+    });
+    req2.on("error", e => {
+      console.error("[EMAIL] Request error:", e.message);
+      resolve();
+    });
+    req2.write(payload);
+    req2.end();
+  });
+}
 app.use(express.static("public"));
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let logs          = [];
 let activeEntries = {};
 let rejectionLog  = [];  // track rejected entrance attempts
+let ecrDeclineLog = [];  // track ECR declines (no email sent)
 
 function addRejection(reason, cardType, cardId, code) {
   rejectionLog.unshift({ time: Date.now(), reason, cardType, cardId, code });
   if (rejectionLog.length > 50) rejectionLog.pop();
+}
+
+function addEcrDecline(outlet, terminal, point, action) {
+  ecrDeclineLog.unshift({
+    time:     Date.now(),
+    outlet,
+    terminal,
+    point,
+    action,
+    ts:       new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" })
+  });
+  if (ecrDeclineLog.length > 100) ecrDeclineLog.pop();
 }
 
 let config = {
@@ -30,6 +113,10 @@ let config = {
   defaultAmount:          800,
   fixAmountSolution:      -1,   // -1 = off, >0 = fixed SALE amount in cents (entrance only)
   phoneForHelp:           "99123456",
+  helpMessage:            "Help has been called. Staff will assist you shortly. For immediate assistance call: 99123456",
+  helpDisplayTime:        "10",
+  lastAlertSent:          null,
+  alertEmail:             process.env.ALERT_EMAIL || "",
   displayMessageEntrance: "Welcome to Limassol Parking!",
   displayMessageExit:     "Please prepare the card that was used during Entrance.",
   charges: [
@@ -46,6 +133,9 @@ let config = {
   monthlyCardsBins:      "123456;12345678910111213453",   // semicolon-separated full card numbers
   showRates:             true,
   responseCode:          "00",
+  flagsForAction:        "0000",  // "1000"=restart app, "0100"=force full init, "1100"=both, "0000"=none
+  voiceAssistant:        true,    // true = app plays audio; false = silent
+  defaultLanguage:       "EN",    // EN, EL, RU, IW
   companyCode:           "MarinaParking",
 
   // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
@@ -61,10 +151,65 @@ let config = {
 
   // ── JCC IPPI ──────────────────────────────────────────────────────────────────
   jccBaseUrl:   "https://test-apis.jccsecure.com",
-  jccUseMock:   true,   // true = call own mock endpoints, false = call real JCC
-  parkingName:  "ParkTec",
-  topupAmount:  500,    // total exit fee in cents for scenario 3 (TopUp)
+  jccUseMock:          true,   // true = call own mock endpoints, false = call real JCC
+  parkingName:         "ParkTec",
+  topupAmount:         500,    // total exit fee in cents for scenario 3 (TopUp)
+  captureRetryMins:    15,     // retry interval in minutes for failed captures
+  captureMaxRetries:   5,      // max retry attempts before marking as FAILED
 };
+
+// ── Pending Captures (capture declined at exit — retry in background) ─────────
+let pendingCaptures = [];  // { id, entry, amountCents, createdAt, retries, status, lastAttempt, lastError }
+
+function addPendingCapture(entry, amountCents) {
+  const id = require("crypto").randomBytes(8).toString("hex").toUpperCase();
+  pendingCaptures.unshift({
+    id, entry, amountCents,
+    createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
+    retries:     0,
+    status:      "PENDING",
+    lastAttempt: null,
+    lastError:   null
+  });
+  console.log(`[PENDING_CAPTURE] Added ${id} — €${(amountCents/100).toFixed(2)} last4=${entry.lastDigits}`);
+}
+
+async function retrySingleCapture(pc) {
+  pc.lastAttempt = new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" });
+  pc.retries++;
+  try {
+    const r = await jccCapture(pc.entry, pc.amountCents);
+    if (r && r.responseCode === "00") {
+      pc.status = "RESOLVED";
+      console.log(`[PENDING_CAPTURE] ${pc.id} RESOLVED on retry ${pc.retries}`);
+    } else {
+      pc.lastError = r ? `${r.responseCode} ${r.responseText}` : "No response";
+      if (pc.retries >= config.captureMaxRetries) {
+        pc.status = "FAILED";
+        console.log(`[PENDING_CAPTURE] ${pc.id} FAILED after ${pc.retries} retries — manual action required`);
+      } else {
+        console.log(`[PENDING_CAPTURE] ${pc.id} retry ${pc.retries}/${config.captureMaxRetries} failed: ${pc.lastError}`);
+      }
+    }
+  } catch(e) {
+    pc.lastError = e.message;
+    console.error(`[PENDING_CAPTURE] ${pc.id} retry error:`, e.message);
+  }
+}
+
+// Background retry loop — checks every 60s, fires when interval elapsed
+function startCaptureRetryLoop() {
+  let lastRun = Date.now();
+  setInterval(async () => {
+    const intervalMs = (config.captureRetryMins || 15) * 60 * 1000;
+    if (Date.now() - lastRun < intervalMs) return;
+    lastRun = Date.now();
+    const pending = pendingCaptures.filter(pc => pc.status === "PENDING");
+    if (pending.length === 0) return;
+    console.log(`[PENDING_CAPTURE] Background retry — ${pending.length} pending`);
+    for (const pc of pending) await retrySingleCapture(pc);
+  }, 60 * 1000); // checks every 60s
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function addLog(req, response) {
@@ -270,7 +415,7 @@ async function jccRelease(entry) {
 }
 
 function scenarioName(n) {
-  return {1:"Free",2:"Capture Only",3:"TopUp Needed",4:"Barrier Failed"}[n]||"?";
+  return {1:"Free",2:"Capture Only",3:"TopUp Approved",4:"TopUp Declined",5:"Barrier Failed"}[n]||"?";
 }
 
 /**
@@ -345,6 +490,26 @@ app.get("/admin/entries", (req, res) => res.json(Object.values(activeEntries)));
 
 // ── GET /admin/rejections ─────────────────────────────────────────────────────
 app.get("/admin/rejections", (req, res) => res.json(rejectionLog));
+app.get("/admin/ecr-declines", (req, res) => res.json(ecrDeclineLog));
+
+// ── Pending Captures endpoints ────────────────────────────────────────────────
+app.get("/admin/pending-captures", (req, res) => res.json(pendingCaptures));
+
+app.post("/admin/retry-capture/:id", async (req, res) => {
+  const pc = pendingCaptures.find(p => p.id === req.params.id);
+  if (!pc) return res.json({ ok: false, error: "Not found" });
+  if (pc.status === "RESOLVED") return res.json({ ok: false, error: "Already resolved" });
+  pc.status = "PENDING"; // reset FAILED to allow manual retry
+  await retrySingleCapture(pc);
+  res.json({ ok: true, status: pc.status, retries: pc.retries, lastError: pc.lastError });
+});
+
+app.delete("/admin/pending-captures/:id", (req, res) => {
+  const idx = pendingCaptures.findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.json({ ok: false, error: "Not found" });
+  pendingCaptures.splice(idx, 1);
+  res.json({ ok: true });
+});
 
 // ── GET /admin/tell-status ────────────────────────────────────────────────────
 app.get("/admin/tell-status", async (req, res) => {
@@ -364,7 +529,20 @@ app.get("/admin/tell-status", async (req, res) => {
 });
 app.post("/admin/config", (req, res) => {
   const {key, value} = req.body;
-  if (key in config) config[key] = value;
+  if (!(key in config)) {
+    console.log(`[CONFIG] Unknown key: "${key}"`);
+    return res.json({ok: false, error: `Unknown key: ${key}`});
+  }
+  const existing = config[key];
+  if (typeof existing === "boolean") {
+    config[key] = value === true || value === "true" || value === 1;
+  } else if (typeof existing === "number") {
+    const n = parseFloat(value);
+    config[key] = isNaN(n) ? existing : n;
+  } else {
+    config[key] = value;
+  }
+  console.log(`[CONFIG] ${key} = ${JSON.stringify(config[key])} (was ${JSON.stringify(existing)})`);
   res.json({ok: true, config});
 });
 app.post("/admin/clear-entries", (req, res) => {
@@ -421,6 +599,25 @@ app.post("/admin/tell-open", async (req, res) => {
   }
 });
 
+// ── POST /admin/tell-register ─────────────────────────────────────────────────
+// Calls TELL /gc/addappid using hwId + hwName + password → saves appId to config
+app.post("/admin/tell-register", async (req, res) => {
+  if (!config.tellHwId)
+    return res.json({ok:false, error:"hwId must be configured first"});
+  try {
+    const body = { hwId: config.tellHwId, hwName: config.tellHwName, password: config.tellPassword };
+    const result = await tellRequest("POST", "/gc/addappid", body);
+    if (result.result === "OK" && result.appId) {
+      config.tellAppId = result.appId;
+      res.json({ok:true, appId: result.appId});
+    } else {
+      res.json({ok:false, error: JSON.stringify(result)});
+    }
+  } catch(e) {
+    res.json({ok:false, error:e.message});
+  }
+});
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const sn = scenarioName(config.exitScenario);
@@ -453,7 +650,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 .tag-unknown{background:#2d2d2d;color:#8b949e;border:1px solid #555}
 </style></head><body>
 <h1>&#x1F17F; Parking RPS Mock Server</h1>
-<p style="color:#8b949e">All changes take effect immediately — no restart needed.</p>
+<p style="color:#8b949e">All changes take effect immediately - no restart needed.</p>
 
 <h2>&#x1F4F1; POS Device Configuration</h2>
 <p style="color:#8b949e;font-size:12px;margin-top:-8px">
@@ -498,14 +695,16 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <h2>&#9881; Parking Configuration</h2>
 <table>
 <tr><th>Setting</th><th>Value</th><th>Actions</th></tr>
+<tr><td>App Version</td><td>${config.lastAppVersionName ? config.lastAppVersionName + ' (build ' + config.lastAppVersionNumber + ')' : '<span style="color:#8b949e">not yet received</span>'}</td><td></td></tr>
 <tr><td>Company Code</td><td>${config.companyCode}</td>
 <td><input class="m" id="inCC" value="${config.companyCode}">
 <button class="btn" onclick="sv('companyCode','inCC')">Save</button></td></tr>
-<tr><td>Exit Scenario</td><td>${config.exitScenario} — ${sn}</td>
+<tr><td>Exit Scenario</td><td>${config.exitScenario} - ${sn}</td>
 <td><button class="btn green" onclick="set('exitScenario',1)">1 Free</button>
 <button class="btn" onclick="set('exitScenario',2)">2 Capture</button>
-<button class="btn orange" onclick="set('exitScenario',3)">3 TopUp</button>
-<button class="btn red" onclick="set('exitScenario',4)">4 Barrier Fail</button></td></tr>
+<button class="btn orange" onclick="set('exitScenario',3)">3 TopUp OK</button>
+<button class="btn red" onclick="set('exitScenario',4)">4 TopUp Declined</button>
+<button class="btn red" onclick="set('exitScenario',5)">5 Barrier Fail</button></td></tr>
 <tr><td>Vehicle Present (mock)</td><td>${config.vehiclePresent}</td>
 <td><button class="btn green" onclick="set('vehiclePresent',true)">YES</button>
 <button class="btn red" onclick="set('vehiclePresent',false)">NO</button></td></tr>
@@ -518,7 +717,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Monthly Cards</td><td>${config.monthlyEnabled}</td>
 <td><button class="btn green" onclick="set('monthlyEnabled',true)">ON</button>
 <button class="btn red" onclick="set('monthlyEnabled',false)">OFF</button></td></tr>
-<tr><td>Monthly Card Numbers</td><td style="font-size:11px">${config.monthlyCardsBins||'—'}</td>
+<tr><td>Monthly Card Numbers</td><td style="font-size:11px">${config.monthlyCardsBins||'-'}</td>
 <td><input class="t" id="inBins" value="${config.monthlyCardsBins||''}" placeholder="e.g. 123456;789012" style="width:220px">
 <button class="btn" onclick="sv('monthlyCardsBins','inBins')">Save</button>
 <span style="color:#8b949e;font-size:11px;margin-left:6px">Semicolon-separated full card numbers</span></td></tr>
@@ -530,6 +729,19 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <button class="btn red" onclick="set('responseCode','91')">91 Outlet</button>
 <button class="btn red" onclick="set('responseCode','92')">92 Company</button>
 <button class="btn red" onclick="set('responseCode','08')">08 Technical</button></td></tr>
+<tr><td>flagsForAction</td><td>${config.flagsForAction}</td>
+<td><button class="btn green" onclick="set('flagsForAction','0000')">0000 None</button>
+<button class="btn orange" onclick="set('flagsForAction','1000')">1000 Restart App</button>
+<button class="btn" onclick="set('flagsForAction','0100')">0100 Force Init</button>
+<button class="btn red" onclick="set('flagsForAction','1100')">1100 Init + Restart</button></td></tr>
+<tr><td>Voice Assistant</td><td>${config.voiceAssistant ? '🔊 ON' : '🔇 OFF'}</td>
+<td><button class="btn green" onclick="set('voiceAssistant',true)">🔊 ON</button>
+<button class="btn red" onclick="set('voiceAssistant',false)">🔇 OFF</button></td></tr>
+<tr><td>Default Language</td><td>${config.defaultLanguage}</td>
+<td><button class="btn green" onclick="set('defaultLanguage','EN')">🇬🇧 EN</button>
+<button class="btn" onclick="set('defaultLanguage','EL')">🇬🇷 EL</button>
+<button class="btn" onclick="set('defaultLanguage','RU')">🇷🇺 RU</button>
+<button class="btn" onclick="set('defaultLanguage','IW')">🇮🇱 IW</button></td></tr>
 </table>
 
 <h2>&#x1F4E1; parkingInit Response Fields</h2>
@@ -551,6 +763,18 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Phone For Help</td><td>${config.phoneForHelp}</td>
 <td><input class="m" id="inPH" value="${config.phoneForHelp}">
 <button class="btn" onclick="sv('phoneForHelp','inPH')">Save</button></td></tr>
+<tr><td>Help Message</td><td style="font-size:11px">${config.helpMessage}</td>
+<td><input class="w" id="inHM" value="${config.helpMessage}">
+<button class="btn" onclick="sv('helpMessage','inHM')">Save</button></td></tr>
+<tr><td>Help Display Time (sec)</td><td>${config.helpDisplayTime}</td>
+<td><input class="m" id="inHDT" value="${config.helpDisplayTime}" style="width:60px">
+<button class="btn" onclick="sv('helpDisplayTime','inHDT')">Save</button></td></tr>
+<tr><td>Email Alerts</td>
+<td>${process.env.RESEND_KEY ? '✅ Resend active' : '⚠️ Not configured (set RESEND_KEY in Render)'}</td>
+<td style="font-size:11px;color:#8b949e">${config.lastAlertSent ? 'Last sent: '+config.lastAlertSent : 'No alerts sent yet'}</td></tr>
+<tr><td>Alert Email (recipient)</td>
+<td><input class="w" id="inAlertEmail" placeholder="recipient@email.com" value="${config.alertEmail}"></td>
+<td><button class="btn" onclick="sv('alertEmail','inAlertEmail')">Save</button></td></tr>
 <tr><td>Display Msg Entrance</td><td style="font-size:11px">${config.displayMessageEntrance}</td>
 <td><input class="w" id="inDME" value="${config.displayMessageEntrance}">
 <button class="btn" onclick="sv('displayMessageEntrance','inDME')">Save</button></td></tr>
@@ -576,7 +800,7 @@ ${config.charges.map((c,i)=>`<tr>
 
 <h2>&#x1F6A7; TELL Gate Control PRO</h2>
 <div class="tell-box">
-<h3>Mode — currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
+<h3>Mode - currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
 <button class="btn green" onclick="set('tellEnabled',true)">&#x1F7E2; Enable Real TELL API</button>
 <button class="btn gray" onclick="set('tellEnabled',false)">⚫ Use Mock</button>
 <p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; barrier opens on entranceCall/exitCall(free,capture)/exitPayment.</p>
@@ -591,8 +815,12 @@ ${config.charges.map((c,i)=>`<tr>
 <td><input class="m" id="hwName" value="${config.tellHwName}"></td>
 <td><button class="btn" onclick="sv('tellHwName','hwName')">Save</button></td></tr>
 <tr><td>App ID (40 chars)</td>
-<td><input class="w" id="appId" placeholder="from gc/addappid" value="${config.tellAppId}"></td>
-<td><button class="btn" onclick="sv('tellAppId','appId')">Save</button></td></tr>
+<td><input class="w" id="appId" placeholder="paste manually or click Get from TELL" value="${config.tellAppId}"></td>
+<td>
+  <button class="btn" onclick="sv('tellAppId','appId')">Save</button>
+  <button class="btn green" onclick="registerAppId()" style="margin-left:4px">&#x1F4E1; Get from TELL</button>
+</td></tr>
+<tr><td></td><td colspan="2"><span id="regResult" style="font-size:12px"></span></td></tr>
 <tr><td>API Key</td>
 <td><input class="w" id="apiKey" value="${config.tellApiKey}"></td>
 <td><button class="btn" onclick="sv('tellApiKey','apiKey')">Save</button></td></tr>
@@ -606,13 +834,13 @@ ${config.charges.map((c,i)=>`<tr>
 <tr><th>Function</th><th>Setting</th></tr>
 <tr><td>🔵 Entrance vehicle input</td>
 <td><select onchange="set('tellVehicleInputEntrance',this.value)">
-<option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 — dry contact</option>
-<option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 — dry contact</option>
+<option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 - dry contact</option>
+<option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 - dry contact</option>
 </select></td></tr>
 <tr><td>🟠 Exit vehicle input</td>
 <td><select onchange="set('tellVehicleInputExit',this.value)">
-<option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 — dry contact</option>
-<option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 — dry contact</option>
+<option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 - dry contact</option>
+<option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 - dry contact</option>
 </select></td></tr>
 <tr><td>Barrier output</td>
 <td><select onchange="set('tellBarrierOutput',Number(this.value))">
@@ -644,6 +872,16 @@ ${config.charges.map((c,i)=>`<tr>
 
 <h2>&#x26D4; Rejected Attempts <span id="rejectionCount" style="font-size:13px;color:#8b949e"></span></h2>
 <div id="rejectionDiv">
+  <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
+</div>
+
+<h2>&#x1F4B3; ECR Declines <span id="ecrDeclineCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="ecrDeclineDiv">
+  <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
+</div>
+
+<h2>&#x26A0;&#xFE0F; Pending Captures <span id="pendingCaptureCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="pendingCaptureDiv">
   <table><tr><td style="color:#8b949e">Loading...</td></tr></table>
 </div>
 
@@ -681,7 +919,7 @@ ${config.charges.map((c,i)=>`<tr>
       <td><input id="releaseAppId" value="${jccConfig.release.appId}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td>
       <td><input id="releaseApiKey" type="password" value="${jccConfig.release.apiKey}" style="width:280px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px"></td></tr>
     <tr><th colspan="3">Global Settings</th></tr>
-    <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF — all requests pass through</span></td></tr>
+    <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF - all requests pass through</span></td></tr>
     <tr><td>JCC Target</td><td colspan="2">
       <select onchange="set('jccUseMock',this.value==='true')">
         <option value="true"  ${config.jccUseMock?'selected':''}>🟡 MOCK (this server)</option>
@@ -693,6 +931,12 @@ ${config.charges.map((c,i)=>`<tr>
     <tr><td>TopUp total amount (cents)</td><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('topupAmount','topupAmountInput')">Save</button>
       <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = €5.00</span></td><td></td></tr>
+    <tr><td>Capture Retry Interval (min)</td><td><input id="captureRetryMinsInput" value="${config.captureRetryMins}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('captureRetryMins','captureRetryMinsInput')">Save</button>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">background retry every X minutes</span></td><td></td></tr>
+    <tr><td>Capture Max Retries</td><td><input id="captureMaxRetriesInput" value="${config.captureMaxRetries}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
+      <button class="btn" style="margin-left:6px" onclick="sv('captureMaxRetries','captureMaxRetriesInput')">Save</button>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">mark as FAILED after N retries</span></td><td></td></tr>
   </table>
   <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">💾 Save JCC HMAC Config</button>
 </div>
@@ -704,7 +948,7 @@ ${config.charges.map((c,i)=>`<tr>
 </div>
 
 <div class="card" style="margin-top:12px">
-  <h3>&#x1F4C5; End of Day — Manual Capture</h3>
+  <h3>&#x1F4C5; End of Day - Manual Capture</h3>
   <p style="color:#8b949e;font-size:12px">Run capture for all active entries at end of day. Each pre-auth will be captured for its pre-auth amount.</p>
   <button class="btn orange" onclick="runEndOfDayCapture()">&#x1F4B0; Run End of Day Capture</button>
   <div id="eodStatus" style="margin-top:8px;color:#8b949e;font-size:12px"></div>
@@ -714,20 +958,17 @@ ${config.charges.map((c,i)=>`<tr>
   <h3>JCC API Endpoints (base: /financialservices/v1/ippi)</h3>
   <table>
     <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/auth/topup</td><td>POST</td><td>TopUp — charge additional amount</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/auth/capture</td><td>POST</td><td>Capture — finalise pre-auth amount</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/auth/release</td><td>POST</td><td>PreAuthorisationRelease — release pre-auth</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/void</td><td>POST</td><td>Void — cancel a transaction</td></tr>
-    <tr><td style="font-family:monospace;color:#58a6ff">/reversal</td><td>POST</td><td>Reversal — reverse a previous operation</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/topup</td><td>POST</td><td>TopUp - charge additional amount</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/capture</td><td>POST</td><td>Capture - finalise pre-auth amount</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/auth/release</td><td>POST</td><td>PreAuthorisationRelease - release pre-auth</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/void</td><td>POST</td><td>Void - cancel a transaction</td></tr>
+    <tr><td style="font-family:monospace;color:#58a6ff">/reversal</td><td>POST</td><td>Reversal - reverse a previous operation</td></tr>
   </table>
 </div>
 
 <div class="card" style="margin-top:12px">
-  <h3>JCC Transaction Log</h3>
-  <table>
-    <tr><th>Time</th><th>Endpoint</th><th>HMAC</th><th>Token/Ref</th><th>Response</th></tr>
-    <tbody id="jccLogs"><tr><td colspan="5" style="color:#8b949e">No transactions yet</td></tr></tbody>
-  </table>
+  <h3>JCC Transaction Log <span id="jccLogCount" style="font-size:12px;color:#8b949e"></span></h3>
+  <div id="jccLogDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
 </div>
 
 <script>
@@ -772,7 +1013,7 @@ function renderLogs(){
     ?allLogs.filter(l=>l.endpoint.toLowerCase().includes(activeFilter.toLowerCase()))
     :allLogs;
   document.getElementById('logCount').textContent=
-    filtered.length+' of '+allLogs.length+' entries'+(activeFilter?' — filter: '+activeFilter:'');
+    filtered.length+' of '+allLogs.length+' entries'+(activeFilter?' - filter: '+activeFilter:'');
   if(!filtered.length){
     document.getElementById('logDiv').innerHTML='<p style="color:#8b949e">No entries match filter</p>';
     return;
@@ -789,6 +1030,7 @@ function renderLogs(){
         '<span style="color:#8b949e;font-size:11px;min-width:130px">'+l.time+'</span>'+
         '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'🔌 ':'')+l.method+' '+l.endpoint+'</span>'+
         (l.request&&l.request.outlet?modeTag(l.request.outlet):'')+
+        (l.request&&l.request.versionName?'<span style="color:#8b949e;font-size:11px;margin-left:4px">v'+l.request.versionName+'</span>':'')+
         (rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
@@ -842,8 +1084,10 @@ async function set(k,v){
 }
 async function sv(key,id){
   const v=document.getElementById(id).value.trim();
-  await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
-  showS('✓ Saved '+key,false);
+  const r=await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const d=await r.json();
+  if(d.ok) location.reload();
+  else showS('✗ Error: '+d.error,true);
 }
 async function clearE(){await fetch('/admin/clear-entries',{method:'POST'});location.reload();}
 function showS(msg,err){
@@ -855,7 +1099,7 @@ async function testConn(){
   try{
     const r=await fetch('/admin/tell-test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
-    if(d.ok) showS('✓ OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
+    if(d.ok) showS('OK OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
 }
@@ -864,9 +1108,28 @@ async function openNow(){
   try{
     const r=await fetch('/admin/tell-open',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
-    if(d.ok) showS('✓ Barrier open command sent OK',false);
+    if(d.ok) showS('OK Barrier open command sent OK',false);
     else showS('✗ '+d.error,true);
   }catch(e){showS('✗ '+e.message,true);}
+}
+async function registerAppId(){
+  const el=document.getElementById('regResult');
+  el.style.color='#8b949e'; el.textContent='Calling /gc/addappid...';
+  try{
+    const r=await fetch('/admin/tell-register',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const d=await r.json();
+    if(d.ok){
+      document.getElementById('appId').value=d.appId;
+      el.style.color='#3fb950';
+      el.textContent='OK App ID registered and saved: '+d.appId;
+    } else {
+      el.style.color='#f85149';
+      el.textContent='✗ '+d.error;
+    }
+  }catch(e){
+    el.style.color='#f85149';
+    el.textContent='✗ '+e.message;
+  }
 }
 
 async function addCharge(){
@@ -911,6 +1174,80 @@ async function loadRejections(){
           '</tr>';
       }).join('')+'</table>';
   }catch(e){}
+}
+
+async function loadEcrDeclines(){
+  try{
+    const r=await fetch('/admin/ecr-declines');
+    const items=await r.json();
+    const el=document.getElementById('ecrDeclineDiv');
+    const cnt=document.getElementById('ecrDeclineCount');
+    if(!el) return;
+    cnt.textContent='('+items.length+')';
+    if(items.length===0){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No ECR declines recorded</td></tr></table>';
+      return;
+    }
+    el.innerHTML='<table><tr><th>Time</th><th>Location</th><th>Terminal</th><th>Reason</th></tr>'+
+      items.map(function(e){
+        return '<tr style="background:#1a1200">'+
+          '<td>'+e.ts+'</td>'+
+          '<td style="color:#f85149">'+e.point+'</td>'+
+          '<td style="font-family:monospace;font-size:11px">'+e.terminal+'</td>'+
+          '<td style="color:#e3b341">'+e.action+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
+async function loadPendingCaptures(){
+  try{
+    const r=await fetch('/admin/pending-captures');
+    const items=await r.json();
+    const el=document.getElementById('pendingCaptureDiv');
+    const cnt=document.getElementById('pendingCaptureCount');
+    if(!el) return;
+    const pending=items.filter(i=>i.status!=='RESOLVED');
+    cnt.textContent='('+pending.length+' active)';
+    if(items.length===0){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No pending captures</td></tr></table>';
+      return;
+    }
+    const statusColor={'PENDING':'#e3b341','FAILED':'#f85149','RESOLVED':'#3fb950'};
+    el.innerHTML='<table><tr><th>ID</th><th>Time</th><th>Card</th><th>Amount</th><th>Retries</th><th>Status</th><th>Last Error</th><th>Actions</th></tr>'+
+      items.map(function(p){
+        var sc=statusColor[p.status]||'#8b949e';
+        var retryBtn=p.status!=='RESOLVED'?'<button class="btn orange" style="font-size:11px" onclick="retryCapture(this.dataset.id)" data-id="'+p.id+'">Retry</button>':'';
+        var deleteBtn='<button class="btn red" style="font-size:11px;margin-left:4px" onclick="deleteCapture(this.dataset.id)" data-id="'+p.id+'">Remove</button>';
+        var tok=p.entry&&p.entry.tokenCode?'<br><small style="color:#8b949e">'+p.entry.tokenCode+'</small>':'';
+        return '<tr style="background:'+(p.status==='RESOLVED'?'#0d2010':p.status==='FAILED'?'#2a0d0d':'#1a1200')+'">'+
+          '<td style="font-family:monospace;font-size:11px">'+p.id+'</td>'+
+          '<td style="font-size:11px">'+p.createdAt+'</td>'+
+          '<td style="font-family:monospace">****'+(p.entry&&p.entry.lastDigits||'????')+tok+'</td>'+
+          '<td style="color:#3fb950">EUR '+(p.amountCents/100).toFixed(2)+'</td>'+
+          '<td>'+p.retries+'</td>'+
+          '<td style="color:'+sc+';font-weight:bold">'+p.status+'</td>'+
+          '<td style="font-size:11px;color:#f85149">'+(p.lastError||'-')+'</td>'+
+          '<td>'+retryBtn+deleteBtn+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
+async function retryCapture(el){
+  var id=el.dataset?el.dataset.id:el;
+  const r=await fetch('/admin/retry-capture/'+id,{method:'POST'});
+  const d=await r.json();
+  if(d.ok) alert('Retry result: '+d.status+(d.lastError?' - '+d.lastError:''));
+  else alert('Error: '+d.error);
+  loadPendingCaptures();
+}
+
+async function deleteCapture(el){
+  var id=el.dataset?el.dataset.id:el;
+  if(!confirm('Remove this pending capture record?')) return;
+  await fetch('/admin/pending-captures/'+id,{method:'DELETE'});
+  loadPendingCaptures();
 }
 
 async function loadActiveEntries(){
@@ -964,19 +1301,19 @@ async function loadTellStatus(){
     const out1Color=s.out1===1?'#1F6FEB':'#30363d';
     el.innerHTML=
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in1Color+'">'+
-        '<div style="font-size:11px;color:#8b949e">IN1 — Entrance</div>'+
+        '<div style="font-size:11px;color:#8b949e">IN1 - Entrance</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+in1Color+'">'+in1Text+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in2Color+'">'+
-        '<div style="font-size:11px;color:#8b949e">IN2 — Exit</div>'+
+        '<div style="font-size:11px;color:#8b949e">IN2 - Exit</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+in2Color+'">'+in2Text+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+barrierColor+'">'+
-        '<div style="font-size:11px;color:#8b949e">IN4 — Barrier</div>'+
+        '<div style="font-size:11px;color:#8b949e">IN4 - Barrier</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+barrierColor+'">'+barrierText+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+out1Color+'">'+
-        '<div style="font-size:11px;color:#8b949e">OUT1 — Relay</div>'+
+        '<div style="font-size:11px;color:#8b949e">OUT1 - Relay</div>'+
         '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'🔵 Active':'⚪ Idle')+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid #30363d">'+
@@ -991,24 +1328,101 @@ async function loadJccLogs(){
   try{
     const r=await fetch('/jcc/logs');
     const logs=await r.json();
-    const el=document.getElementById('jccLogs');
+    const el=document.getElementById('jccLogDiv');
+    const cnt=document.getElementById('jccLogCount');
     if(!el) return;
-    el.innerHTML=logs.slice(0,20).map(function(l){
-      var bg=l.hmacValid?'#1a2a1a':'#2a1a1a';
-      var col=l.hmacValid?'#4caf50':'#f44336';
-      var chk=l.hmacValid?'&#10003;':'&#10007;';
-      var ref=(l.request&&(l.request.tokenCode||l.request.originalRef))||'';
-      var respCode=(l.response&&l.response.responseCode)||'?';
-      var respDesc=(l.response&&l.response.responseDescription)||JSON.stringify(l.response||{}).substring(0,40);
-      return '<tr style="background:'+bg+'">'+
-        '<td>'+l.time.substring(11,19)+'</td>'+
-        '<td><b>'+l.endpoint+'</b></td>'+
-        '<td style="color:'+col+'">'+chk+'</td>'+
-        '<td>'+ref+'</td>'+
-        '<td>'+respCode+' '+respDesc+'</td>'+
-        '</tr>';
+    cnt.textContent='('+logs.length+' entries)';
+    if(logs.length===0){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No JCC calls yet</td></tr></table>';
+      return;
+    }
+
+    // Field labels for each JCC call type
+    var reqLabels={
+      amount:'Amount (cents)', currency:'Currency', originalRef:'Original Ref',
+      authID:'Auth ID', messageNo:'Message No', messageType:'Message Type',
+      dateTime:'DateTime', merchantNo:'Merchant No', stationID:'Station ID',
+      tokenCode:'Token Code', maskedPAN:'Masked PAN', cardExpiry:'Card Expiry',
+      cardType:'Card Type', invoiceNo:'Invoice No', reasonCode:'Reason Code',
+      userID:'User ID', posSoftware:'POS Software', merchantType:'Merchant Type',
+      surchargeAmount:'Surcharge', citIndicator:'CIT Indicator', ippiVersion:'IPPI Version'
+    };
+    var resLabels={
+      responseCode:'Response Code', responseText:'Response Text',
+      messageNo:'Message No', messageType:'Message Type',
+      mid:'MID', tid:'TID', authID:'Auth ID',
+      retrievalRef:'Retrieval Ref', receiptString:'Receipt',
+      citIndicator:'CIT Indicator'
+    };
+
+    var typeColor={'topup':'#e3b341','capture':'#3fb950','release':'#58a6ff',
+                   'topup-response':'#7a5c00','capture-response':'#1a5c1a','release-response':'#1a3a5c'};
+
+    el.innerHTML=logs.slice(0,50).map(function(l,idx){
+      var isResp=l.endpoint.includes('-response');
+      var baseType=l.endpoint.replace('-response','');
+      var col=typeColor[l.endpoint]||'#8b949e';
+      var hmacCol=l.hmacValid?'#3fb950':'#f85149';
+      var hmacTxt=l.hmacValid?'HMAC OK':'HMAC FAIL';
+      var rc=(l.response&&l.response.responseCode)||'';
+      var rcCol=rc==='00'?'#3fb950':rc?'#f85149':'#8b949e';
+      var rt=(l.response&&(l.response.responseText||l.response.responseDescription))||'';
+
+      // Build request fields table
+      var reqFields='';
+      if(l.request && !isResp){
+        reqFields='<table style="width:100%;font-size:11px;margin:4px 0">';
+        Object.keys(l.request).forEach(function(k){
+          var v=l.request[k];
+          if(v===undefined||v===null||v==='') return;
+          var label=reqLabels[k]||k;
+          var valCol='#c9d1d9';
+          if(k==='tokenCode') valCol='#e3b341';
+          if(k==='maskedPAN') valCol='#58a6ff';
+          if(k==='amount') valCol='#3fb950';
+          if(k==='authID'||k==='originalRef') valCol='#d2a8ff';
+          reqFields+='<tr><td style="color:#8b949e;width:140px;padding:1px 6px">'+label+'</td>'+
+            '<td style="font-family:monospace;color:'+valCol+';padding:1px 6px">'+v+'</td></tr>';
+        });
+        reqFields+='</table>';
+      }
+
+      // Build response fields table
+      var resFields='';
+      if(l.response && Object.keys(l.response).length>0){
+        resFields='<table style="width:100%;font-size:11px;margin:4px 0">';
+        Object.keys(l.response).forEach(function(k){
+          var v=l.response[k];
+          if(v===undefined||v===null||v==='') return;
+          var label=resLabels[k]||k;
+          var valCol='#c9d1d9';
+          if(k==='responseCode') valCol=rc==='00'?'#3fb950':'#f85149';
+          if(k==='responseText') valCol=rc==='00'?'#3fb950':'#f85149';
+          if(k==='authID') valCol='#d2a8ff';
+          if(k==='retrievalRef') valCol='#e3b341';
+          resFields+='<tr><td style="color:#8b949e;width:140px;padding:1px 6px">'+label+'</td>'+
+            '<td style="font-family:monospace;color:'+valCol+';padding:1px 6px">'+v+'</td></tr>';
+        });
+        resFields+='</table>';
+      }
+
+      var bg=isResp?(rc==='00'?'#0d1e0d':'#1e0d0d'):'#0d1117';
+      var border=isResp?'border-left:3px solid '+(rc==='00'?'#3fb950':'#f85149'):'border-left:3px solid '+col;
+
+      return '<div style="'+border+';background:'+bg+';margin-bottom:4px;padding:8px 12px;border-radius:4px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+          '<span style="color:'+col+';font-weight:bold;font-size:13px">'+l.endpoint.toUpperCase()+'</span>'+
+          '<span style="display:flex;gap:12px;font-size:11px">'+
+            '<span style="color:'+hmacCol+'">'+hmacTxt+'</span>'+
+            (rc?'<span style="color:'+rcCol+';font-weight:bold">RC: '+rc+' '+rt+'</span>':'')+
+            '<span style="color:#8b949e">'+l.time.substring(11,19)+'</span>'+
+          '</span>'+
+        '</div>'+
+        (reqFields?'<div style="color:#8b949e;font-size:11px;margin-bottom:2px">REQUEST</div>'+reqFields:'')+
+        (resFields?'<div style="color:#8b949e;font-size:11px;margin-bottom:2px;margin-top:4px">RESPONSE</div>'+resFields:'')+
+      '</div>';
     }).join('');
-  }catch(e){}
+  }catch(e){ console.error('loadJccLogs error',e); }
 }
 
 async function loadJccTransaction(){
@@ -1036,7 +1450,7 @@ async function runEndOfDayCapture(){
   try{
     const r=await fetch('/admin/eod-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
-    el.textContent='✓ EOD Capture done — '+d.processed+' entries processed. '+d.results;
+    el.textContent='OK EOD Capture done - '+d.processed+' entries processed. '+d.results;
   }catch(e){el.textContent='✗ Error: '+e.message;}
 }
 
@@ -1061,11 +1475,22 @@ loadJccTransaction();setInterval(loadJccTransaction,3000);
 loadActiveEntries();setInterval(loadActiveEntries,5000);
 loadTellStatus();setInterval(loadTellStatus,5000);
 loadRejections();setInterval(loadRejections,5000);
+loadEcrDeclines();setInterval(loadEcrDeclines,5000);
+loadPendingCaptures();setInterval(loadPendingCaptures,10000);
 </script></body></html>`);
 });
 
 // ── POST /parkingInit ─────────────────────────────────────────────────────────
 app.post("/parkingInit", (req, res) => {
+  // Track app version for dashboard display
+  const versionName = req.body.versionName || "";
+  const versionNumber = req.body.versionNumber || "";
+  if (versionName) {
+    config.lastAppVersionName   = versionName;
+    config.lastAppVersionNumber = versionNumber;
+    console.log(`[parkingInit] App version: ${versionName} (${versionNumber})`);
+  }
+
   if (config.responseCode !== "00") {
     const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
     const response = {responseCode:config.responseCode, responseDescription:errMap[config.responseCode]||"Error"};
@@ -1112,8 +1537,17 @@ app.post("/parkingInit", (req, res) => {
       tellVehicleInput:  mode === "Exit" ? config.tellVehicleInputExit : config.tellVehicleInputEntrance
     } : {}),
     responseCode:                    "00",
-    responseDescription:             "Successful Response"
+    responseDescription:             "Successful Response",
+    timeOfServer:                    ts(),
+    flagsForAction:                  config.flagsForAction,
+    voiceAssistant:                  config.voiceAssistant ? "1" : "0",  // "1"=enabled, "0"=silent
+    defaultLanguage:                 config.defaultLanguage               // "EN","EL","RU","IW"
   };
+  // Auto-reset flagsForAction to "0000" after sending — prevents loop on next keep-alive
+  if (config.flagsForAction !== "0000") {
+    console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent → auto-reset to 0000`);
+    config.flagsForAction = "0000";
+  }
   addLog(req, response); res.json(response);
 });
 
@@ -1145,6 +1579,7 @@ app.post("/entranceCall", async (req, res) => {
   if (token && activeEntries[token] && inputType === "Monthly Card") {
     const existing = activeEntries[token];
     const entryTime = new Date(existing.entryTime).toISOString().substring(11,19);
+    // No jccRelease needed — monthly cards have no pre-auth
     const response = {
       outlet: outlet || config.entranceOutlet, terminal: terminal || config.entranceTerminal,
       installationPoint: "Entrance",
@@ -1156,6 +1591,9 @@ app.post("/entranceCall", async (req, res) => {
     addRejection("Already inside since "+entryTime, "Monthly Card", existing.lastDigits, "41");
     addLog(req, response); return res.json(response);
   }
+    addRejection("Already inside since "+entryTime, "Monthly Card", existing.lastDigits, "41");
+    addLog(req, response); return res.json(response);
+  }
 
   if (inputType === "Bank Card") {
     const { lastDigits: ld, expiryDate: exp } = req.body;
@@ -1164,18 +1602,19 @@ app.post("/entranceCall", async (req, res) => {
     );
     if (duplicate) {
       const entryTime = new Date(duplicate.entryTime).toISOString().substring(11,19);
-      // Release the new pre-auth since driver is already inside
-      const releaseEntry = {
-        authCode: authCode, receiptNumber: receiptNumber,
-        originalRefNum: referenceNo || receiptNumber,
-        tokenCode: req.body.tokenCode || token,
-        lastDigits: ld, expiryDate: exp || "0000",
-        outlet: outlet || config.entranceOutlet,
-        terminal: terminal || config.entranceTerminal,
-        preAuthAmountCents: parseInt(preAuthAmount || config.minimumAmountPreAuth || 300)
-      };
-      try { await jccRelease(releaseEntry); console.log(`[entranceCall] Released pre-auth for duplicate bank card *${ld}`); }
-      catch(e) { console.error("[entranceCall] Release failed:", e.message); }
+      // Release the pre-auth since we're rejecting entrance
+      try {
+        const releaseEntry = {
+          tokenCode, authCode, receiptNumber,
+          originalRefNum:     referenceNo || receiptNumber,
+          preAuthAmountCents: parseInt(preAuthAmount || config.minimumAmountPreAuth || 300),
+          outlet, terminal,
+          lastDigits:         ld,
+          expiryDate:         exp
+        };
+        await jccRelease(releaseEntry);
+        console.log(`[entranceCall] jccRelease called — duplicate bank card *${ld}`);
+      } catch(e) { console.error("[entranceCall] jccRelease failed:", e.message); }
       const response = {
         outlet: outlet || config.entranceOutlet, terminal: terminal || config.entranceTerminal,
         installationPoint: "Entrance",
@@ -1210,20 +1649,33 @@ app.post("/entranceCall", async (req, res) => {
   }
   let barrier = "mock-ok";
   if (config.tellEnabled && config.tellHwId && config.tellAppId) {
-    try { barrier = await openBarrierWithRetry() ? "tell-ok" : "tell-failed"; }
+    try { barrier = await tellOpenBarrier() ? "tell-ok" : "tell-failed"; }
     catch(e) { barrier = "tell-error: " + e.message; console.error("TELL entrance:", e.message); }
   }
 
-  // If barrier failed — release pre-auth, remove entry, restore space
-  if (barrier === "tell-failed" || barrier.startsWith("tell-error")) {
-    if (token && activeEntries[token] && inputType !== "Monthly Card") {
-      const entry = activeEntries[token];
-      try { await jccRelease(entry); console.log("[entranceCall] Barrier failed — released pre-auth"); }
-      catch(e) { console.error("[entranceCall] Release after barrier fail:", e.message); }
+  // If barrier failed — release pre-auth (bank card only) and remove entry
+  if (barrier !== "tell-ok" && barrier !== "mock-ok") {
+    console.log(`[entranceCall] Barrier failed (${barrier}) — removing entry${inputType === "Bank Card" ? " + releasing pre-auth" : ""}`);
+    if (token && activeEntries[token]) {
+      if (inputType === "Bank Card") {
+        // Only bank cards have a pre-auth to release
+        try {
+          const releaseEntry = {
+            tokenCode, authCode, receiptNumber,
+            originalRefNum:     referenceNo || receiptNumber,
+            preAuthAmountCents: parseInt(preAuthAmount || config.minimumAmountPreAuth || 300),
+            outlet, terminal,
+            lastDigits:         lastDigits || "",
+            expiryDate:         expiryDate || "0000"
+          };
+          await jccRelease(releaseEntry);
+          console.log(`[entranceCall] jccRelease called — barrier failure`);
+        } catch(e) { console.error("[entranceCall] jccRelease failed:", e.message); }
+      }
+      releaseSpace(activeEntries[token]);
       delete activeEntries[token];
-      releaseSpace(entry);
     }
-    const response = {
+    const failResponse = {
       outlet:               req.body.outlet   || config.entranceOutlet,
       terminal:             req.body.terminal || config.entranceTerminal,
       availablePlaceMonthly:  String(config.availablePlaceMonthly),
@@ -1231,11 +1683,11 @@ app.post("/entranceCall", async (req, res) => {
       installationPoint:    "Entrance",
       displayMessage:       "Technical issue. Please contact staff.",
       timeToDisplayMessage: "8",
-      responseCode:         "08",
+      responseCode:         "99",
       responseDescription:  "Barrier failed to open",
       _barrier:             barrier
     };
-    addLog(req, response); return res.json(response);
+    addLog(req, failResponse); return res.json(failResponse);
   }
 
   const response = {
@@ -1313,98 +1765,116 @@ app.post("/exitCall", async (req, res) => {
   let response;
   switch(config.exitScenario) {
 
-    // Scenario 1: FREE
+    // ── Scenario 1: FREE ──────────────────────────────────────────────────────
+    // Release pre-auth, open barrier, no charge
     case 1: {
-      if (entry) {
-        try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-        delete activeEntries[token];
-        releaseSpace(entry);
-      }
-      const b = await openBarrierWithRetry();
-      response = b === "failed"
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
+      delete activeEntries[token];
+      releaseSpace(entry);
+      const b1 = await openBarrierWithRetry();
+      response = b1 === "failed"
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:"0",
             displayMessage:"Thank you! Have a nice day.", timeToDisplayMessage:"5",
-            responseCode:"00", responseDescription:"Successful Response", _barrier:b };
+            responseCode:"00", responseDescription:"Successful Response" };
       break;
     }
 
-    // Scenario 2: CAPTURE (fee <= preAuth)
+    // ── Scenario 2: CAPTURE ───────────────────────────────────────────────────
+    // Capture the calculated fee (must be <= preAuth), open barrier
     case 2: {
-      const captureAmt = feeCents > 0 ? Math.min(feeCents, preAuthCents) : preAuthCents;
-      if (entry) {
-        try { await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
-        delete activeEntries[token];
-        releaseSpace(entry);
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      const captureAmt = feeCents > 0 ? feeCents : preAuthCents;
+      let captureResult2 = null;
+      try { captureResult2 = await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
+      const captureOk2 = captureResult2 && captureResult2.responseCode === "00";
+      if (!captureOk2) {
+        // Capture declined — open barrier anyway, store for retry
+        console.log(`[JCC] Capture declined (${captureResult2?.responseCode}) — storing for retry`);
+        addPendingCapture(entry, captureAmt);
       }
-      const b = await openBarrierWithRetry();
-      response = b === "failed"
+      delete activeEntries[token];
+      releaseSpace(entry);
+      const b2 = await openBarrierWithRetry();
+      response = b2 === "failed"
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:String(captureAmt),
-            displayMessage:`Thank you! Charged €${(captureAmt/100).toFixed(2)}.`,
+            displayMessage: captureOk2
+              ? `Thank you! Charged €${(captureAmt/100).toFixed(2)}.`
+              : `Thank you! Charged €${(captureAmt/100).toFixed(2)}. (Payment pending)`,
             timeToDisplayMessage:"5", responseCode:"00",
-            responseDescription:"Successful Response", _barrier:b };
+            responseDescription:"Successful Response" };
       break;
     }
 
-    // Scenario 3: TOPUP (fee > preAuth)
+    // ── Scenario 3: TOPUP APPROVED ────────────────────────────────────────────
+    // TopUp succeeds → Capture full fee → open barrier
+    // If TopUp is declined by JCC → fall back to Scenario 4 behaviour (release + barrierOpen:"-2")
     case 3: {
-      const totalFee = feeCents > 0 ? feeCents : (config.topupAmount || 500);
-      const topupAmt = Math.max(0, totalFee - preAuthCents);
-      const recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      const totalFee3 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
+      const topupAmt3 = Math.max(0, totalFee3 - preAuthCents);
+      let topupResult3 = null;
+      try { topupResult3 = await jccTopup(entry, topupAmt3); } catch(e) { console.error("[JCC TOPUP]", e.message); }
 
-      if (topupAmt <= 0) {
-        // Fee <= preAuth — just capture
-        if (entry) {
-          try { await jccCapture(entry, totalFee); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
-          delete activeEntries[token];
-          releaseSpace(entry);
+      const topupApproved = topupResult3 && topupResult3.responseCode === "00";
+      console.log(`[JCC] topup result: ${topupResult3?.responseCode} ${topupResult3?.responseText} → ${topupApproved ? "APPROVED" : "DECLINED"}`);
+
+      if (topupApproved) {
+        // TopUp approved → Capture full fee → open barrier
+        let captureResult3 = null;
+        try { captureResult3 = await jccCapture(entry, totalFee3); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
+        const captureOk3 = captureResult3 && captureResult3.responseCode === "00";
+        if (!captureOk3) {
+          console.log(`[JCC] Capture declined after TopUp (${captureResult3?.responseCode}) — storing for retry`);
+          addPendingCapture(entry, totalFee3);
         }
-        const b = await openBarrierWithRetry();
-        response = b === "failed"
-          ? staffResponse("Technical issue. Please contact staff.")
-          : { barrierOpen:"1", moneyToPay:String(totalFee),
-              displayMessage:`Thank you! Charged €${(totalFee/100).toFixed(2)}.`,
+        delete activeEntries[token];
+        releaseSpace(entry);
+        const b3 = await openBarrierWithRetry();
+        response = b3 === "failed"
+          ? staffResponse(`Payment €${(totalFee3/100).toFixed(2)} processed. Barrier failed — staff called.`)
+          : { barrierOpen:"1", moneyToPay:String(totalFee3),
+              displayMessage: captureOk3
+                ? `Thank you! Total €${(totalFee3/100).toFixed(2)}.`
+                : `Thank you! Total €${(totalFee3/100).toFixed(2)}. (Payment pending)`,
               timeToDisplayMessage:"5", responseCode:"00",
-              responseDescription:"Successful Response", _barrier:b };
-        break;
-      }
-
-      // TopUp needed
-      try {
-        const topupResult = await jccTopup(entry, topupAmt);
-        if (topupResult.responseCode === "00") {
-          // TopUp APPROVED -> Capture full amount -> open barrier
-          try { await jccCapture(entry, totalFee); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
-          delete activeEntries[token];
-          releaseSpace(entry);
-          const b = await openBarrierWithRetry();
-          // Barrier failed after approved payment -- do NOT ask re-tap
-          response = b === "failed"
-            ? staffResponse(`Payment €${(totalFee/100).toFixed(2)} processed. Barrier failed - staff called.`)
-            : { barrierOpen:"1", moneyToPay:String(totalFee),
-                displayMessage:`Thank you! Total €${(totalFee/100).toFixed(2)}.`,
-                timeToDisplayMessage:"5", responseCode:"00",
-                responseDescription:"Successful Response", _barrier:b,
-                _jccTopup:"00", _jccCapture:"00" };
-        } else {
-          // TopUp DECLINED -> Release pre-auth -> ask for full SALE
-          try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-          response = { barrierOpen:"-2", moneyToPay:String(totalFee), recordId,
-            displayMessage:`Card declined. Please tap card for full €${(totalFee/100).toFixed(2)}.`,
-            timeToDisplayMessage:"10", responseCode:"31",
-            responseDescription:"TopUp declined - full SALE required",
-            _jccTopup: topupResult.responseCode };
-        }
-      } catch(e) {
-        console.error("[JCC TOPUP ERROR]", e.message);
-        response = staffResponse("JCC error. Please contact staff.");
+              responseDescription:"Successful Response" };
+      } else {
+        // TopUp declined by JCC → Release pre-auth → ask app for full SALE
+        console.log("[JCC] TopUp declined — falling back to full SALE flow");
+        if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
+        try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
+        // Do NOT delete entry — app needs it alive to send exitPayment
+        response = { barrierOpen:"-2", moneyToPay:String(totalFee3),
+          recordId: entry.recordId,
+          displayMessage:`Card declined. Please tap card for full €${(totalFee3/100).toFixed(2)}.`,
+          timeToDisplayMessage:"10", responseCode:"31",
+          responseDescription:"TopUp declined — full SALE required" };
       }
       break;
     }
 
-    // Scenario 4: BARRIER FAILED
-    case 4: default:
+    // ── Scenario 4: TOPUP DECLINED ────────────────────────────────────────────
+    // TopUp declined → Release pre-auth → ask app for full SALE (barrierOpen:"-2")
+    case 4: {
+      if (!entry) { response = staffResponse("Entry not found."); break; }
+      const totalFee4 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
+      // Generate recordId once and store it on the entry so it is stable across retries
+      if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
+      try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
+      // Do NOT delete entry — app needs it alive to send exitPayment
+      response = { barrierOpen:"-2", moneyToPay:String(totalFee4),
+        recordId: entry.recordId,
+        displayMessage:`Card declined. Please tap card for full €${(totalFee4/100).toFixed(2)}.`,
+        timeToDisplayMessage:"10", responseCode:"31",
+        responseDescription:"TopUp declined — full SALE required" };
+      break;
+    }
+
+    // ── Scenario 5: BARRIER FAILED ────────────────────────────────────────────
+    case 5: default:
       response = staffResponse("Technical issue. Please contact staff.");
       break;
   }
@@ -1416,7 +1886,7 @@ app.post("/exitPayment", async (req, res) => {
   const { token } = req.body;
   const exitEntry = token ? activeEntries[token] : null;
   if (token) delete activeEntries[token];
-  releaseSpace(exitEntry);
+  if (exitEntry) releaseSpace(exitEntry);
   const b = await openBarrierWithRetry();
   let response;
   if (b === "failed") {
@@ -1466,7 +1936,39 @@ app.post("/vehiclePresent", async (req, res) => {
 
 // ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
-  const response = {responseCode:"00",responseDescription:"Successful Response"};
+  const action = req.body.action || "";
+  const isManualHelp = action === "Help Button";
+  const isEcrDecline = action.toLowerCase().includes("ecr decline") || action.toLowerCase().includes("ecr_decline");
+
+  if (isManualHelp) {
+    // Only send email for manual Help button press
+    Promise.race([
+      sendHelpAlert(req),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000))
+    ]).catch(e => console.error("[EMAIL] Alert error:", e.message));
+  } else if (isEcrDecline) {
+    // Store ECR decline silently — no email
+    addEcrDecline(
+      req.body.outlet           || "?",
+      req.body.terminal         || "?",
+      req.body.intallationPoint || "?",
+      action
+    );
+    console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} — ${action}`);
+  }
+
+  const response = {
+    outlet:               req.body.outlet   || config.entranceOutlet,
+    terminal:             req.body.terminal || config.entranceTerminal,
+    installationPoint:    req.body.intallationPoint || "",
+    daytime:              ts(),
+    displayMessage:       config.helpMessage,
+    timeToDisplayMessage: config.helpDisplayTime,
+    availablePlacesNormal: String(config.availablePlacesNormal),
+    availablePlaceMonthly: String(config.availablePlaceMonthly),
+    responseCode:         "00",
+    responseDescription:  "Successful Response"
+  };
   addLog(req, response); res.json(response);
 });
 
@@ -1687,4 +2189,6 @@ app.post("/jcc/config", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Parking RPS Mock running on http://0.0.0.0:${PORT}`);
+  startCaptureRetryLoop();
+  console.log(`[PENDING_CAPTURE] Retry loop started — every ${config.captureRetryMins} min, max ${config.captureMaxRetries} retries`);
 });
