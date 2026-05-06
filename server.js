@@ -1750,13 +1750,24 @@ app.post("/exitCall", async (req, res) => {
   const entry = token ? activeEntries[token] : null;
   const inputType = req.body.inputType || (entry && entry.inputType) || "Bank Card";
 
-  // ── Monthly Card exit — always free, no JCC calls, open barrier immediately ──
+  // ── Monthly Card exit — always free, no JCC calls ────────────────────────
   if (inputType === "Monthly Card") {
-    console.log(`[exitCall] Monthly Card exit — free, no JCC`);
-    if (token && activeEntries[token]) {
-      releaseSpace(activeEntries[token]);
-      delete activeEntries[token];
+    if (!token || !activeEntries[token]) {
+      // Card not registered at entrance — reject
+      console.log(`[exitCall] Monthly Card exit — no entry found for token`);
+      const response = {
+        barrierOpen:         "0",
+        moneyToPay:          "0",
+        displayMessage:      "No entry record found. Please contact staff.",
+        timeToDisplayMessage:"10",
+        responseCode:        "41",
+        responseDescription: "No entry record found"
+      };
+      addLog(req, response); return res.json(response);
     }
+    console.log(`[exitCall] Monthly Card exit — entry found, opening barrier`);
+    releaseSpace(activeEntries[token]);
+    delete activeEntries[token];
     const bm = await openBarrierWithRetry();
     const response = bm === "failed"
       ? { barrierOpen:"0", moneyToPay:"0",
