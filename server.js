@@ -915,6 +915,8 @@ app.post("/parkingInit", (req, res) => {
       tellPassword:      config.tellPassword,
       tellVehicleInput:  mode === "Exit" ? config.tellVehicleInputExit : config.tellVehicleInputEntrance
     } : {}),
+    stationId:                       rentalConfig.rentalStationId   || "LIM-001",
+    stationName:                     rentalConfig.rentalStationName || "Rental Station",
     responseCode:                    "00",
     responseDescription:             "Successful Response",
     timeOfServer:                    ts(),
