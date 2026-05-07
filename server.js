@@ -621,8 +621,8 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <h1>&#x1F17F; Parking RPS Mock Server</h1>
 
 <div class="tab-nav">
-  <button class="tab-btn active" onclick="showTab('parking')">&#x1F697; Parking</button>
-  <button class="tab-btn" onclick="showTab('bike')">&#x1F6B2; Bike Rental</button>
+  <button class="tab-btn active" onclick="showTab('parking',this)">&#x1F697; Parking</button>
+  <button class="tab-btn" onclick="showTab('rental',this)">&#x1F6B2; Rental</button>
 </div>
 
 <div id="tab-parking" class="tab-content active">
@@ -695,26 +695,26 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 </div>
 
 <!-- ═══ BIKE TAB ═══ -->
-<div id="tab-bike" class="tab-content">
+<div id="tab-rental" class="tab-content">
 <p style="color:#8b949e">Bike rental RPS — separate from parking. All changes take effect immediately.</p>
 
 <h2>&#x1F4F1; Bike Terminal Configuration</h2>
 <div class="pos-box" style="border-color:#1D9E75">
-<h3>🟢 Bike Rental POS</h3>
+<h3>🟢 Rental POS</h3>
 <table>
 <tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
 <tr><td>Outlet Number</td>
   <td><input class="t" id="bikeOutlet" value="" id="bikeOutlet" maxlength="10" placeholder="10 digits"></td>
-  <td><button class="btn" onclick="saveBikeCfg('bikeOutlet','bikeOutlet')">Save</button></td></tr>
+  <td><button class="btn" onclick="saveRentalCfg('bikeOutlet','bikeOutlet')">Save</button></td></tr>
 <tr><td>Terminal ID</td>
   <td><input class="t" id="bikeTerminal" value="" maxlength="12" placeholder="12 digits"></td>
-  <td><button class="btn" onclick="saveBikeCfg('bikeTerminal','bikeTerminal')">Save</button></td></tr>
+  <td><button class="btn" onclick="saveRentalCfg('bikeTerminal','bikeTerminal')">Save</button></td></tr>
 <tr><td>Station ID</td>
   <td><input class="t" id="bikeStationId" value="" placeholder="e.g. LIM-001"></td>
-  <td><button class="btn" onclick="saveBikeCfg('bikeStationId','bikeStationId')">Save</button></td></tr>
+  <td><button class="btn" onclick="saveRentalCfg('bikeStationId','bikeStationId')">Save</button></td></tr>
 <tr><td>Station Name</td>
   <td><input class="m" id="bikeStationName" value="" placeholder="e.g. Limassol Marina"></td>
-  <td><button class="btn" onclick="saveBikeCfg('bikeStationName','bikeStationName')">Save</button></td></tr>
+  <td><button class="btn" onclick="saveRentalCfg('bikeStationName','bikeStationName')">Save</button></td></tr>
 </table></div>
 
 <h2>&#9881; Bike Tariff (RPS calculates)</h2>
@@ -726,26 +726,26 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>∞</td><td>€6.00 + €1.50/hr</td><td></td></tr>
 </table>
 
-<h2>&#x1F6B2; Active Rentals <span id="bikeRentalCount"></span></h2>
-<div id="bikeRentalsDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
+<h2>&#x1F6B2; Active Rentals <span id="rentalCount"></span></h2>
+<div id="rentalsDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
 
 <h2>&#x1F4CB; Bike Request Log</h2>
 <div style="display:flex;gap:6px;margin-bottom:10px">
-  <button class="btn green" onclick="setBikeFilter('bikeRental/start')">Start</button>
-  <button class="btn orange" onclick="setBikeFilter('bikeRental/exit')">Exit</button>
-  <button class="btn gray" onclick="setBikeFilter('')">All</button>
+  <button class="btn green" onclick="setRentalFilter('rental/start')">Start</button>
+  <button class="btn orange" onclick="setRentalFilter('rental/exit')">Exit</button>
+  <button class="btn gray" onclick="setRentalFilter('')">All</button>
   <button class="btn red" style="margin-left:auto" onclick="clearBikeLogs()">Clear</button>
 </div>
-<div id="bikeLogDiv"><p style="color:#8b949e">Loading...</p></div>
+<div id="rentalLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
 <script>
 // ── Tab switching ──────────────────────────────────────────────────────────
-function showTab(name) {
+function showTab(name, btn) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  event.target.classList.add('active');
+  btn.classList.add('active');
 }
 
 // ── Parking tab JS ─────────────────────────────────────────────────────────
@@ -802,12 +802,12 @@ async function loadActiveEntries(){
 }
 
 // ── Bike tab JS ────────────────────────────────────────────────────────────
-let bikeFilter='', bikeLogs=[];
-function setBikeFilter(f){bikeFilter=f;renderBikeLogs();}
+let rentalFilter='', rentalLogs=[];
+function setRentalFilter(f){rentalFilter=f;renderBikeLogs();}
 function renderBikeLogs(){
-  const filtered=bikeFilter?bikeLogs.filter(l=>l.endpoint.includes(bikeFilter)):bikeLogs;
-  if(!filtered.length){document.getElementById('bikeLogDiv').innerHTML='<p style="color:#8b949e">No bike requests yet</p>';return;}
-  document.getElementById('bikeLogDiv').innerHTML=filtered.map(function(l){
+  const filtered=rentalFilter?rentalLogs.filter(l=>l.endpoint.includes(rentalFilter)):rentalLogs;
+  if(!filtered.length){document.getElementById('rentalLogDiv').innerHTML='<p style="color:#8b949e">No bike requests yet</p>';return;}
+  document.getElementById('rentalLogDiv').innerHTML=filtered.map(function(l){
     const rc=(l.response&&l.response.responseCode)||'';
     const rcCol=rc==='00'?'#3fb950':rc?'#ff6b6b':'#8b949e';
     const isExit=l.endpoint.includes('exit');
@@ -824,22 +824,22 @@ function renderBikeLogs(){
       '</div></div>';
   }).join('');
 }
-async function loadBikeLogs(){
-  try{const r=await fetch('/bike/logs');bikeLogs=await r.json();renderBikeLogs();}catch(e){}
+async function loadRentalLogs(){
+  try{const r=await fetch('/rental/logs');rentalLogs=await r.json();renderBikeLogs();}catch(e){}
 }
 async function clearBikeLogs(){
-  await fetch('/bike/logs',{method:'DELETE'});bikeLogs=[];renderBikeLogs();
+  await fetch('/rental/logs',{method:'DELETE'});rentalLogs=[];renderBikeLogs();
 }
-async function saveBikeCfg(key, id){
+async function saveRentalCfg(key, id){
   const v=document.getElementById(id).value.trim();
-  const r=await fetch('/bike/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const r=await fetch('/rental/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
   const d=await r.json();
   if(d.ok) alert('Saved: '+key+' = '+v); else alert('Error: '+d.error);
 }
-async function loadBikeRentals(){
+async function loadRentals(){
   try{
-    const r=await fetch('/bike/rentals');const items=await r.json();
-    const el=document.getElementById('bikeRentalsDiv');const cnt=document.getElementById('bikeRentalCount');
+    const r=await fetch('/rental/rentals');const items=await r.json();
+    const el=document.getElementById('rentalsDiv');const cnt=document.getElementById('rentalCount');
     if(!el)return;cnt.textContent='('+items.length+')';
     if(!items.length){el.innerHTML='<table><tr><td style="color:#8b949e">No active rentals</td></tr></table>';return;}
     const now=Date.now();
@@ -857,9 +857,9 @@ async function loadBikeRentals(){
       }).join('')+'</table>';
   }catch(e){}
 }
-async function loadBikeConfig(){
+async function loadRentalConfig(){
   try{
-    const r=await fetch('/bike/config');const d=await r.json();
+    const r=await fetch('/rental/config');const d=await r.json();
     if(d.bikeOutlet)    document.getElementById('bikeOutlet').value=d.bikeOutlet;
     if(d.bikeTerminal)  document.getElementById('bikeTerminal').value=d.bikeTerminal;
     if(d.bikeStationId) document.getElementById('bikeStationId').value=d.bikeStationId;
@@ -869,9 +869,9 @@ async function loadBikeConfig(){
 
 loadLogs();setInterval(loadLogs,3000);
 loadActiveEntries();setInterval(loadActiveEntries,5000);
-loadBikeLogs();setInterval(loadBikeLogs,3000);
-loadBikeRentals();setInterval(loadBikeRentals,5000);
-loadBikeConfig();
+loadRentalLogs();setInterval(loadRentalLogs,3000);
+loadRentals();setInterval(loadRentals,5000);
+loadRentalConfig();
 </script></body></html>`);
 });
 
@@ -1291,7 +1291,7 @@ app.post("/jcc/config", (req, res) => {
 // BIKE RENTAL — completely separate state and endpoints
 // ═══════════════════════════════════════════════════════════════════════════════
 
-let bikeConfig = {
+let rentalConfig = {
   bikeOutlet:      "",
   bikeTerminal:    "",
   bikeStationId:   "LIM-001",
@@ -1299,10 +1299,10 @@ let bikeConfig = {
 };
 
 let activeRentals = {};  // key: rentalId
-let bikeLogs      = [];
+let rentalLogs      = [];
 
-function addBikeLog(req, response) {
-  bikeLogs.unshift({
+function addRentalLog(req, response) {
+  rentalLogs.unshift({
     id:       Date.now(),
     time:     new Date().toLocaleString(),
     endpoint: req.originalUrl,
@@ -1310,8 +1310,8 @@ function addBikeLog(req, response) {
     request:  req.body || {},
     response: response
   });
-  if (bikeLogs.length > 200) bikeLogs.pop();
-  console.log(`[BIKE] ${req.method} ${req.originalUrl}`);
+  if (rentalLogs.length > 200) rentalLogs.pop();
+  console.log(`[RENTAL] ${req.method} ${req.originalUrl}`);
   console.log(`  REQ: ${JSON.stringify(req.body)}`);
   console.log(`  RES: ${JSON.stringify(response)}`);
 }
@@ -1339,29 +1339,29 @@ function calculateBikeFee(startTime) {
   return 600 + Math.ceil((mins - 180) / 60) * 150;  // €6.00 + €1.50/hr
 }
 
-// ── GET /bike/config ──────────────────────────────────────────────────────────
-app.get("/bike/config", (req, res) => res.json(bikeConfig));
+// ── GET /rental/config ──────────────────────────────────────────────────────────
+app.get("/rental/config", (req, res) => res.json(rentalConfig));
 
-// ── POST /bike/config ─────────────────────────────────────────────────────────
-app.post("/bike/config", (req, res) => {
+// ── POST /rental/config ─────────────────────────────────────────────────────────
+app.post("/rental/config", (req, res) => {
   const { key, value } = req.body;
-  if (!(key in bikeConfig)) return res.json({ ok: false, error: `Unknown key: ${key}` });
-  bikeConfig[key] = value;
-  console.log(`[BIKE_CONFIG] ${key} = ${value}`);
+  if (!(key in rentalConfig)) return res.json({ ok: false, error: `Unknown key: ${key}` });
+  rentalConfig[key] = value;
+  console.log(`[RENTAL_CONFIG] ${key} = ${value}`);
   res.json({ ok: true });
 });
 
-// ── GET /bike/rentals ─────────────────────────────────────────────────────────
-app.get("/bike/rentals", (req, res) => res.json(Object.values(activeRentals)));
+// ── GET /rental/rentals ─────────────────────────────────────────────────────────
+app.get("/rental/rentals", (req, res) => res.json(Object.values(activeRentals)));
 
-// ── GET /bike/logs ────────────────────────────────────────────────────────────
-app.get("/bike/logs", (req, res) => res.json(bikeLogs));
+// ── GET /rental/logs ────────────────────────────────────────────────────────────
+app.get("/rental/logs", (req, res) => res.json(rentalLogs));
 
-// ── DELETE /bike/logs ─────────────────────────────────────────────────────────
-app.delete("/bike/logs", (req, res) => { bikeLogs = []; res.json({ ok: true }); });
+// ── DELETE /rental/logs ─────────────────────────────────────────────────────────
+app.delete("/rental/logs", (req, res) => { rentalLogs = []; res.json({ ok: true }); });
 
-// ── GET /bike/stations — mock available bikes at station ──────────────────────
-app.get("/bike/stations/:stationId/bikes", (req, res) => {
+// ── GET /rental/stations — mock available bikes at station ──────────────────────
+app.get("/rental/stations/:stationId/bikes", (req, res) => {
   const bikes = [
     { bikeId: "1042", type: "Regular", dock: "Dock 3", available: true },
     { bikeId: "1078", type: "Regular", dock: "Dock 5", available: true },
@@ -1372,25 +1372,25 @@ app.get("/bike/stations/:stationId/bikes", (req, res) => {
   res.json({ stationId: req.params.stationId, bikes, responseCode: "00" });
 });
 
-// ── POST /bikeRental/start ────────────────────────────────────────────────────
+// ── POST /rental/start ────────────────────────────────────────────────────
 // Called by terminal after Pre-Auth approved
 // Request: { terminalId, outlet, bikeId, bikeType, authCode, receiptNumber,
 //            tokenCode, lastDigits, expiryDate, preAuthAmount }
 // Response: { responseCode, unlockCode, rentalId }
-app.post("/bikeRental/start", (req, res) => {
+app.post("/rental/start", (req, res) => {
   const { terminalId, outlet, bikeId, bikeType, authCode,
           receiptNumber, tokenCode, lastDigits, expiryDate, preAuthAmount } = req.body;
 
   if (!bikeId || !authCode) {
     const response = { responseCode: "99", responseDescription: "Missing bikeId or authCode" };
-    addBikeLog(req, response); return res.json(response);
+    addRentalLog(req, response); return res.json(response);
   }
 
   // Check bike not already rented
   const alreadyRented = Object.values(activeRentals).find(r => r.bikeId === bikeId);
   if (alreadyRented) {
     const response = { responseCode: "41", responseDescription: "Bike already rented" };
-    addBikeLog(req, response); return res.json(response);
+    addRentalLog(req, response); return res.json(response);
   }
 
   // Call mock nextbike API
@@ -1407,14 +1407,14 @@ app.post("/bikeRental/start", (req, res) => {
     lastDigits:         lastDigits    || "",
     expiryDate:         expiryDate    || "0000",
     preAuthAmountCents: parseInt(preAuthAmount || 1000),
-    outlet:             outlet        || bikeConfig.bikeOutlet,
-    terminalId:         terminalId    || bikeConfig.bikeTerminal,
+    outlet:             outlet        || rentalConfig.bikeOutlet,
+    terminalId:         terminalId    || rentalConfig.bikeTerminal,
     startTime:          bikeApiResult.startTime,
     unlockCode:         bikeApiResult.unlockCode,
     status:             "active"
   };
 
-  console.log(`[BIKE] Rental started — rentalId=${bikeApiResult.rentalId} bikeId=${bikeId} authCode=${authCode}`);
+  console.log(`[RENTAL] Rental started — rentalId=${bikeApiResult.rentalId} bikeId=${bikeId} authCode=${authCode}`);
 
   const response = {
     responseCode:        "00",
@@ -1423,41 +1423,41 @@ app.post("/bikeRental/start", (req, res) => {
     unlockCode:          bikeApiResult.unlockCode,
     bikeId
   };
-  addBikeLog(req, response); res.json(response);
+  addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /bikeRental/exit ─────────────────────────────────────────────────────
+// ── POST /rental/exit ─────────────────────────────────────────────────────
 // Called by terminal after PAN Capture type 14
 // Request: { terminalId, outlet, bikeId, pan, last4 }
 // Response: { responseCode, barrierOpen, amountDue, rentalId }
 // barrierOpen: "1" = void (free), "-2" = capture needed, "0" = staff
-app.post("/bikeRental/exit", async (req, res) => {
+app.post("/rental/exit", async (req, res) => {
   const { terminalId, outlet, bikeId, pan, last4 } = req.body;
 
   if (!bikeId) {
     const response = { responseCode: "99", responseDescription: "Missing bikeId", barrierOpen: "0" };
-    addBikeLog(req, response); return res.json(response);
+    addRentalLog(req, response); return res.json(response);
   }
 
   // Find rental by bikeId
   const rental = Object.values(activeRentals).find(r => r.bikeId === bikeId && r.status === "active");
   if (!rental) {
     const response = { responseCode: "41", responseDescription: "No active rental found for this bike", barrierOpen: "0" };
-    addBikeLog(req, response); return res.json(response);
+    addRentalLog(req, response); return res.json(response);
   }
 
   // Confirm bike locked via mock nextbike API
   const statusResult = mockBikeApiStatus(rental.rentalId);
   if (statusResult.status === "not_found") {
     const response = { responseCode: "99", responseDescription: "Bike status unknown — contact staff", barrierOpen: "0" };
-    addBikeLog(req, response); return res.json(response);
+    addRentalLog(req, response); return res.json(response);
   }
 
   // Calculate amount due
   const amountCents = calculateBikeFee(rental.startTime);
   const durationMins = Math.floor((Date.now() - rental.startTime) / 60000);
 
-  console.log(`[BIKE] Exit — rentalId=${rental.rentalId} bikeId=${bikeId} duration=${durationMins}min amount=€${(amountCents/100).toFixed(2)}`);
+  console.log(`[RENTAL] Exit — rentalId=${rental.rentalId} bikeId=${bikeId} duration=${durationMins}min amount=€${(amountCents/100).toFixed(2)}`);
 
   // Mark rental as ending — capture will be done by terminal
   rental.status      = "ending";
@@ -1478,33 +1478,33 @@ app.post("/bikeRental/exit", async (req, res) => {
       : `Duration: ${durationMins}min. Free — no charge.`,
     timeToDisplayMessage: "5"
   };
-  addBikeLog(req, response); res.json(response);
+  addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /bikeRental/complete ─────────────────────────────────────────────────
+// ── POST /rental/complete ─────────────────────────────────────────────────
 // Called by terminal after ECR Capture confirmed
 // Request: { rentalId, amountCharged }
-app.post("/bikeRental/complete", (req, res) => {
+app.post("/rental/complete", (req, res) => {
   const { rentalId, amountCharged } = req.body;
   const rental = activeRentals[rentalId];
   if (!rental) {
     const response = { responseCode: "41", responseDescription: "Rental not found" };
-    addBikeLog(req, response); return res.json(response);
+    addRentalLog(req, response); return res.json(response);
   }
   rental.status        = "completed";
   rental.amountCharged = amountCharged;
   rental.completedAt   = Date.now();
   // Remove from active after 60s
   setTimeout(() => { delete activeRentals[rentalId]; }, 60000);
-  console.log(`[BIKE] Rental completed — rentalId=${rentalId} charged=€${(parseInt(amountCharged||0)/100).toFixed(2)}`);
+  console.log(`[RENTAL] Rental completed — rentalId=${rentalId} charged=€${(parseInt(amountCharged||0)/100).toFixed(2)}`);
   const response = { responseCode: "00", responseDescription: "Rental completed", rentalId };
-  addBikeLog(req, response); res.json(response);
+  addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /bikeRental/void ─────────────────────────────────────────────────────
+// ── POST /rental/void ─────────────────────────────────────────────────────
 // Called by terminal when Pre-Auth void (free ride or cancel)
 // Request: { rentalId }
-app.post("/bikeRental/void", (req, res) => {
+app.post("/rental/void", (req, res) => {
   const { rentalId } = req.body;
   const rental = activeRentals[rentalId];
   if (rental) {
@@ -1512,7 +1512,7 @@ app.post("/bikeRental/void", (req, res) => {
     setTimeout(() => { delete activeRentals[rentalId]; }, 60000);
   }
   const response = { responseCode: "00", responseDescription: "Rental voided", rentalId };
-  addBikeLog(req, response); res.json(response);
+  addRentalLog(req, response); res.json(response);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
