@@ -771,11 +771,7 @@ function renderLogs(){
 }
 async function loadLogs(){const r=await fetch('/logs');allLogs=await r.json();renderLogs();}
 async function clearLogs(){if(!confirm('Clear?'))return;await fetch('/admin/clear-logs',{method:'POST'});allLogs=[];renderLogs();}
-function exportLogs(){
-  const lines=allLogs.map(l=>'['+l.time+'] '+l.method+' '+l.endpoint+'\n'+JSON.stringify(l.request)+'\n'+JSON.stringify(l.response)).join('\n\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines],{type:'text/plain'}));
-  a.download='parking-logs.txt';a.click();
-}
+function exportLogs(){const lines=allLogs.map(l=>'['+l.time+'] '+l.method+' '+l.endpoint+'\\n'+JSON.stringify(l.request)+'\\n'+JSON.stringify(l.response)).join('\\n\\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines],{type:'text/plain'}));a.download='parking-logs.txt';a.click();}
 async function set(k,v){await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});location.reload();}
 async function sv(key,id){
   const v=document.getElementById(id).value.trim();
