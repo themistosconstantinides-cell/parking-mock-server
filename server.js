@@ -7,9 +7,12 @@ app.use(express.json());
 // ── Email alerts via Resend HTTP API ─────────────────────────────────────────
 // Set RESEND_KEY and ALERT_EMAIL in Render environment variables
 // No npm packages needed — uses built-in https module
-async function sendHelpAlert(req) {
+async function sendHelpAlert(req, isCarWash = false) {
   const apiKey = process.env.RESEND_KEY;
-  const to     = config.alertEmail || process.env.ALERT_EMAIL;
+  const to     = (isCarWash ? carWashConfig.alertEmail : null)
+              || req.body._overrideEmail
+              || config.alertEmail
+              || process.env.ALERT_EMAIL;
   if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set — skipping"); return; }
   if (!to)     { console.log("[EMAIL] No alert email configured — skipping"); return; }
 
@@ -58,7 +61,8 @@ async function sendHelpAlert(req) {
       res.on("end", () => {
         if (res.statusCode === 200 || res.statusCode === 201) {
           console.log(`[EMAIL] Alert sent -> ${to}`);
-          config.lastAlertSent = time;
+          if (isCarWash) carWashConfig.lastAlertSent = time;
+          else config.lastAlertSent = time;
         } else {
           console.error(`[EMAIL] Failed: HTTP ${res.statusCode} — ${data}`);
         }
@@ -220,6 +224,8 @@ let carWashConfig = {
   displayMessageOfEntrance: "Welcome to Car Wash!",
   helpMessage:              "Help has been called. Staff will assist you shortly.",
   helpDisplayTime:          "10",
+  alertEmail:               process.env.ALERT_EMAIL || "",
+  lastAlertSent:            null,
   washScenario:             1,    // 1=capture_preauth, 2=fixed_amount, 3=free
   controllerUrl:            "",   // CarWash controller base URL (e.g. http://192.168.1.10)
   controllerApiKey:         "",   // CarWash controller API key
@@ -1173,6 +1179,16 @@ ${config.charges.map((c,i)=>`<tr>
   <td>${carWashConfig.helpDisplayTime}</td>
   <td><input style="width:60px" id="cwHDT" value="${carWashConfig.helpDisplayTime}">
   <button class="btn" onclick="cwSv('helpDisplayTime','cwHDT')">Save</button></td>
+</tr>
+<tr>
+  <td>Email Alerts</td>
+  <td>${process.env.RESEND_KEY ? '&#x2705; Resend active' : '&#x26A0;&#xFE0F; Not configured (set RESEND_KEY in Render)'}</td>
+  <td style="font-size:11px;color:#8b949e">${carWashConfig.lastAlertSent ? 'Last sent: '+carWashConfig.lastAlertSent : 'No alerts sent yet'}</td>
+</tr>
+<tr>
+  <td>Alert Email (recipient)</td>
+  <td><input class="w" id="cwAlertEmail" placeholder="recipient@email.com" value="${carWashConfig.alertEmail}"></td>
+  <td><button class="btn" onclick="cwSv('alertEmail','cwAlertEmail')">Save</button></td>
 </tr>
 <tr>
   <td>Controller URL</td>
@@ -2426,18 +2442,22 @@ app.post("/vehiclePresent", async (req, res) => {
 
 // ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
-  const action = req.body.action || "";
-  const isManualHelp = action === "Help Button";
-  const isEcrDecline = action.toLowerCase().includes("ecr decline") || action.toLowerCase().includes("ecr_decline");
+  const action      = req.body.action      || "";
+  const application = req.body.application || "";
+  const isCarWash   = application === "CarWash";
+  const isManualHelp  = action === "Help Button";
+  const isEcrDecline  = action.toLowerCase().includes("ecr decline") || action.toLowerCase().includes("ecr_decline");
 
   if (isManualHelp) {
-    // Only send email for manual Help button press
+    // Send to carwash or parking email depending on which app called
+    const alertReq = isCarWash
+      ? { ...req, body: { ...req.body, _overrideEmail: carWashConfig.alertEmail } }
+      : req;
     Promise.race([
-      sendHelpAlert(req),
+      sendHelpAlert(alertReq, isCarWash),
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 15000))
     ]).catch(e => console.error("[EMAIL] Alert error:", e.message));
   } else if (isEcrDecline) {
-    // Store ECR decline silently — no email
     addEcrDecline(
       req.body.outlet           || "?",
       req.body.terminal         || "?",
@@ -2447,13 +2467,14 @@ app.post("/help", (req, res) => {
     console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} — ${action}`);
   }
 
+  const cfg = isCarWash ? carWashConfig : config;
   const response = {
     outlet:               req.body.outlet   || config.entranceOutlet,
     terminal:             req.body.terminal || config.entranceTerminal,
     installationPoint:    req.body.intallationPoint || "",
     daytime:              ts(),
-    displayMessage:       config.helpMessage,
-    timeToDisplayMessage: config.helpDisplayTime,
+    displayMessage:       cfg.helpMessage,
+    timeToDisplayMessage: cfg.helpDisplayTime,
     availablePlacesNormal: String(config.availablePlacesNormal),
     availablePlaceMonthly: String(config.availablePlaceMonthly),
     responseCode:         "00",
