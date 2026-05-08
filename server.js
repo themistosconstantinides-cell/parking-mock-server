@@ -2165,6 +2165,33 @@ app.post("/parkingInit", (req, res) => {
     console.log(`[parkingInit] App version: ${versionName} (${versionNumber})`);
   }
 
+  // ── CarWash init — clean response, no parking fields ─────────────────────────
+  if (req.body.application === "CarWash") {
+    if (carWashConfig.responseCode !== "00") {
+      const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
+      const response = { responseCode: carWashConfig.responseCode, responseDescription: errMap[carWashConfig.responseCode] || "Error" };
+      addCarWashLog(req, response); return res.json(response);
+    }
+    const response = {
+      responseCode:             "00",
+      responseDescription:      "Successful Response",
+      maxWashTimeSeconds:       String(carWashConfig.maxWashTimeSeconds),
+      maxWashAmountCents:       String(carWashConfig.maxWashAmountCents),
+      displayMessageOfEntrance: carWashConfig.displayMessageOfEntrance,
+      controllerUrl:            carWashConfig.controllerUrl,
+      controllerApiKey:         carWashConfig.controllerApiKey,
+      flagsForAction:           carWashConfig.flagsForAction,
+      voiceAssistant:           carWashConfig.voiceAssistant ? "1" : "0",
+      defaultLanguage:          carWashConfig.defaultLanguage,
+      timeOfServer:             ts()
+    };
+    if (carWashConfig.flagsForAction !== "0000") {
+      console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent → auto-reset to 0000`);
+      carWashConfig.flagsForAction = "0000";
+    }
+    addCarWashLog(req, response); return res.json(response);
+  }
+
   if (config.responseCode !== "00") {
     const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
     const response = {responseCode:config.responseCode, responseDescription:errMap[config.responseCode]||"Error"};
@@ -2221,17 +2248,6 @@ app.post("/parkingInit", (req, res) => {
       voiceAssistant:     rentalConfig.voiceAssistant ? "1" : "0",
       defaultLanguage:    rentalConfig.defaultLanguage
     } : {}),
-    // CarWash-specific fields — only included when app identifies as CarWash
-    ...(req.body.application === "CarWash" ? {
-      maxWashTimeSeconds:       String(carWashConfig.maxWashTimeSeconds),
-      maxWashAmountCents:       String(carWashConfig.maxWashAmountCents),
-      displayMessageOfEntrance: carWashConfig.displayMessageOfEntrance,
-      controllerUrl:            carWashConfig.controllerUrl,
-      controllerApiKey:         carWashConfig.controllerApiKey,
-      flagsForAction:           carWashConfig.flagsForAction,
-      voiceAssistant:           carWashConfig.voiceAssistant ? "1" : "0",
-      defaultLanguage:          carWashConfig.defaultLanguage
-    } : {}),
     responseCode:                    "00",
     responseDescription:             "Successful Response",
     timeOfServer:                    ts(),
@@ -2243,10 +2259,6 @@ app.post("/parkingInit", (req, res) => {
   if (config.flagsForAction !== "0000") {
     console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent → auto-reset to 0000`);
     config.flagsForAction = "0000";
-  }
-  if (req.body.application === "CarWash" && carWashConfig.flagsForAction !== "0000") {
-    console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent → auto-reset to 0000`);
-    carWashConfig.flagsForAction = "0000";
   }
   if (req.body.application === "Rental" && rentalConfig.flagsForAction !== "0000") {
     console.log(`[parkingInit/Rental] flagsForAction=${rentalConfig.flagsForAction} sent → auto-reset to 0000`);
