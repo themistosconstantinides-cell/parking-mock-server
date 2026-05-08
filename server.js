@@ -211,6 +211,44 @@ function startCaptureRetryLoop() {
   }, 60 * 1000); // checks every 60s
 }
 
+// ── CarWash State ─────────────────────────────────────────────────────────────
+let carWashConfig = {
+  outlet:                   "0000259010",
+  terminal:                 "000025901025",
+  maxWashTimeSeconds:       300,
+  maxWashAmountCents:       500,
+  displayMessageOfEntrance: "Welcome to Car Wash!",
+  helpMessage:              "Help has been called. Staff will assist you shortly.",
+  helpDisplayTime:          "10",
+  washScenario:             1,    // 1=capture_preauth, 2=fixed_amount, 3=free
+  responseCode:             "00",
+  voiceAssistant:           true,
+  defaultLanguage:          "EN"
+};
+let activeWashSessions   = {};
+let washPendingCaptures  = [];
+let carWashLogs          = [];
+
+function addCarWashLog(req, response) {
+  carWashLogs.unshift({
+    id: Date.now(), time: new Date().toLocaleString(),
+    endpoint: req.originalUrl, method: req.method,
+    request: req.body || {}, response
+  });
+  if (carWashLogs.length > 200) carWashLogs.pop();
+  console.log(`[CW] ${req.method} ${req.originalUrl} → ${JSON.stringify(response).substring(0,80)}`);
+}
+
+function addWashPendingCapture(session, amountCents) {
+  const id = require("crypto").randomBytes(8).toString("hex").toUpperCase();
+  washPendingCaptures.unshift({
+    id, session, amountCents,
+    createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
+    retries: 0, status: "PENDING", lastAttempt: null, lastError: null
+  });
+  console.log(`[CW_PENDING] Added ${id} — €${(amountCents/100).toFixed(2)} washId=${session.washId}`);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function addLog(req, response) {
   logs.unshift({
@@ -658,6 +696,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <div class="tab-nav">
   <button class="tab-btn active" onclick="showTab('parking',this)">&#x1F697; Parking</button>
   <button class="tab-btn" onclick="showTab('rental',this)">&#x1F512; Rental</button>
+  <button class="tab-btn" onclick="showTab('carwash',this)">&#x1F6BF; Car Wash</button>
 </div>
 
 <div id="tab-parking" class="tab-content active">
@@ -1028,6 +1067,122 @@ ${config.charges.map((c,i)=>`<tr>
   <button class="btn red" style="margin-left:auto" onclick="clearRentalLogs()">Clear</button>
 </div>
 <div id="rentalLogDiv"><p style="color:#8b949e">Loading...</p></div>
+</div>
+
+<!-- ═══ CARWASH TAB ═══ -->
+<div id="tab-carwash" class="tab-content">
+<h1>&#x1F6BF; Car Wash RPS Mock</h1>
+<p style="color:#8b949e">All changes take effect immediately. Uses same JCC IPPI endpoints as Parking.</p>
+
+<h2>&#x1F4F1; Car Wash POS Configuration</h2>
+<div class="pos-box" style="border-color:#1F9E8E">
+<h3>&#x1F6BF; Car Wash POS</h3>
+<table>
+<tr><th style="width:180px">Parameter</th><th>Value</th><th style="width:100px"></th></tr>
+<tr>
+  <td>Outlet Number</td>
+  <td><input class="t" id="cwOutlet" value="${carWashConfig.outlet}" maxlength="10"></td>
+  <td><button class="btn" onclick="cwSv('outlet','cwOutlet')">Save</button></td>
+</tr>
+<tr>
+  <td>Terminal ID</td>
+  <td><input class="t" id="cwTerminal" value="${carWashConfig.terminal}" maxlength="12"></td>
+  <td><button class="btn" onclick="cwSv('terminal','cwTerminal')">Save</button></td>
+</tr>
+</table>
+</div>
+
+<h2>&#x2699;&#xFE0F; Wash Configuration</h2>
+<table>
+<tr><th>Setting</th><th>Current</th><th>Actions</th></tr>
+<tr>
+  <td>Max Wash Time (seconds)</td>
+  <td>${carWashConfig.maxWashTimeSeconds}s = ${Math.floor(carWashConfig.maxWashTimeSeconds/60)}min</td>
+  <td><input class="n" type="number" id="cwMaxTime" value="${carWashConfig.maxWashTimeSeconds}">
+  <button class="btn" onclick="cwSet('maxWashTimeSeconds',Number(document.getElementById('cwMaxTime').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Max Pre-Auth Amount (cents)</td>
+  <td>${carWashConfig.maxWashAmountCents} = &#x20AC;${(carWashConfig.maxWashAmountCents/100).toFixed(2)}</td>
+  <td><input class="n" type="number" id="cwMaxAmt" value="${carWashConfig.maxWashAmountCents}">
+  <button class="btn" onclick="cwSet('maxWashAmountCents',Number(document.getElementById('cwMaxAmt').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Wash Scenario</td>
+  <td>${{1:"Capture Pre-Auth",2:"Fixed Amount",3:"Free"}[carWashConfig.washScenario]||"?"}</td>
+  <td>
+    <button class="btn green" onclick="cwSet('washScenario',1)">1 Capture</button>
+    <button class="btn orange" onclick="cwSet('washScenario',2)">2 Fixed</button>
+    <button class="btn red" onclick="cwSet('washScenario',3)">3 Free</button>
+  </td>
+</tr>
+<tr>
+  <td>Force Init Error</td>
+  <td>${carWashConfig.responseCode}</td>
+  <td>
+    <button class="btn green" onclick="cwSet('responseCode','00')">00 OK</button>
+    <button class="btn red" onclick="cwSet('responseCode','91')">91 Outlet</button>
+    <button class="btn red" onclick="cwSet('responseCode','08')">08 Technical</button>
+  </td>
+</tr>
+<tr>
+  <td>Voice Assistant</td>
+  <td>${carWashConfig.voiceAssistant ? '&#x1F50A; ON' : '&#x1F507; OFF'}</td>
+  <td>
+    <button class="btn green" onclick="cwSet('voiceAssistant',true)">&#x1F50A; ON</button>
+    <button class="btn red" onclick="cwSet('voiceAssistant',false)">&#x1F507; OFF</button>
+  </td>
+</tr>
+<tr>
+  <td>Default Language</td>
+  <td>${carWashConfig.defaultLanguage}</td>
+  <td>
+    <button class="btn green" onclick="cwSet('defaultLanguage','EN')">&#x1F1EC;&#x1F1E7; EN</button>
+    <button class="btn" onclick="cwSet('defaultLanguage','EL')">&#x1F1EC;&#x1F1F7; EL</button>
+    <button class="btn" onclick="cwSet('defaultLanguage','RU')">&#x1F1F7;&#x1F1FA; RU</button>
+    <button class="btn" onclick="cwSet('defaultLanguage','IW')">&#x1F1EE;&#x1F1F1; IW</button>
+  </td>
+</tr>
+<tr>
+  <td>Welcome Message</td>
+  <td style="font-size:11px">${carWashConfig.displayMessageOfEntrance}</td>
+  <td><input class="w" id="cwDME" value="${carWashConfig.displayMessageOfEntrance}">
+  <button class="btn" onclick="cwSv('displayMessageOfEntrance','cwDME')">Save</button></td>
+</tr>
+<tr>
+  <td>Help Message</td>
+  <td style="font-size:11px">${carWashConfig.helpMessage}</td>
+  <td><input class="w" id="cwHM" value="${carWashConfig.helpMessage}">
+  <button class="btn" onclick="cwSv('helpMessage','cwHM')">Save</button></td>
+</tr>
+<tr>
+  <td>Help Display Time (sec)</td>
+  <td>${carWashConfig.helpDisplayTime}</td>
+  <td><input style="width:60px" id="cwHDT" value="${carWashConfig.helpDisplayTime}">
+  <button class="btn" onclick="cwSv('helpDisplayTime','cwHDT')">Save</button></td>
+</tr>
+</table>
+
+<h2>&#x1F6BF; Active Wash Sessions <span id="cwSessionCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="cwSessionsDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
+<button class="btn red" onclick="cwClearSessions()">Clear All Sessions</button>
+
+<h2>&#x26A0;&#xFE0F; Pending Wash Captures <span id="cwPendingCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="cwPendingDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
+
+<h2>&#x1F4CB; Car Wash Request Log</h2>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="btn gray" onclick="cwSetFilter('')">All</button>
+  <button class="btn" style="background:#1f6feb" onclick="cwSetFilter('parkingInit')">Init</button>
+  <button class="btn green" onclick="cwSetFilter('washStart')">Wash Start</button>
+  <button class="btn orange" onclick="cwSetFilter('washStop')">Wash Stop</button>
+  <button class="btn gray" onclick="cwSetFilter('help')">Help</button>
+  <span style="margin-left:auto;display:flex;gap:6px">
+    <button class="btn red" onclick="cwClearLogs()">&#x1F5D1; Clear</button>
+  </span>
+</div>
+<div id="cwLogCount" style="color:#8b949e;font-size:11px;margin-bottom:8px"></div>
+<div id="cwLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
 <script>
@@ -1603,6 +1758,133 @@ async function loadRentalConfig(){
 }
 
 
+// ── Car Wash Tab JS ──────────────────────────────────────────────────────────
+let cwFilter='', cwAllLogs=[];
+
+function cwSetFilter(f){cwFilter=f;cwRenderLogs();}
+
+async function cwSet(k,v){
+  await fetch('/admin/carwash-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+  location.reload();
+}
+async function cwSv(key,id){
+  const v=document.getElementById(id).value.trim();
+  const r=await fetch('/admin/carwash-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const d=await r.json();
+  if(d.ok) location.reload(); else alert('Error: '+d.error);
+}
+async function cwClearSessions(){
+  if(!confirm('Clear all active wash sessions?')) return;
+  await fetch('/admin/carwash-clear-sessions',{method:'POST'});
+  loadCwSessions();
+}
+async function cwClearLogs(){
+  if(!confirm('Clear car wash logs?')) return;
+  await fetch('/admin/carwash-clear-logs',{method:'POST'});
+  cwAllLogs=[];cwRenderLogs();
+}
+
+async function loadCwSessions(){
+  try{
+    const r=await fetch('/admin/carwash-sessions');
+    const items=await r.json();
+    const el=document.getElementById('cwSessionsDiv');
+    const cnt=document.getElementById('cwSessionCount');
+    if(!el) return;
+    cnt.textContent='('+items.length+')';
+    if(!items.length){
+      el.innerHTML='<table><tr><td colspan="5" style="color:#8b949e">No active wash sessions</td></tr></table>';
+      return;
+    }
+    const now=Date.now();
+    el.innerHTML='<table><tr><th>Wash ID</th><th>Last4</th><th>Pre-Auth</th><th>Started</th><th>Running</th></tr>'+
+      items.map(function(s){
+        const mins=Math.floor((now-(s.startTime||now))/60000);
+        const secs=Math.floor(((now-(s.startTime||now))%60000)/1000);
+        return '<tr style="background:#0a1a2e">'+
+          '<td style="font-family:monospace;font-size:11px;color:#1F9E8E">'+s.washId+'</td>'+
+          '<td>****'+(s.lastDigits||'')+'</td>'+
+          '<td style="color:#3fb950">&#x20AC;'+(s.preAuthAmountCents/100).toFixed(2)+'</td>'+
+          '<td style="font-size:11px">'+new Date(s.startTime).toLocaleTimeString()+'</td>'+
+          '<td style="color:#e3b341">'+mins+'m '+secs+'s</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
+async function loadCwPending(){
+  try{
+    const r=await fetch('/admin/carwash-pending-captures');
+    const items=await r.json();
+    const el=document.getElementById('cwPendingDiv');
+    const cnt=document.getElementById('cwPendingCount');
+    if(!el) return;
+    const active=items.filter(i=>i.status!=='RESOLVED');
+    cnt.textContent='('+active.length+' active)';
+    if(!items.length){
+      el.innerHTML='<table><tr><td style="color:#8b949e">No pending wash captures</td></tr></table>';
+      return;
+    }
+    const sc={'PENDING':'#e3b341','FAILED':'#f85149','RESOLVED':'#3fb950'};
+    el.innerHTML='<table><tr><th>ID</th><th>Time</th><th>Wash ID</th><th>Card</th><th>Amount</th><th>Retries</th><th>Status</th><th>Last Error</th></tr>'+
+      items.map(function(p){
+        var c=sc[p.status]||'#8b949e';
+        return '<tr style="background:'+(p.status==='RESOLVED'?'#0d2010':p.status==='FAILED'?'#2a0d0d':'#1a1200')+'">'+
+          '<td style="font-family:monospace;font-size:11px">'+p.id+'</td>'+
+          '<td style="font-size:11px">'+p.createdAt+'</td>'+
+          '<td style="font-family:monospace;font-size:11px;color:#1F9E8E">'+(p.session&&p.session.washId||'?')+'</td>'+
+          '<td style="font-family:monospace">****'+(p.session&&p.session.lastDigits||'??')+'</td>'+
+          '<td style="color:#3fb950">&#x20AC;'+(p.amountCents/100).toFixed(2)+'</td>'+
+          '<td>'+p.retries+'</td>'+
+          '<td style="color:'+c+';font-weight:bold">'+p.status+'</td>'+
+          '<td style="font-size:11px;color:#f85149">'+(p.lastError||'-')+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
+  }catch(e){}
+}
+
+async function loadCwLogs(){
+  try{
+    const r=await fetch('/admin/carwash-logs');
+    cwAllLogs=await r.json();
+    cwRenderLogs();
+  }catch(e){}
+}
+
+function cwRenderLogs(){
+  const filtered=cwFilter
+    ?cwAllLogs.filter(l=>l.endpoint.toLowerCase().includes(cwFilter.toLowerCase()))
+    :cwAllLogs;
+  const countEl=document.getElementById('cwLogCount');
+  if(countEl) countEl.textContent=filtered.length+' of '+cwAllLogs.length+' entries'+(cwFilter?' — filter: '+cwFilter:'');
+  const el=document.getElementById('cwLogDiv');
+  if(!el) return;
+  if(!filtered.length){el.innerHTML='<p style="color:#8b949e">No entries match filter</p>';return;}
+  el.innerHTML=filtered.map(function(l){
+    const rc=(l.response&&l.response.responseCode)||'';
+    const isStart=l.endpoint.includes('washStart');
+    const isStop=l.endpoint.includes('washStop');
+    const col=isStart?'#1F9E8E':isStop?'#e65100':l.endpoint.includes('Init')?'#1f6feb':'#555';
+    const rcCol=rc==='00'?'#3fb950':rc?'#f85149':'#8b949e';
+    return '<div style="background:#0d1117;border:1px solid '+col+';border-radius:6px;padding:10px;margin-bottom:8px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<span style="color:#8b949e;font-size:11px">'+l.time+'</span>'+
+        '<span style="color:'+col+';font-weight:bold;font-size:12px">'+l.method+' '+l.endpoint+'</span>'+
+        (rc?'<span style="margin-left:auto;color:'+rcCol+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+        '<div><div style="color:#8b949e;font-size:10px;margin-bottom:2px">REQUEST</div>'+
+          '<pre>'+JSON.stringify(l.request,null,2)+'</pre></div>'+
+        '<div><div style="color:#3fb950;font-size:10px;margin-bottom:2px">RESPONSE</div>'+
+          '<pre style="border-left:3px solid '+rcCol+'">'+JSON.stringify(l.response,null,2)+'</pre></div>'+
+      '</div></div>';
+  }).join('');
+}
+
+loadCwSessions();setInterval(loadCwSessions,4000);
+loadCwPending();setInterval(loadCwPending,8000);
+loadCwLogs();setInterval(loadCwLogs,3000);
+
 loadLogs();setInterval(loadLogs,3000);
 loadJccLogs();setInterval(loadJccLogs,3000);
 loadJccTransaction();setInterval(loadJccTransaction,3000);
@@ -1675,6 +1957,14 @@ app.post("/parkingInit", (req, res) => {
     } : {}),
     stationId:                       rentalConfig.rentalStationId   || "LIM-001",
     stationName:                     rentalConfig.rentalStationName || "Rental Station",
+    // CarWash-specific fields — only included when app identifies as CarWash
+    ...(req.body.application === "CarWash" ? {
+      maxWashTimeSeconds: String(carWashConfig.maxWashTimeSeconds),
+      maxWashAmountCents: String(carWashConfig.maxWashAmountCents),
+      displayMessageOfEntrance: carWashConfig.displayMessageOfEntrance,
+      voiceAssistant: carWashConfig.voiceAssistant ? "1" : "0",
+      defaultLanguage: carWashConfig.defaultLanguage
+    } : {}),
     responseCode:                    "00",
     responseDescription:             "Successful Response",
     timeOfServer:                    ts(),
@@ -2138,6 +2428,149 @@ app.post("/help", (req, res) => {
     responseDescription:  "Successful Response"
   };
   addLog(req, response); res.json(response);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Car Wash API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── POST /washStart ───────────────────────────────────────────────────────────
+app.post("/washStart", (req, res) => {
+  const { washId, token, authCode, lastDigits, expiryDate, tokenCode,
+          receiptNumber, referenceNo, preAuthAmount, outlet, terminal } = req.body;
+
+  if (carWashConfig.responseCode !== "00") {
+    const errMap = { "91":"Invalid Outlet Number", "08":"Technical issue. Please wait." };
+    const response = { responseCode: carWashConfig.responseCode,
+      responseDescription: errMap[carWashConfig.responseCode] || "Error" };
+    addCarWashLog(req, response); return res.json(response);
+  }
+
+  if (!washId) {
+    const response = { responseCode: "99", responseDescription: "Missing washId" };
+    addCarWashLog(req, response); return res.json(response);
+  }
+
+  activeWashSessions[washId] = {
+    washId,
+    token:              token || washId,
+    authCode:           authCode || "",
+    lastDigits:         lastDigits || "????",
+    expiryDate:         expiryDate || "0000",
+    tokenCode:          tokenCode || token || washId,
+    receiptNumber:      receiptNumber || "",
+    originalRefNum:     referenceNo || receiptNumber || "",
+    preAuthAmountCents: parseInt(preAuthAmount || carWashConfig.maxWashAmountCents || 500),
+    outlet:             outlet   || carWashConfig.outlet,
+    terminal:           terminal || carWashConfig.terminal,
+    startTime:          Date.now()
+  };
+
+  console.log(`[WASH_START] washId=${washId} last4=${lastDigits} preAuth=€${(parseInt(preAuthAmount||0)/100).toFixed(2)}`);
+
+  const response = {
+    responseCode:         "00",
+    responseDescription:  "Successful Response",
+    displayMessage:       "Wash started! Enjoy.",
+    timeToDisplayMessage: "5"
+  };
+  addCarWashLog(req, response); res.json(response);
+});
+
+// ── POST /washStop ────────────────────────────────────────────────────────────
+app.post("/washStop", async (req, res) => {
+  const { washId, timeUsedSeconds, reason } = req.body;
+  const session = washId ? activeWashSessions[washId] : null;
+
+  if (!session) {
+    const response = {
+      responseCode: "41", responseDescription: "Wash session not found",
+      amountCharged: "0", timeUsedSeconds: String(timeUsedSeconds || 0),
+      displayMessage: "Session not found. Please contact staff.",
+      timeToDisplayMessage: "10"
+    };
+    addCarWashLog(req, response); return res.json(response);
+  }
+
+  // Determine charge amount by scenario
+  let amountCents = 0;
+  switch (carWashConfig.washScenario) {
+    case 1: amountCents = session.preAuthAmountCents; break;  // capture pre-auth amount
+    case 2: amountCents = carWashConfig.maxWashAmountCents;  break;  // fixed
+    case 3: amountCents = 0;                                 break;  // free
+    default: amountCents = session.preAuthAmountCents;
+  }
+
+  delete activeWashSessions[washId];
+  const timeUsed = parseInt(timeUsedSeconds || 0);
+
+  if (amountCents === 0) {
+    try { await jccRelease(session); } catch(e) { console.error("[WASH_STOP RELEASE]", e.message); }
+    const response = {
+      responseCode: "00", responseDescription: "Successful Response",
+      amountCharged: "0", timeUsedSeconds: String(timeUsed),
+      displayMessage: "Thank you! Wash was free.", timeToDisplayMessage: "5"
+    };
+    addCarWashLog(req, response); return res.json(response);
+  }
+
+  // Capture the charge
+  let captureResult = null;
+  try { captureResult = await jccCapture(session, amountCents); }
+  catch(e) { console.error("[WASH_STOP CAPTURE]", e.message); }
+
+  const captureOk = captureResult && captureResult.responseCode === "00";
+  if (!captureOk) {
+    addWashPendingCapture(session, amountCents);
+    console.log(`[WASH_STOP] Capture failed (${captureResult?.responseCode}) — stored for retry. washId=${washId}`);
+  }
+
+  const mins = Math.floor(timeUsed / 60);
+  const secs = timeUsed % 60;
+
+  const response = {
+    responseCode:         "00",
+    responseDescription:  "Successful Response",
+    amountCharged:        String(amountCents),
+    timeUsedSeconds:      String(timeUsed),
+    displayMessage:       captureOk
+      ? `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)}`
+      : `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)} (pending)`,
+    timeToDisplayMessage: "8"
+  };
+  addCarWashLog(req, response); res.json(response);
+});
+
+// ── CarWash Admin endpoints ───────────────────────────────────────────────────
+app.get("/admin/carwash-config",  (req, res) => res.json(carWashConfig));
+app.get("/admin/carwash-sessions",(req, res) => res.json(Object.values(activeWashSessions)));
+app.get("/admin/carwash-logs",    (req, res) => res.json(carWashLogs));
+app.get("/admin/carwash-pending-captures", (req, res) => res.json(washPendingCaptures));
+
+app.post("/admin/carwash-config", (req, res) => {
+  const { key, value } = req.body;
+  if (!(key in carWashConfig)) return res.json({ ok: false, error: `Unknown key: ${key}` });
+  const existing = carWashConfig[key];
+  if (typeof existing === "boolean")
+    carWashConfig[key] = value === true || value === "true" || value === 1;
+  else if (typeof existing === "number") {
+    const n = parseFloat(value);
+    carWashConfig[key] = isNaN(n) ? existing : n;
+  } else {
+    carWashConfig[key] = value;
+  }
+  console.log(`[CW_CONFIG] ${key} = ${JSON.stringify(carWashConfig[key])}`);
+  res.json({ ok: true, config: carWashConfig });
+});
+
+app.post("/admin/carwash-clear-sessions", (req, res) => {
+  activeWashSessions = {};
+  res.json({ ok: true });
+});
+
+app.post("/admin/carwash-clear-logs", (req, res) => {
+  carWashLogs = [];
+  res.json({ ok: true });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
