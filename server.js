@@ -221,6 +221,8 @@ let carWashConfig = {
   helpMessage:              "Help has been called. Staff will assist you shortly.",
   helpDisplayTime:          "10",
   washScenario:             1,    // 1=capture_preauth, 2=fixed_amount, 3=free
+  controllerUrl:            "",   // CarWash controller base URL (e.g. http://192.168.1.10)
+  controllerApiKey:         "",   // CarWash controller API key
   responseCode:             "00",
   voiceAssistant:           true,
   defaultLanguage:          "EN"
@@ -1161,6 +1163,18 @@ ${config.charges.map((c,i)=>`<tr>
   <td><input style="width:60px" id="cwHDT" value="${carWashConfig.helpDisplayTime}">
   <button class="btn" onclick="cwSv('helpDisplayTime','cwHDT')">Save</button></td>
 </tr>
+<tr>
+  <td>Controller URL</td>
+  <td style="font-size:11px">${carWashConfig.controllerUrl||'<span style="color:#8b949e">not set</span>'}</td>
+  <td><input class="w" id="cwCtrlUrl" placeholder="http://192.168.1.10" value="${carWashConfig.controllerUrl}">
+  <button class="btn" onclick="cwSv('controllerUrl','cwCtrlUrl')">Save</button></td>
+</tr>
+<tr>
+  <td>Controller API Key</td>
+  <td style="font-size:11px">${carWashConfig.controllerApiKey ? '****' + carWashConfig.controllerApiKey.slice(-4) : '<span style="color:#8b949e">not set</span>'}</td>
+  <td><input class="w" id="cwCtrlKey" type="password" placeholder="API key" value="${carWashConfig.controllerApiKey}">
+  <button class="btn" onclick="cwSv('controllerApiKey','cwCtrlKey')">Save</button></td>
+</tr>
 </table>
 
 <h2>&#x1F6BF; Active Wash Sessions <span id="cwSessionCount" style="font-size:13px;color:#8b949e"></span></h2>
@@ -1959,11 +1973,13 @@ app.post("/parkingInit", (req, res) => {
     stationName:                     rentalConfig.rentalStationName || "Rental Station",
     // CarWash-specific fields — only included when app identifies as CarWash
     ...(req.body.application === "CarWash" ? {
-      maxWashTimeSeconds: String(carWashConfig.maxWashTimeSeconds),
-      maxWashAmountCents: String(carWashConfig.maxWashAmountCents),
+      maxWashTimeSeconds:       String(carWashConfig.maxWashTimeSeconds),
+      maxWashAmountCents:       String(carWashConfig.maxWashAmountCents),
       displayMessageOfEntrance: carWashConfig.displayMessageOfEntrance,
-      voiceAssistant: carWashConfig.voiceAssistant ? "1" : "0",
-      defaultLanguage: carWashConfig.defaultLanguage
+      controllerUrl:            carWashConfig.controllerUrl,
+      controllerApiKey:         carWashConfig.controllerApiKey,
+      voiceAssistant:           carWashConfig.voiceAssistant ? "1" : "0",
+      defaultLanguage:          carWashConfig.defaultLanguage
     } : {}),
     responseCode:                    "00",
     responseDescription:             "Successful Response",
