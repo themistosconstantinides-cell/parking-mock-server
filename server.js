@@ -223,6 +223,7 @@ let carWashConfig = {
   washScenario:             1,    // 1=capture_preauth, 2=fixed_amount, 3=free
   controllerUrl:            "",   // CarWash controller base URL (e.g. http://192.168.1.10)
   controllerApiKey:         "",   // CarWash controller API key
+  flagsForAction:           "0000", // "1000"=restart app, "0100"=force re-init, "1100"=both
   responseCode:             "00",
   voiceAssistant:           true,
   defaultLanguage:          "EN"
@@ -1128,6 +1129,16 @@ ${config.charges.map((c,i)=>`<tr>
   </td>
 </tr>
 <tr>
+  <td>Force Action (flagsForAction)</td>
+  <td>${carWashConfig.flagsForAction}</td>
+  <td>
+    <button class="btn green" onclick="cwSet('flagsForAction','0000')">0000 None</button>
+    <button class="btn orange" onclick="cwSet('flagsForAction','1000')">1000 Restart App</button>
+    <button class="btn" onclick="cwSet('flagsForAction','0100')">0100 Force Re-Init</button>
+    <button class="btn red" onclick="cwSet('flagsForAction','1100')">1100 Init + Restart</button>
+  </td>
+</tr>
+<tr>
   <td>Voice Assistant</td>
   <td>${carWashConfig.voiceAssistant ? '&#x1F50A; ON' : '&#x1F507; OFF'}</td>
   <td>
@@ -1978,6 +1989,7 @@ app.post("/parkingInit", (req, res) => {
       displayMessageOfEntrance: carWashConfig.displayMessageOfEntrance,
       controllerUrl:            carWashConfig.controllerUrl,
       controllerApiKey:         carWashConfig.controllerApiKey,
+      flagsForAction:           carWashConfig.flagsForAction,
       voiceAssistant:           carWashConfig.voiceAssistant ? "1" : "0",
       defaultLanguage:          carWashConfig.defaultLanguage
     } : {}),
@@ -1992,6 +2004,10 @@ app.post("/parkingInit", (req, res) => {
   if (config.flagsForAction !== "0000") {
     console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent → auto-reset to 0000`);
     config.flagsForAction = "0000";
+  }
+  if (req.body.application === "CarWash" && carWashConfig.flagsForAction !== "0000") {
+    console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent → auto-reset to 0000`);
+    carWashConfig.flagsForAction = "0000";
   }
   addLog(req, response); res.json(response);
 });
