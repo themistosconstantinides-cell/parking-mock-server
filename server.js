@@ -1373,6 +1373,20 @@ ${rentalConfig.charges.map((c,i)=>`<tr>
   <td><input class="w" id="cwCtrlKey" type="password" placeholder="API key" value="${carWashConfig.controllerApiKey}">
   <button class="btn" onclick="cwSv('controllerApiKey','cwCtrlKey')">Save</button></td>
 </tr>
+<tr>
+  <td>Monthly Card Button</td>
+  <td>${carWashConfig.monthlyEnabled ? '&#x2705; Enabled' : '&#x26D4; Disabled'}</td>
+  <td>
+    <button class="btn green" onclick="cwSet('monthlyEnabled',true)">&#x2705; Enable</button>
+    <button class="btn red" onclick="cwSet('monthlyEnabled',false)">&#x26D4; Disable</button>
+  </td>
+</tr>
+<tr>
+  <td>Monthly Card Numbers</td>
+  <td style="font-size:11px">${carWashConfig.monthlyCardsBins || '<span style="color:#8b949e">any card accepted</span>'}</td>
+  <td><input class="w" id="cwMonthlyBins" placeholder="123456;789012 (empty=allow all)" value="${carWashConfig.monthlyCardsBins}">
+  <button class="btn" onclick="cwSv('monthlyCardsBins','cwMonthlyBins')">Save</button></td>
+</tr>
 </table>
 
 <h2>&#x1F6BF; Active Wash Sessions <span id="cwSessionCount" style="font-size:13px;color:#8b949e"></span></h2>
