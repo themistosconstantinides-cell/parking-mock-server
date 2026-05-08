@@ -286,12 +286,14 @@ let carWashConfig = {
   alertEmail:               process.env.ALERT_EMAIL || "",
   lastAlertSent:            null,
   washScenario:             1,    // 1=capture_preauth, 2=fixed_amount, 3=free
-  controllerUrl:            "",   // CarWash controller base URL (e.g. http://192.168.1.10)
-  controllerApiKey:         "",   // CarWash controller API key
-  flagsForAction:           "0000", // "1000"=restart app, "0100"=force re-init, "1100"=both
+  controllerUrl:            "",
+  controllerApiKey:         "",
+  flagsForAction:           "0000",
   responseCode:             "00",
   voiceAssistant:           true,
-  defaultLanguage:          "EN"
+  defaultLanguage:          "EN",
+  monthlyEnabled:           true,   // show Monthly Card button in app
+  monthlyCardsBins:         "",     // semicolon-separated card numbers for validation (empty = allow all)
 };
 let activeWashSessions   = {};
 let washPendingCaptures  = [];
@@ -2183,6 +2185,8 @@ app.post("/parkingInit", (req, res) => {
       flagsForAction:           carWashConfig.flagsForAction,
       voiceAssistant:           carWashConfig.voiceAssistant ? "1" : "0",
       defaultLanguage:          carWashConfig.defaultLanguage,
+      availablePlaceMonthly:    carWashConfig.monthlyEnabled ? "0" : "-1",
+      monthlyCardsBins:         carWashConfig.monthlyCardsBins || "",
       timeOfServer:             ts()
     };
     if (carWashConfig.flagsForAction !== "0000") {
@@ -2729,7 +2733,9 @@ app.post("/help", (req, res) => {
 // ── POST /washStart ───────────────────────────────────────────────────────────
 app.post("/washStart", (req, res) => {
   const { washId, token, authCode, lastDigits, expiryDate, tokenCode,
-          receiptNumber, referenceNo, preAuthAmount, outlet, terminal } = req.body;
+          receiptNumber, referenceNo, preAuthAmount, outlet, terminal, inputType } = req.body;
+
+  const isMonthly = inputType === "Monthly Card";
 
   if (carWashConfig.responseCode !== "00") {
     const errMap = { "91":"Invalid Outlet Number", "08":"Technical issue. Please wait." };
@@ -2752,7 +2758,8 @@ app.post("/washStart", (req, res) => {
     tokenCode:          tokenCode || token || washId,
     receiptNumber:      receiptNumber || "",
     originalRefNum:     referenceNo || receiptNumber || "",
-    preAuthAmountCents: parseInt(preAuthAmount || carWashConfig.maxWashAmountCents || 500),
+    preAuthAmountCents: isMonthly ? 0 : parseInt(preAuthAmount || carWashConfig.maxWashAmountCents || 500),
+    isMonthly:          isMonthly,
     outlet:             outlet   || carWashConfig.outlet,
     terminal:           terminal || carWashConfig.terminal,
     startTime:          Date.now()
@@ -2788,6 +2795,20 @@ app.post("/washStop", async (req, res) => {
 
   // Always calculate time used server-side from session.startTime — more reliable than app-reported value
   const timeUsed = Math.round((Date.now() - session.startTime) / 1000);
+
+  // Monthly card — no pre-auth was taken, free wash, no JCC calls
+  if (session.isMonthly) {
+    const mins = Math.floor(timeUsed / 60);
+    const secs = timeUsed % 60;
+    console.log(`[WASH_STOP] Monthly card — free wash washId=${washId} timeUsed=${timeUsed}s`);
+    const response = {
+      responseCode: "00", responseDescription: "Successful Response",
+      amountCharged: "0", timeUsedSeconds: String(timeUsed),
+      displayMessage: `Monthly Card — Free Wash\nTime used: ${mins}m ${secs}s`,
+      timeToDisplayMessage: "5"
+    };
+    addCarWashLog(req, response); return res.json(response);
+  }
 
   // Void pre-auth immediately — wash never started or crashed before completing
   if (reason === "controller_failed" || reason === "app_restart") {
