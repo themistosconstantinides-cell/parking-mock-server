@@ -2773,7 +2773,9 @@ app.post("/washStop", async (req, res) => {
   }
 
   delete activeWashSessions[washId];
-  const timeUsed = parseInt(timeUsedSeconds || 0);
+
+  // Always calculate time used server-side from session.startTime — more reliable than app-reported value
+  const timeUsed = Math.round((Date.now() - session.startTime) / 1000);
 
   // Void pre-auth immediately — wash never started or crashed before completing
   if (reason === "controller_failed" || reason === "app_restart") {
@@ -2790,9 +2792,16 @@ app.post("/washStop", async (req, res) => {
   // Determine charge amount by scenario
   let amountCents = 0;
   switch (carWashConfig.washScenario) {
-    case 1: amountCents = session.preAuthAmountCents; break;  // capture pre-auth amount
-    case 2: amountCents = carWashConfig.maxWashAmountCents;  break;  // fixed
-    case 3: amountCents = 0;                                 break;  // free
+    case 1: {
+      // Proportional to actual time used — capped at pre-auth amount
+      const maxSecs = carWashConfig.maxWashTimeSeconds || 300;
+      const ratio   = Math.min(timeUsed / maxSecs, 1.0);
+      amountCents   = Math.round(session.preAuthAmountCents * ratio);
+      console.log(`[WASH_STOP] Proportional charge: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% → €${(amountCents/100).toFixed(2)}`);
+      break;
+    }
+    case 2: amountCents = carWashConfig.maxWashAmountCents; break;  // fixed amount
+    case 3: amountCents = 0;                                break;  // free
     default: amountCents = session.preAuthAmountCents;
   }
 
