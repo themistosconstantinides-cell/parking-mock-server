@@ -2772,6 +2772,21 @@ app.post("/washStop", async (req, res) => {
     addCarWashLog(req, response); return res.json(response);
   }
 
+  delete activeWashSessions[washId];
+  const timeUsed = parseInt(timeUsedSeconds || 0);
+
+  // Void pre-auth immediately — wash never started or crashed before completing
+  if (reason === "controller_failed" || reason === "app_restart") {
+    console.log(`[WASH_STOP] Void pre-auth — reason=${reason} washId=${washId}`);
+    try { await jccRelease(session); } catch(e) { console.error("[WASH_STOP VOID]", e.message); }
+    const response = {
+      responseCode: "00", responseDescription: "Pre-auth voided. No charge applied.",
+      amountCharged: "0", timeUsedSeconds: "0",
+      displayMessage: "Pre-auth voided. No charge applied.", timeToDisplayMessage: "10"
+    };
+    addCarWashLog(req, response); return res.json(response);
+  }
+
   // Determine charge amount by scenario
   let amountCents = 0;
   switch (carWashConfig.washScenario) {
@@ -2780,9 +2795,6 @@ app.post("/washStop", async (req, res) => {
     case 3: amountCents = 0;                                 break;  // free
     default: amountCents = session.preAuthAmountCents;
   }
-
-  delete activeWashSessions[washId];
-  const timeUsed = parseInt(timeUsedSeconds || 0);
 
   if (amountCents === 0) {
     try { await jccRelease(session); } catch(e) { console.error("[WASH_STOP RELEASE]", e.message); }
