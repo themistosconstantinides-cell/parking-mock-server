@@ -215,6 +215,65 @@ function startCaptureRetryLoop() {
   }, 60 * 1000); // checks every 60s
 }
 
+// ── Rental State ─────────────────────────────────────────────────────────────
+let rentalConfig = {
+  rentalOutlet:       "",
+  rentalTerminal:     "",
+  rentalStationId:    "LIM-001",
+  rentalStationName:  "Rental Station",
+  preAuthAmountCents: 1000,      // pre-auth amount in cents (e.g. 1000 = €10)
+  maxRentalTimeMins:  120,       // max rental duration in minutes
+  rentalScenario:     1,         // 1=time-based capture, 2=fixed amount, 3=free+release
+  fixedAmountCents:   500,       // used for scenario 2
+  displayMessage:     "Welcome! Tap your card to rent an item.",
+  helpMessage:        "Help has been called. Staff will assist you shortly.",
+  helpDisplayTime:    "10",
+  alertEmail:         process.env.ALERT_EMAIL || "",
+  lastAlertSent:      null,
+  flagsForAction:     "0000",
+  responseCode:       "00",
+  voiceAssistant:     true,
+  defaultLanguage:    "EN",
+  charges:            [
+    { upToMins: 30,  fee: 200 },
+    { upToMins: 60,  fee: 300 },
+    { upToMins: 120, fee: 500 },
+    { upToMins: -1,  fee: 800 }
+  ]
+};
+let activeRentals         = {};
+let rentalLogs            = [];
+let rentalPendingCaptures = [];
+
+function addRentalLog(req, response) {
+  rentalLogs.unshift({
+    id: Date.now(), time: new Date().toLocaleString(),
+    endpoint: req.originalUrl, method: req.method,
+    request: req.body || {}, response
+  });
+  if (rentalLogs.length > 200) rentalLogs.pop();
+  console.log(`[RENTAL] ${req.method} ${req.originalUrl} → ${JSON.stringify(response).substring(0,80)}`);
+}
+
+function addRentalPendingCapture(session, amountCents) {
+  const id = require("crypto").randomBytes(8).toString("hex").toUpperCase();
+  rentalPendingCaptures.unshift({
+    id, session, amountCents,
+    createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
+    retries: 0, status: "PENDING", lastAttempt: null, lastError: null
+  });
+  console.log(`[RENTAL_PENDING] Added ${id} — €${(amountCents/100).toFixed(2)} rentalId=${session.rentalId}`);
+}
+
+function calcRentalFee(startTimeMs, endTimeMs) {
+  const mins = (endTimeMs - startTimeMs) / 60000;
+  const sorted = [...rentalConfig.charges].sort((a, b) => (a.upToMins === -1 ? 1 : b.upToMins === -1 ? -1 : a.upToMins - b.upToMins));
+  for (const tier of sorted) {
+    if (tier.upToMins === -1 || mins <= tier.upToMins) return tier.fee;
+  }
+  return sorted[sorted.length - 1].fee;
+}
+
 // ── CarWash State ─────────────────────────────────────────────────────────────
 let carWashConfig = {
   outlet:                   "0000259010",
@@ -1035,44 +1094,154 @@ ${config.charges.map((c,i)=>`<tr>
 
 <!-- ═══ RENTAL TAB ═══ -->
 <div id="tab-rental" class="tab-content">
-<p style="color:#8b949e">Rental RPS — separate from parking. All changes take effect immediately.</p>
+<h1>&#x1F512; Rental RPS Mock</h1>
+<p style="color:#8b949e">All changes take effect immediately. Uses same JCC IPPI endpoints as Parking.</p>
 
 <h2>&#x1F4F1; Rental Terminal Configuration</h2>
 <div class="pos-box" style="border-color:#1D9E75">
-<h3>🟢 Rental POS</h3>
+<h3>&#x1F7E2; Rental POS</h3>
 <table>
 <tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
 <tr><td>Outlet Number</td>
-  <td><input class="t" id="rentalOutlet" value="" maxlength="10" placeholder="10 digits"></td>
+  <td><input class="t" id="rentalOutlet" value="${rentalConfig.rentalOutlet}" maxlength="10" placeholder="10 digits"></td>
   <td><button class="btn" onclick="saveRentalCfg('rentalOutlet','rentalOutlet')">Save</button></td></tr>
 <tr><td>Terminal ID</td>
-  <td><input class="t" id="rentalTerminal" value="" maxlength="12" placeholder="12 digits"></td>
+  <td><input class="t" id="rentalTerminal" value="${rentalConfig.rentalTerminal}" maxlength="12" placeholder="12 digits"></td>
   <td><button class="btn" onclick="saveRentalCfg('rentalTerminal','rentalTerminal')">Save</button></td></tr>
 <tr><td>Station ID</td>
-  <td><input class="t" id="rentalStationId" value="" placeholder="e.g. LIM-001"></td>
+  <td><input class="t" id="rentalStationId" value="${rentalConfig.rentalStationId}" placeholder="e.g. LIM-001"></td>
   <td><button class="btn" onclick="saveRentalCfg('rentalStationId','rentalStationId')">Save</button></td></tr>
 <tr><td>Station Name</td>
-  <td><input class="m" id="rentalStationName" value="" placeholder="e.g. Limassol Marina"></td>
+  <td><input class="m" id="rentalStationName" value="${rentalConfig.rentalStationName}" placeholder="e.g. Limassol Marina"></td>
   <td><button class="btn" onclick="saveRentalCfg('rentalStationName','rentalStationName')">Save</button></td></tr>
 </table></div>
 
-<h2>&#9881; Rental Tariff (RPS calculates)</h2>
+<h2>&#x2699;&#xFE0F; Rental Configuration</h2>
 <table>
-<tr><th>Up to (min)</th><th>Rate</th><th>Action</th></tr>
-<tr><td>60</td><td>€3.00</td><td><span style="color:#8b949e">fixed for demo</span></td></tr>
-<tr><td>120</td><td>€4.50</td><td></td></tr>
-<tr><td>180</td><td>€6.00</td><td></td></tr>
-<tr><td>∞</td><td>€6.00 + €1.50/hr</td><td></td></tr>
+<tr><th>Setting</th><th>Current</th><th>Actions</th></tr>
+<tr>
+  <td>Pre-Auth Amount (cents)</td>
+  <td>${rentalConfig.preAuthAmountCents} = &#x20AC;${(rentalConfig.preAuthAmountCents/100).toFixed(2)}</td>
+  <td><input class="n" type="number" id="rnPreAuth" value="${rentalConfig.preAuthAmountCents}">
+  <button class="btn" onclick="rnSet('preAuthAmountCents',Number(document.getElementById('rnPreAuth').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Max Rental Time (min)</td>
+  <td>${rentalConfig.maxRentalTimeMins} min</td>
+  <td><input class="n" type="number" id="rnMaxTime" value="${rentalConfig.maxRentalTimeMins}">
+  <button class="btn" onclick="rnSet('maxRentalTimeMins',Number(document.getElementById('rnMaxTime').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Rental Scenario</td>
+  <td>${{1:"Time-based capture",2:"Fixed amount",3:"Free + release"}[rentalConfig.rentalScenario]||"?"}</td>
+  <td>
+    <button class="btn green" onclick="rnSet('rentalScenario',1)">1 Time-based</button>
+    <button class="btn orange" onclick="rnSet('rentalScenario',2)">2 Fixed</button>
+    <button class="btn red" onclick="rnSet('rentalScenario',3)">3 Free</button>
+  </td>
+</tr>
+<tr>
+  <td>Fixed Amount (cents)</td>
+  <td>${rentalConfig.fixedAmountCents} = &#x20AC;${(rentalConfig.fixedAmountCents/100).toFixed(2)}</td>
+  <td><input class="n" type="number" id="rnFixed" value="${rentalConfig.fixedAmountCents}">
+  <button class="btn" onclick="rnSet('fixedAmountCents',Number(document.getElementById('rnFixed').value))">Set</button>
+  <span style="color:#8b949e;font-size:11px;margin-left:6px">only used for scenario 2</span></td>
+</tr>
+<tr>
+  <td>Force Init Error</td>
+  <td>${rentalConfig.responseCode}</td>
+  <td>
+    <button class="btn green" onclick="rnSet('responseCode','00')">00 OK</button>
+    <button class="btn red" onclick="rnSet('responseCode','91')">91 Outlet</button>
+    <button class="btn red" onclick="rnSet('responseCode','08')">08 Technical</button>
+  </td>
+</tr>
+<tr>
+  <td>Force Action (flagsForAction)</td>
+  <td>${rentalConfig.flagsForAction}</td>
+  <td>
+    <button class="btn green" onclick="rnSet('flagsForAction','0000')">0000 None</button>
+    <button class="btn orange" onclick="rnSet('flagsForAction','1000')">1000 Restart App</button>
+    <button class="btn" onclick="rnSet('flagsForAction','0100')">0100 Force Re-Init</button>
+    <button class="btn red" onclick="rnSet('flagsForAction','1100')">1100 Init + Restart</button>
+  </td>
+</tr>
+<tr>
+  <td>Voice Assistant</td>
+  <td>${rentalConfig.voiceAssistant ? '&#x1F50A; ON' : '&#x1F507; OFF'}</td>
+  <td>
+    <button class="btn green" onclick="rnSet('voiceAssistant',true)">&#x1F50A; ON</button>
+    <button class="btn red" onclick="rnSet('voiceAssistant',false)">&#x1F507; OFF</button>
+  </td>
+</tr>
+<tr>
+  <td>Default Language</td>
+  <td>${rentalConfig.defaultLanguage}</td>
+  <td>
+    <button class="btn green" onclick="rnSet('defaultLanguage','EN')">&#x1F1EC;&#x1F1E7; EN</button>
+    <button class="btn" onclick="rnSet('defaultLanguage','EL')">&#x1F1EC;&#x1F1F7; EL</button>
+    <button class="btn" onclick="rnSet('defaultLanguage','RU')">&#x1F1F7;&#x1F1FA; RU</button>
+    <button class="btn" onclick="rnSet('defaultLanguage','IW')">&#x1F1EE;&#x1F1F1; IW</button>
+  </td>
+</tr>
+<tr>
+  <td>Welcome Message</td>
+  <td style="font-size:11px">${rentalConfig.displayMessage}</td>
+  <td><input class="w" id="rnDM" value="${rentalConfig.displayMessage}">
+  <button class="btn" onclick="rnSv('displayMessage','rnDM')">Save</button></td>
+</tr>
+<tr>
+  <td>Help Message</td>
+  <td style="font-size:11px">${rentalConfig.helpMessage}</td>
+  <td><input class="w" id="rnHM" value="${rentalConfig.helpMessage}">
+  <button class="btn" onclick="rnSv('helpMessage','rnHM')">Save</button></td>
+</tr>
+<tr>
+  <td>Help Display Time (sec)</td>
+  <td>${rentalConfig.helpDisplayTime}</td>
+  <td><input style="width:60px" id="rnHDT" value="${rentalConfig.helpDisplayTime}">
+  <button class="btn" onclick="rnSv('helpDisplayTime','rnHDT')">Save</button></td>
+</tr>
+<tr>
+  <td>Email Alerts</td>
+  <td>${process.env.RESEND_KEY ? '&#x2705; Resend active' : '&#x26A0;&#xFE0F; Not configured'}</td>
+  <td style="font-size:11px;color:#8b949e">${rentalConfig.lastAlertSent ? 'Last sent: '+rentalConfig.lastAlertSent : 'No alerts sent yet'}</td>
+</tr>
+<tr>
+  <td>Alert Email (recipient)</td>
+  <td><input class="w" id="rnAlertEmail" placeholder="recipient@email.com" value="${rentalConfig.alertEmail}"></td>
+  <td><button class="btn" onclick="rnSv('alertEmail','rnAlertEmail')">Save</button></td>
+</tr>
 </table>
 
-<h2>&#x1F6B2; Active Rentals <span id="rentalCount"></span></h2>
+<h3 style="color:#8b949e;margin-top:16px">Time-based Charges (scenario 1)</h3>
+<table>
+<tr><th>Up to (min)</th><th>Fee (cents)</th><th>= Euro</th><th></th></tr>
+${rentalConfig.charges.map((c,i)=>`<tr>
+<td>${c.upToMins===-1?'∞':c.upToMins}</td><td>${c.fee}</td><td>&#x20AC;${(c.fee/100).toFixed(2)}</td>
+<td><button class="btn red" onclick="removeRentalCharge(${i})">Remove</button></td>
+</tr>`).join('')}
+</table>
+<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+  <input class="n" type="number" id="rnChTo" placeholder="up to min (-1=∞)">
+  <input class="n" type="number" id="rnChFee" placeholder="fee cents">
+  <button class="btn green" onclick="addRentalCharge()">+ Add Tier</button>
+</div>
+
+<h2>&#x1F4E6; Active Rentals <span id="rentalCount" style="font-size:13px;color:#8b949e"></span></h2>
 <div id="rentalsDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
+<button class="btn red" onclick="clearRentals()">Clear All Rentals</button>
+
+<h2>&#x26A0;&#xFE0F; Pending Rental Captures <span id="rentalPendingCount" style="font-size:13px;color:#8b949e"></span></h2>
+<div id="rentalPendingDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
 
 <h2>&#x1F4CB; Rental Request Log</h2>
 <div style="display:flex;gap:6px;margin-bottom:10px">
-  <button class="btn green" onclick="setRentalFilter('rental/start')">Start</button>
-  <button class="btn orange" onclick="setRentalFilter('rental/exit')">Exit</button>
   <button class="btn gray" onclick="setRentalFilter('')">All</button>
+  <button class="btn green" onclick="setRentalFilter('rental/start')">Start</button>
+  <button class="btn orange" onclick="setRentalFilter('rental/stop')">Stop</button>
+  <button class="btn" style="background:#1f6feb" onclick="setRentalFilter('rentalInit')">Init</button>
+  <button class="btn gray" onclick="setRentalFilter('rental/help')">Help</button>
   <button class="btn red" style="margin-left:auto" onclick="clearRentalLogs()">Clear</button>
 </div>
 <div id="rentalLogDiv"><p style="color:#8b949e">Loading...</p></div>
@@ -1736,22 +1905,24 @@ async function saveJccConfig(){
 let rentalFilter='', rentalLogs=[];
 function setRentalFilter(f){rentalFilter=f;renderRentalLogs();}
 function renderRentalLogs(){
-  const filtered=rentalFilter?rentalLogs.filter(l=>l.endpoint.includes(rentalFilter)):rentalLogs;
-  if(!filtered.length){document.getElementById('rentalLogDiv').innerHTML='<p style="color:#8b949e">No rental requests yet</p>';return;}
-  document.getElementById('rentalLogDiv').innerHTML=filtered.map(function(l){
+  const filtered=rentalFilter?rentalLogs.filter(l=>l.endpoint.toLowerCase().includes(rentalFilter.toLowerCase())):rentalLogs;
+  const el=document.getElementById('rentalLogDiv');
+  if(!filtered.length){el.innerHTML='<p style="color:#8b949e">No rental requests yet</p>';return;}
+  el.innerHTML=filtered.map(function(l){
     const rc=(l.response&&l.response.responseCode)||'';
     const rcCol=rc==='00'?'#3fb950':rc?'#ff6b6b':'#8b949e';
-    const isExit=l.endpoint.includes('exit');
-    const borderCol=isExit?'#e65100':'#1D9E75';
-    return '<div style="background:#161b22;border-left:3px solid '+borderCol+';border-radius:4px;padding:10px;margin-bottom:8px">'+
-      '<div style="display:flex;gap:8px;margin-bottom:6px">'+
+    const isStop=l.endpoint.includes('stop');
+    const isInit=l.endpoint.includes('Init');
+    const borderCol=isStop?'#e65100':isInit?'#1f6feb':'#1D9E75';
+    return '<div style="background:#0d1117;border:1px solid '+borderCol+';border-radius:6px;padding:10px;margin-bottom:8px">'+
+      '<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<span style="color:#8b949e;font-size:11px">'+l.time+'</span>'+
         '<span style="color:'+borderCol+';font-weight:bold;font-size:12px">'+l.method+' '+l.endpoint+'</span>'+
-        (rc?'<span style="margin-left:auto;color:'+rcCol+';font-size:12px">RC: '+rc+'</span>':'')+
+        (rc?'<span style="margin-left:auto;color:'+rcCol+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
-        '<div><div style="color:#8b949e;font-size:10px">REQUEST</div><pre>'+JSON.stringify(l.request,null,2)+'</pre></div>'+
-        '<div><div style="color:#3fb950;font-size:10px">RESPONSE</div><pre>'+JSON.stringify(l.response,null,2)+'</pre></div>'+
+        '<div><div style="color:#8b949e;font-size:10px;margin-bottom:2px">REQUEST</div><pre>'+JSON.stringify(l.request,null,2)+'</pre></div>'+
+        '<div><div style="color:#3fb950;font-size:10px;margin-bottom:2px">RESPONSE</div><pre style="border-left:3px solid '+rcCol+'">'+JSON.stringify(l.response,null,2)+'</pre></div>'+
       '</div></div>';
   }).join('');
 }
@@ -1759,13 +1930,39 @@ async function loadRentalLogs(){
   try{const r=await fetch('/rental/logs');rentalLogs=await r.json();renderRentalLogs();}catch(e){}
 }
 async function clearRentalLogs(){
+  if(!confirm('Clear rental logs?'))return;
   await fetch('/rental/logs',{method:'DELETE'});rentalLogs=[];renderRentalLogs();
 }
-async function saveRentalCfg(key, id){
+async function rnSet(k,v){
+  await fetch('/admin/rental-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+  location.reload();
+}
+async function rnSv(key,id){
   const v=document.getElementById(id).value.trim();
-  const r=await fetch('/rental/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const r=await fetch('/admin/rental-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
   const d=await r.json();
-  if(d.ok) alert('Saved: '+key+' = '+v); else alert('Error: '+d.error);
+  if(d.ok) location.reload(); else alert('Error: '+d.error);
+}
+async function saveRentalCfg(key,id){
+  const v=document.getElementById(id).value.trim();
+  const r=await fetch('/admin/rental-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const d=await r.json();
+  if(d.ok) location.reload(); else alert('Error: '+d.error);
+}
+async function addRentalCharge(){
+  const upToMins=parseInt(document.getElementById('rnChTo').value)||(-1);
+  const fee=parseInt(document.getElementById('rnChFee').value);
+  if(!fee){alert('Fee is required');return;}
+  await fetch('/admin/rental-add-charge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({upToMins,fee})});
+  location.reload();
+}
+async function removeRentalCharge(i){
+  await fetch('/admin/rental-remove-charge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})});
+  location.reload();
+}
+async function clearRentals(){
+  if(!confirm('Clear all active rentals?'))return;
+  await fetch('/admin/rental-clear',{method:'POST'});location.reload();
 }
 async function loadRentals(){
   try{
@@ -1774,27 +1971,44 @@ async function loadRentals(){
     if(!el)return;cnt.textContent='('+items.length+')';
     if(!items.length){el.innerHTML='<table><tr><td style="color:#8b949e">No active rentals</td></tr></table>';return;}
     const now=Date.now();
-    el.innerHTML='<table><tr><th>Rental ID</th><th>Item</th><th>Last4</th><th>Start</th><th>Duration</th><th>Auth</th></tr>'+
-      items.map(function(r){
-        const mins=Math.floor((now-r.startTime)/60000);
+    el.innerHTML='<table><tr><th>Rental ID</th><th>Last4</th><th>Pre-Auth</th><th>Start</th><th>Duration</th><th>Auth</th></tr>'+
+      items.map(function(item){
+        const mins=Math.floor((now-(item.startTime||now))/60000);
+        const secs=Math.floor(((now-(item.startTime||now))%60000)/1000);
         return '<tr style="background:#0a1a0a">'+
-          '<td style="font-family:monospace;font-size:11px;color:#1D9E75">'+r.rentalId+'</td>'+
-          '<td style="color:#FAC775">Item #'+r.bikeId+'</td>'+
-          '<td>****'+r.last4+'</td>'+
-          '<td style="font-size:11px">'+new Date(r.startTime).toLocaleTimeString()+'</td>'+
-          '<td style="color:#3fb950">'+mins+'m</td>'+
-          '<td style="font-family:monospace;font-size:11px">'+r.authCode+'</td>'+
+          '<td style="font-family:monospace;font-size:11px;color:#1D9E75">'+item.rentalId+'</td>'+
+          '<td style="font-family:monospace">****'+(item.lastDigits||'')+'</td>'+
+          '<td style="color:#3fb950">&#x20AC;'+((item.preAuthAmountCents||0)/100).toFixed(2)+'</td>'+
+          '<td style="font-size:11px">'+new Date(item.startTime).toLocaleTimeString()+'</td>'+
+          '<td style="color:#e3b341">'+mins+'m '+secs+'s</td>'+
+          '<td style="font-family:monospace;font-size:11px">'+(item.authCode||'')+'</td>'+
           '</tr>';
       }).join('')+'</table>';
   }catch(e){}
 }
-async function loadRentalConfig(){
+async function loadRentalPending(){
   try{
-    const r=await fetch('/rental/config');const d=await r.json();
-    if(d.rentalOutlet)    document.getElementById('rentalOutlet').value=d.rentalOutlet;
-    if(d.rentalTerminal)  document.getElementById('rentalTerminal').value=d.rentalTerminal;
-    if(d.rentalStationId) document.getElementById('rentalStationId').value=d.rentalStationId;
-    if(d.rentalStationName) document.getElementById('rentalStationName').value=d.rentalStationName;
+    const r=await fetch('/admin/rental-pending-captures');const items=await r.json();
+    const el=document.getElementById('rentalPendingDiv');const cnt=document.getElementById('rentalPendingCount');
+    if(!el)return;
+    const active=items.filter(i=>i.status!=='RESOLVED');
+    cnt.textContent='('+active.length+' active)';
+    if(!items.length){el.innerHTML='<table><tr><td style="color:#8b949e">No pending rental captures</td></tr></table>';return;}
+    const sc={'PENDING':'#e3b341','FAILED':'#f85149','RESOLVED':'#3fb950'};
+    el.innerHTML='<table><tr><th>ID</th><th>Time</th><th>Rental ID</th><th>Card</th><th>Amount</th><th>Retries</th><th>Status</th><th>Last Error</th></tr>'+
+      items.map(function(p){
+        var c=sc[p.status]||'#8b949e';
+        return '<tr style="background:'+(p.status==='RESOLVED'?'#0d2010':p.status==='FAILED'?'#2a0d0d':'#1a1200')+'">'+
+          '<td style="font-family:monospace;font-size:11px">'+p.id+'</td>'+
+          '<td style="font-size:11px">'+p.createdAt+'</td>'+
+          '<td style="font-family:monospace;font-size:11px;color:#1D9E75">'+(p.session&&p.session.rentalId||'?')+'</td>'+
+          '<td style="font-family:monospace">****'+(p.session&&p.session.lastDigits||'??')+'</td>'+
+          '<td style="color:#3fb950">&#x20AC;'+(p.amountCents/100).toFixed(2)+'</td>'+
+          '<td>'+p.retries+'</td>'+
+          '<td style="color:'+c+';font-weight:bold">'+p.status+'</td>'+
+          '<td style="font-size:11px;color:#f85149">'+(p.lastError||'-')+'</td>'+
+          '</tr>';
+      }).join('')+'</table>';
   }catch(e){}
 }
 
@@ -1936,7 +2150,7 @@ loadEcrDeclines();setInterval(loadEcrDeclines,5000);
 loadPendingCaptures();setInterval(loadPendingCaptures,10000);
 loadRentalLogs();setInterval(loadRentalLogs,3000);
 loadRentals();setInterval(loadRentals,5000);
-loadRentalConfig();
+loadRentalPending();setInterval(loadRentalPending,8000);
 </script></body></html>`);
 });
 
@@ -1998,6 +2212,15 @@ app.post("/parkingInit", (req, res) => {
     } : {}),
     stationId:                       rentalConfig.rentalStationId   || "LIM-001",
     stationName:                     rentalConfig.rentalStationName || "Rental Station",
+    // Rental-specific fields — only included when app identifies as Rental
+    ...(req.body.application === "Rental" ? {
+      preAuthAmountCents: String(rentalConfig.preAuthAmountCents),
+      maxRentalTimeMins:  String(rentalConfig.maxRentalTimeMins),
+      displayMessage:     rentalConfig.displayMessage,
+      flagsForAction:     rentalConfig.flagsForAction,
+      voiceAssistant:     rentalConfig.voiceAssistant ? "1" : "0",
+      defaultLanguage:    rentalConfig.defaultLanguage
+    } : {}),
     // CarWash-specific fields — only included when app identifies as CarWash
     ...(req.body.application === "CarWash" ? {
       maxWashTimeSeconds:       String(carWashConfig.maxWashTimeSeconds),
@@ -2024,6 +2247,10 @@ app.post("/parkingInit", (req, res) => {
   if (req.body.application === "CarWash" && carWashConfig.flagsForAction !== "0000") {
     console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent → auto-reset to 0000`);
     carWashConfig.flagsForAction = "0000";
+  }
+  if (req.body.application === "Rental" && rentalConfig.flagsForAction !== "0000") {
+    console.log(`[parkingInit/Rental] flagsForAction=${rentalConfig.flagsForAction} sent → auto-reset to 0000`);
+    rentalConfig.flagsForAction = "0000";
   }
   addLog(req, response); res.json(response);
 });
@@ -2839,34 +3066,170 @@ app.post("/jcc/config", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── POST /rental/complete ─────────────────────────────────────────────────────
-app.post("/rental/complete", (req, res) => {
-  const { rentalId, amountCharged } = req.body;
-  const rental = activeRentals[rentalId];
-  if (!rental) {
-    const response = { responseCode: "41", responseDescription: "Rental not found" };
+// ── POST /rental/start ────────────────────────────────────────────────────────
+// Android pre-auth approved → store rental session
+app.post("/rental/start", (req, res) => {
+  const { rentalId, outlet, terminal, token, lastDigits, expiryDate,
+          authCode, rrn, receiptNumber, tokenCode, preAuthAmountCents, timeOfStart } = req.body;
+  if (!rentalId) {
+    const response = { responseCode: "41", responseDescription: "rentalId required" };
     addRentalLog(req, response); return res.json(response);
   }
-  rental.status        = "completed";
-  rental.amountCharged = amountCharged;
-  rental.completedAt   = Date.now();
-  setTimeout(() => { delete activeRentals[rentalId]; }, 60000);
-  console.log(`[RENTAL] Rental completed — rentalId=${rentalId} charged=€${(parseInt(amountCharged||0)/100).toFixed(2)}`);
-  const response = { responseCode: "00", responseDescription: "Rental completed", rentalId };
+  if (rentalConfig.responseCode !== "00") {
+    const response = { responseCode: rentalConfig.responseCode, displayMessage: "Service unavailable. Please try again." };
+    addRentalLog(req, response); return res.json(response);
+  }
+  activeRentals[rentalId] = {
+    rentalId, outlet, terminal, token, lastDigits, expiryDate,
+    authCode, rrn, receiptNumber, tokenCode,
+    preAuthAmountCents: parseInt(preAuthAmountCents || rentalConfig.preAuthAmountCents),
+    timeOfStart, startTime: Date.now()
+  };
+  console.log(`[RENTAL] Started — rentalId=${rentalId} last4=****${lastDigits}`);
+  const response = {
+    responseCode:  "00",
+    responseDescription: "Rental started",
+    rentalId,
+    displayMessage: "Item is yours! Return it when done.",
+    timeToDisplayMessage: "5"
+  };
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/void ─────────────────────────────────────────────────────────
-app.post("/rental/void", (req, res) => {
-  const { rentalId } = req.body;
-  const rental = activeRentals[rentalId];
-  if (rental) {
-    rental.status = "voided";
-    setTimeout(() => { delete activeRentals[rentalId]; }, 60000);
+// ── POST /rental/stop ─────────────────────────────────────────────────────────
+// Customer returns item → capture fee based on time used, then clear session
+app.post("/rental/stop", async (req, res) => {
+  const { rentalId, timeOfStop, reason } = req.body;
+  const session = activeRentals[rentalId];
+  if (!session) {
+    const response = { responseCode: "41", displayMessage: "Rental session not found.", timeToDisplayMessage: "8" };
+    addRentalLog(req, response); return res.json(response);
   }
-  const response = { responseCode: "00", responseDescription: "Rental voided", rentalId };
+
+  const endTime    = Date.now();
+  const timeUsedMs = endTime - session.startTime;
+  const timeUsedSec = Math.floor(timeUsedMs / 1000);
+
+  let amountCents = 0;
+  let responseCode = "00";
+  let displayMessage = "";
+
+  try {
+    if (rentalConfig.rentalScenario === 3) {
+      // Free — release the pre-auth
+      await jccRelease(session);
+      amountCents = 0;
+      displayMessage = "Thank you! No charge for this rental.";
+    } else if (rentalConfig.rentalScenario === 2) {
+      // Fixed amount
+      amountCents = rentalConfig.fixedAmountCents;
+      const r = await jccCapture(session, amountCents);
+      if (!r || r.responseCode !== "00") {
+        addRentalPendingCapture(session, amountCents);
+        amountCents = 0;
+        displayMessage = "Return received. Payment pending — please contact staff.";
+      } else {
+        displayMessage = "Thank you! €" + (amountCents / 100).toFixed(2) + " charged.";
+      }
+    } else {
+      // Scenario 1: time-based
+      amountCents = calcRentalFee(session.startTime, endTime);
+      const r = await jccCapture(session, amountCents);
+      if (!r || r.responseCode !== "00") {
+        addRentalPendingCapture(session, amountCents);
+        amountCents = 0;
+        displayMessage = "Return received. Payment pending — please contact staff.";
+      } else {
+        const mins = Math.floor(timeUsedSec / 60);
+        const secs = timeUsedSec % 60;
+        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: €${(amountCents/100).toFixed(2)}`;
+      }
+    }
+  } catch(e) {
+    console.error(`[RENTAL/stop] JCC error:`, e.message);
+    addRentalPendingCapture(session, amountCents || calcRentalFee(session.startTime, endTime));
+    displayMessage = "Return received. Payment pending — please contact staff.";
+  }
+
+  delete activeRentals[rentalId];
+  console.log(`[RENTAL] Stopped — rentalId=${rentalId} timeUsed=${timeUsedSec}s charged=€${(amountCents/100).toFixed(2)}`);
+  const response = {
+    responseCode,
+    rentalId,
+    amountCharged:        String(amountCents),
+    timeUsedSeconds:      String(timeUsedSec),
+    displayMessage,
+    timeToDisplayMessage: "10"
+  };
   addRentalLog(req, response); res.json(response);
 });
+
+// ── POST /rental/help ─────────────────────────────────────────────────────────
+app.post("/rental/help", async (req, res) => {
+  const action = req.body.action || "Help Button";
+  if (action === "Help Button" || action.startsWith("Help")) {
+    sendHelpAlert(req, false).catch(e => console.error("[RENTAL/help] email error:", e.message));
+  }
+  const response = {
+    responseCode:        "00",
+    displayMessage:      rentalConfig.helpMessage,
+    timeToDisplayMessage: rentalConfig.helpDisplayTime
+  };
+  addRentalLog(req, response); res.json(response);
+});
+
+// ── GET /rental/rentals ───────────────────────────────────────────────────────
+app.get("/rental/rentals", (req, res) => res.json(Object.values(activeRentals)));
+
+// ── GET /rental/logs ──────────────────────────────────────────────────────────
+app.get("/rental/logs", (req, res) => res.json(rentalLogs));
+
+// ── DELETE /rental/logs ───────────────────────────────────────────────────────
+app.delete("/rental/logs", (req, res) => { rentalLogs = []; res.json({ ok: true }); });
+
+// ── GET /rental/config ────────────────────────────────────────────────────────
+app.get("/rental/config", (req, res) => res.json(rentalConfig));
+
+// ── POST /admin/rental-config ─────────────────────────────────────────────────
+app.post("/admin/rental-config", (req, res) => {
+  const { key, value } = req.body;
+  if (!(key in rentalConfig)) return res.json({ ok: false, error: `Unknown key: ${key}` });
+  const existing = rentalConfig[key];
+  if (typeof existing === "boolean") {
+    rentalConfig[key] = value === true || value === "true" || value === 1;
+  } else if (typeof existing === "number") {
+    const n = parseFloat(value);
+    rentalConfig[key] = isNaN(n) ? existing : n;
+  } else if (Array.isArray(existing)) {
+    return res.json({ ok: false, error: "Use add/remove-charge endpoints for arrays" });
+  } else {
+    rentalConfig[key] = value;
+  }
+  console.log(`[RENTAL_CONFIG] ${key} = ${JSON.stringify(rentalConfig[key])}`);
+  res.json({ ok: true, config: rentalConfig });
+});
+
+// ── POST /admin/rental-add-charge ─────────────────────────────────────────────
+app.post("/admin/rental-add-charge", (req, res) => {
+  const { upToMins, fee } = req.body;
+  if (!fee) return res.json({ ok: false, error: "fee required" });
+  rentalConfig.charges.push({ upToMins: parseInt(upToMins) || -1, fee: parseInt(fee) });
+  rentalConfig.charges.sort((a, b) => (a.upToMins === -1 ? 1 : b.upToMins === -1 ? -1 : a.upToMins - b.upToMins));
+  res.json({ ok: true });
+});
+
+// ── POST /admin/rental-remove-charge ─────────────────────────────────────────
+app.post("/admin/rental-remove-charge", (req, res) => {
+  const { index } = req.body;
+  if (index >= 0 && index < rentalConfig.charges.length) rentalConfig.charges.splice(index, 1);
+  res.json({ ok: true });
+});
+
+// ── POST /admin/rental-clear ──────────────────────────────────────────────────
+app.post("/admin/rental-clear", (req, res) => { activeRentals = {}; res.json({ ok: true }); });
+
+// ── GET /admin/rental-pending-captures ───────────────────────────────────────
+app.get("/admin/rental-pending-captures", (req, res) => res.json(rentalPendingCaptures));
 
 
 // ── START ─────────────────────────────────────────────────────────────────────
