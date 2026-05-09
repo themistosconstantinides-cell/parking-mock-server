@@ -219,18 +219,18 @@ function startCaptureRetryLoop() {
 let rentalConfig = {
   rentalOutlet:          "",
   rentalTerminal:        "",
-  rentalStationId:       "LIM-001",
-  rentalStationName:     "Rental Station",
-  preAuthAmountCents:    1000,      // legacy field (used by /rental/start)
-  preAuthStandardCents:  2000,      // Standard item pre-auth (€20.00)
-  preAuthPremiumCents:   5000,      // Premium item pre-auth (€50.00)
+  rentalStationId:       "LIM-012",
+  rentalStationName:     "Limassol Marina — Station 12",
+  preAuthAmountCents:    1500,      // legacy field (used by /rental/start)
+  preAuthStandardCents:  1500,      // Standard pre-auth €15
+  preAuthPremiumCents:   3000,      // Premium pre-auth €30
   maxRentalTimeMins:     120,
   rentalScenario:        1,         // 1=time-based, 2=fixed, 3=free+release
-  fixedAmountCents:      500,
-  unlockDisplaySecs:     15,        // how long unlock code screen stays up
-  returnDisplaySecs:     8,         // how long payment-ok screen stays up
-  phoneForHelp:          "99123456",
-  displayMessage:        "Welcome! Tap your card to rent an item.",
+  fixedAmountCents:      300,
+  unlockDisplaySecs:     15,
+  returnDisplaySecs:     8,
+  phoneForHelp:          "77002020",
+  displayMessage:        "Welcome to Limassol Marina — Station 12",
   helpMessage:           "Help has been called. Staff will assist you shortly.",
   helpDisplayTime:       "10",
   alertEmail:            process.env.ALERT_EMAIL || "",
@@ -240,19 +240,24 @@ let rentalConfig = {
   voiceAssistant:        true,
   defaultLanguage:       "EN",
   charges:               [
-    { upToMins: 30,  fee: 200 },
     { upToMins: 60,  fee: 300 },
-    { upToMins: 120, fee: 500 },
-    { upToMins: -1,  fee: 800 }
+    { upToMins: 120, fee: 450 },
+    { upToMins: 180, fee: 600 },
+    { upToMins: -1,  fee: 750 }
   ],
   items: [
-    { itemId: "1042", type: "Standard", dock: "Dock 3" },
-    { itemId: "1078", type: "Standard", dock: "Dock 5" },
-    { itemId: "2011", type: "Premium",  dock: "Dock 1" },
-    { itemId: "1055", type: "Standard", dock: "Dock 7" },
-    { itemId: "2034", type: "Premium",  dock: "Dock 2" },
-    { itemId: "1091", type: "Standard", dock: "Dock 8" },
-    { itemId: "2055", type: "Premium",  dock: "Dock 4" },
+    { itemId: "S-001", type: "Standard", dock: "Dock 1"  },
+    { itemId: "S-002", type: "Standard", dock: "Dock 2"  },
+    { itemId: "S-003", type: "Standard", dock: "Dock 3"  },
+    { itemId: "S-004", type: "Standard", dock: "Dock 4"  },
+    { itemId: "S-005", type: "Standard", dock: "Dock 5"  },
+    { itemId: "S-006", type: "Standard", dock: "Dock 6"  },
+    { itemId: "S-007", type: "Standard", dock: "Dock 7"  },
+    { itemId: "S-008", type: "Standard", dock: "Dock 8"  },
+    { itemId: "P-001", type: "Premium",  dock: "Dock 9"  },
+    { itemId: "P-002", type: "Premium",  dock: "Dock 10" },
+    { itemId: "P-003", type: "Premium",  dock: "Dock 11" },
+    { itemId: "P-004", type: "Premium",  dock: "Dock 12" },
   ]
 };
 let activeRentals             = {};
