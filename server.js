@@ -1489,7 +1489,16 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
+  localStorage.setItem('activeTab', name);
 }
+// Restore active tab after reload
+(function() {
+  const saved = localStorage.getItem('activeTab');
+  if (saved && saved !== 'parking') {
+    const btn = document.querySelector('.tab-btn[onclick*="\''+saved+'\'"]');
+    if (btn) showTab(saved, btn);
+  }
+})();
 
 let allLogs=[];
 let activeFilter='';
