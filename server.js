@@ -1494,10 +1494,15 @@ function showTab(name, btn) {
 // Restore active tab after reload
 (function() {
   const saved = localStorage.getItem('activeTab');
-  if (saved && saved !== 'parking') {
-    const btn = document.querySelector('.tab-btn[onclick*="\''+saved+'\'"]');
-    if (btn) showTab(saved, btn);
-  }
+  if (!saved || saved === 'parking') return;
+  const tab = document.getElementById('tab-' + saved);
+  if (!tab) return;
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('active');
+    if ((b.getAttribute('onclick') || '').includes("'" + saved + "'")) b.classList.add('active');
+  });
+  tab.classList.add('active');
 })();
 
 let allLogs=[];
