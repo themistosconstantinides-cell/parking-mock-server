@@ -217,33 +217,62 @@ function startCaptureRetryLoop() {
 
 // ── Rental State ─────────────────────────────────────────────────────────────
 let rentalConfig = {
-  rentalOutlet:       "",
-  rentalTerminal:     "",
-  rentalStationId:    "LIM-001",
-  rentalStationName:  "Rental Station",
-  preAuthAmountCents: 1000,      // pre-auth amount in cents (e.g. 1000 = €10)
-  maxRentalTimeMins:  120,       // max rental duration in minutes
-  rentalScenario:     1,         // 1=time-based capture, 2=fixed amount, 3=free+release
-  fixedAmountCents:   500,       // used for scenario 2
-  displayMessage:     "Welcome! Tap your card to rent an item.",
-  helpMessage:        "Help has been called. Staff will assist you shortly.",
-  helpDisplayTime:    "10",
-  alertEmail:         process.env.ALERT_EMAIL || "",
-  lastAlertSent:      null,
-  flagsForAction:     "0000",
-  responseCode:       "00",
-  voiceAssistant:     true,
-  defaultLanguage:    "EN",
-  charges:            [
+  rentalOutlet:          "",
+  rentalTerminal:        "",
+  rentalStationId:       "LIM-001",
+  rentalStationName:     "Rental Station",
+  preAuthAmountCents:    1000,      // legacy field (used by /rental/start)
+  preAuthStandardCents:  2000,      // Standard item pre-auth (€20.00)
+  preAuthPremiumCents:   5000,      // Premium item pre-auth (€50.00)
+  maxRentalTimeMins:     120,
+  rentalScenario:        1,         // 1=time-based, 2=fixed, 3=free+release
+  fixedAmountCents:      500,
+  unlockDisplaySecs:     15,        // how long unlock code screen stays up
+  returnDisplaySecs:     8,         // how long payment-ok screen stays up
+  phoneForHelp:          "99123456",
+  displayMessage:        "Welcome! Tap your card to rent an item.",
+  helpMessage:           "Help has been called. Staff will assist you shortly.",
+  helpDisplayTime:       "10",
+  alertEmail:            process.env.ALERT_EMAIL || "",
+  lastAlertSent:         null,
+  flagsForAction:        "0000",
+  responseCode:          "00",
+  voiceAssistant:        true,
+  defaultLanguage:       "EN",
+  charges:               [
     { upToMins: 30,  fee: 200 },
     { upToMins: 60,  fee: 300 },
     { upToMins: 120, fee: 500 },
     { upToMins: -1,  fee: 800 }
+  ],
+  items: [
+    { itemId: "1042", type: "Standard", dock: "Dock 3" },
+    { itemId: "1078", type: "Standard", dock: "Dock 5" },
+    { itemId: "2011", type: "Premium",  dock: "Dock 1" },
+    { itemId: "1055", type: "Standard", dock: "Dock 7" },
+    { itemId: "2034", type: "Premium",  dock: "Dock 2" },
+    { itemId: "1091", type: "Standard", dock: "Dock 8" },
+    { itemId: "2055", type: "Premium",  dock: "Dock 4" },
   ]
 };
-let activeRentals         = {};
-let rentalLogs            = [];
-let rentalPendingCaptures = [];
+let activeRentals             = {};
+let rentalItemAvailability    = {};  // itemId -> boolean (true = available)
+let rentalLogs                = [];
+let rentalPendingCaptures     = [];
+
+function getRentalItems() {
+  return rentalConfig.items.map(item => ({
+    itemId:    item.itemId,
+    type:      item.type,
+    dock:      item.dock,
+    available: rentalItemAvailability[item.itemId] !== false
+  }));
+}
+
+function generateRentalUnlockCode(entryId) {
+  const hash = [...entryId].reduce((acc, c) => ((acc * 31) + c.charCodeAt(0)) | 0, 0);
+  return String((Math.abs(hash) % 9000) + 1000);
+}
 
 function addRentalLog(req, response) {
   rentalLogs.unshift({
@@ -1122,10 +1151,34 @@ ${config.charges.map((c,i)=>`<tr>
 <table>
 <tr><th>Setting</th><th>Current</th><th>Actions</th></tr>
 <tr>
-  <td>Pre-Auth Amount (cents)</td>
-  <td>${rentalConfig.preAuthAmountCents} = &#x20AC;${(rentalConfig.preAuthAmountCents/100).toFixed(2)}</td>
-  <td><input class="n" type="number" id="rnPreAuth" value="${rentalConfig.preAuthAmountCents}">
-  <button class="btn" onclick="rnSet('preAuthAmountCents',Number(document.getElementById('rnPreAuth').value))">Set</button></td>
+  <td>Pre-Auth Standard (cents)</td>
+  <td>${rentalConfig.preAuthStandardCents} = &#x20AC;${(rentalConfig.preAuthStandardCents/100).toFixed(2)}</td>
+  <td><input class="n" type="number" id="rnPreAuthStd" value="${rentalConfig.preAuthStandardCents}">
+  <button class="btn" onclick="rnSet('preAuthStandardCents',Number(document.getElementById('rnPreAuthStd').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Pre-Auth Premium (cents)</td>
+  <td>${rentalConfig.preAuthPremiumCents} = &#x20AC;${(rentalConfig.preAuthPremiumCents/100).toFixed(2)}</td>
+  <td><input class="n" type="number" id="rnPreAuthPrem" value="${rentalConfig.preAuthPremiumCents}">
+  <button class="btn" onclick="rnSet('preAuthPremiumCents',Number(document.getElementById('rnPreAuthPrem').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Unlock Display (sec)</td>
+  <td>${rentalConfig.unlockDisplaySecs}s</td>
+  <td><input class="n" type="number" id="rnUnlockSec" value="${rentalConfig.unlockDisplaySecs}">
+  <button class="btn" onclick="rnSet('unlockDisplaySecs',Number(document.getElementById('rnUnlockSec').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Return Display (sec)</td>
+  <td>${rentalConfig.returnDisplaySecs}s</td>
+  <td><input class="n" type="number" id="rnReturnSec" value="${rentalConfig.returnDisplaySecs}">
+  <button class="btn" onclick="rnSet('returnDisplaySecs',Number(document.getElementById('rnReturnSec').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Phone for Help</td>
+  <td>${rentalConfig.phoneForHelp}</td>
+  <td><input class="m" id="rnPhone" value="${rentalConfig.phoneForHelp}">
+  <button class="btn" onclick="rnSv('phoneForHelp','rnPhone')">Save</button></td>
 </tr>
 <tr>
   <td>Max Rental Time (min)</td>
@@ -1230,6 +1283,22 @@ ${rentalConfig.charges.map((c,i)=>`<tr>
   <button class="btn green" onclick="addRentalCharge()">+ Add Tier</button>
 </div>
 
+<h2>&#x1F4CB; Item Catalogue</h2>
+<p style="color:#8b949e;font-size:12px;margin-top:-8px">Items returned by /rental/init and /rental/keepAlive. Toggle availability to simulate dock state.</p>
+<table>
+<tr><th>Item ID</th><th>Type</th><th>Dock</th><th>Availability</th><th></th></tr>
+${rentalConfig.items.map((item,i)=>`<tr>
+  <td>${item.itemId}</td><td>${item.type}</td><td>${item.dock}</td>
+  <td id="rnItemAvail_${item.itemId}" style="color:${rentalItemAvailability[item.itemId]===false?'#ff6b6b':'#3fb950'}">
+    ${rentalItemAvailability[item.itemId]===false?'&#x26D4; Rented':'&#x2705; Available'}
+  </td>
+  <td>
+    <button class="btn green" onclick="setRentalItemAvail('${item.itemId}',true)">Free</button>
+    <button class="btn red" onclick="setRentalItemAvail('${item.itemId}',false)">Rented</button>
+  </td>
+</tr>`).join('')}
+</table>
+
 <h2>&#x1F4E6; Active Rentals <span id="rentalCount" style="font-size:13px;color:#8b949e"></span></h2>
 <div id="rentalsDiv"><table><tr><td style="color:#8b949e">Loading...</td></tr></table></div>
 <button class="btn red" onclick="clearRentals()">Clear All Rentals</button>
@@ -1240,9 +1309,11 @@ ${rentalConfig.charges.map((c,i)=>`<tr>
 <h2>&#x1F4CB; Rental Request Log</h2>
 <div style="display:flex;gap:6px;margin-bottom:10px">
   <button class="btn gray" onclick="setRentalFilter('')">All</button>
-  <button class="btn green" onclick="setRentalFilter('rental/start')">Start</button>
-  <button class="btn orange" onclick="setRentalFilter('rental/stop')">Stop</button>
-  <button class="btn" style="background:#1f6feb" onclick="setRentalFilter('rentalInit')">Init</button>
+  <button class="btn" style="background:#1f6feb" onclick="setRentalFilter('rental/init')">Init</button>
+  <button class="btn gray" onclick="setRentalFilter('keepAlive')">Keep-Alive</button>
+  <button class="btn" onclick="setRentalFilter('preAuthAmount')">Pre-Auth</button>
+  <button class="btn green" onclick="setRentalFilter('rental/entry')">Entry</button>
+  <button class="btn orange" onclick="setRentalFilter('rental/return')">Return</button>
   <button class="btn gray" onclick="setRentalFilter('rental/help')">Help</button>
   <button class="btn red" style="margin-left:auto" onclick="clearRentalLogs()">Clear</button>
 </div>
@@ -1980,6 +2051,10 @@ async function clearRentals(){
   if(!confirm('Clear all active rentals?'))return;
   await fetch('/admin/rental-clear',{method:'POST'});location.reload();
 }
+async function setRentalItemAvail(itemId,avail){
+  await fetch('/admin/rental-item-avail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemId,available:avail})});
+  location.reload();
+}
 async function loadRentals(){
   try{
     const r=await fetch('/rental/rentals');const items=await r.json();
@@ -1987,13 +2062,16 @@ async function loadRentals(){
     if(!el)return;cnt.textContent='('+items.length+')';
     if(!items.length){el.innerHTML='<table><tr><td style="color:#8b949e">No active rentals</td></tr></table>';return;}
     const now=Date.now();
-    el.innerHTML='<table><tr><th>Rental ID</th><th>Last4</th><th>Pre-Auth</th><th>Start</th><th>Duration</th><th>Auth</th></tr>'+
+    el.innerHTML='<table><tr><th>Entry/Rental ID</th><th>Item</th><th>Last4</th><th>Code</th><th>Pre-Auth</th><th>Start</th><th>Duration</th><th>Auth</th></tr>'+
       items.map(function(item){
         const mins=Math.floor((now-(item.startTime||now))/60000);
         const secs=Math.floor(((now-(item.startTime||now))%60000)/1000);
+        const id=item.entryId||item.rentalId||'?';
         return '<tr style="background:#0a1a0a">'+
-          '<td style="font-family:monospace;font-size:11px;color:#1D9E75">'+item.rentalId+'</td>'+
+          '<td style="font-family:monospace;font-size:11px;color:#1D9E75">'+id+'</td>'+
+          '<td style="font-size:11px">'+(item.itemId||'-')+(item.itemType?' ('+item.itemType+')':'')+'</td>'+
           '<td style="font-family:monospace">****'+(item.lastDigits||'')+'</td>'+
+          '<td style="font-family:monospace;color:#e3b341">'+(item.unlockCode||'-')+'</td>'+
           '<td style="color:#3fb950">&#x20AC;'+((item.preAuthAmountCents||0)/100).toFixed(2)+'</td>'+
           '<td style="font-size:11px">'+new Date(item.startTime).toLocaleTimeString()+'</td>'+
           '<td style="color:#e3b341">'+mins+'m '+secs+'s</td>'+
@@ -3134,6 +3212,169 @@ app.post("/jcc/config", (req, res) => {
   res.json({ ok: true });
 });
 
+// ── POST /rental/init ─────────────────────────────────────────────────────────
+// Android app calls this on startup to get station config + initial item list
+app.post("/rental/init", (req, res) => {
+  if (rentalConfig.responseCode !== "00") {
+    const response = { responseCode: rentalConfig.responseCode, responseDescription: "Service unavailable" };
+    addRentalLog(req, response); return res.json(response);
+  }
+  const response = {
+    responseCode:          "00",
+    stationId:             rentalConfig.rentalStationId,
+    stationName:           rentalConfig.rentalStationName,
+    phoneForHelp:          rentalConfig.phoneForHelp,
+    helpMessage:           rentalConfig.helpMessage,
+    helpDisplayTime:       String(rentalConfig.helpDisplayTime),
+    unlockDisplaySecs:     String(rentalConfig.unlockDisplaySecs),
+    returnDisplaySecs:     String(rentalConfig.returnDisplaySecs),
+    preAuthStandardCents:  String(rentalConfig.preAuthStandardCents),
+    preAuthPremiumCents:   String(rentalConfig.preAuthPremiumCents),
+    flagsForAction:        rentalConfig.flagsForAction,
+    voiceAssistant:        rentalConfig.voiceAssistant,
+    defaultLanguage:       rentalConfig.defaultLanguage,
+    displayMessage:        rentalConfig.displayMessage,
+    items:                 getRentalItems()
+  };
+  addRentalLog(req, response); res.json(response);
+});
+
+// ── POST /rental/keepAlive ────────────────────────────────────────────────────
+// Sent every 30s — returns refreshed item list + any pending flags
+app.post("/rental/keepAlive", (req, res) => {
+  const response = {
+    responseCode:   "00",
+    stationId:      rentalConfig.rentalStationId,
+    items:          getRentalItems(),
+    flagsForAction: rentalConfig.flagsForAction
+  };
+  addRentalLog(req, response); res.json(response);
+});
+
+// ── POST /rental/preAuthAmount ────────────────────────────────────────────────
+// Called just before ECR PreAuth — confirms item is still available and returns amount
+app.post("/rental/preAuthAmount", (req, res) => {
+  const { itemId, itemType } = req.body;
+  const item = rentalConfig.items.find(i => i.itemId === itemId);
+  if (!item || rentalItemAvailability[itemId] === false) {
+    const response = { responseCode: "02", responseDescription: `Item ${itemId} is not available` };
+    addRentalLog(req, response); return res.json(response);
+  }
+  const cents = (itemType === "Premium") ? rentalConfig.preAuthPremiumCents : rentalConfig.preAuthStandardCents;
+  const response = {
+    responseCode:        "00",
+    itemId,
+    itemType:            itemType || item.type,
+    preAuthAmountCents:  String(cents),
+    currency:            "EUR"
+  };
+  addRentalLog(req, response); res.json(response);
+});
+
+// ── POST /rental/entry ────────────────────────────────────────────────────────
+// ECR PreAuth approved → create rental record, generate unlock code
+app.post("/rental/entry", (req, res) => {
+  const { entryId, outlet, terminal, stationId, itemId, itemType, dock,
+          authCode, receiptNumber, tokenCode, lastDigits, expiryDate, preAuthAmountCents } = req.body;
+  if (!entryId) {
+    const response = { responseCode: "41", responseDescription: "entryId required" };
+    addRentalLog(req, response); return res.json(response);
+  }
+  if (rentalConfig.responseCode !== "00") {
+    const response = { responseCode: rentalConfig.responseCode, responseDescription: "Service unavailable" };
+    addRentalLog(req, response); return res.json(response);
+  }
+  // Duplicate guard — return same unlock code
+  if (activeRentals[entryId]) {
+    const response = { responseCode: "00", entryId, unlockCode: activeRentals[entryId].unlockCode, duplicate: true };
+    addRentalLog(req, response); return res.json(response);
+  }
+  const unlockCode = generateRentalUnlockCode(entryId);
+  rentalItemAvailability[itemId] = false;
+  activeRentals[entryId] = {
+    entryId, outlet, terminal, stationId, itemId, itemType, dock,
+    authCode, receiptNumber, tokenCode, lastDigits, expiryDate,
+    preAuthAmountCents: parseInt(preAuthAmountCents || rentalConfig.preAuthStandardCents),
+    unlockCode,
+    startTime: Date.now()
+  };
+  console.log(`[RENTAL] Entry — entryId=${entryId} item=${itemId} last4=****${lastDigits} code=${unlockCode}`);
+  const response = {
+    responseCode:      "00",
+    responseDescription: "Rental entry created",
+    entryId,
+    itemId,
+    unlockCode,
+    displayMessage:    `Your item is ready. Code: ${unlockCode}`,
+    unlockDisplaySecs: String(rentalConfig.unlockDisplaySecs)
+  };
+  addRentalLog(req, response); res.json(response);
+});
+
+// ── POST /rental/return ───────────────────────────────────────────────────────
+// ECR PAN-Capture approved → verify card, calc fee, JCC capture, release item
+app.post("/rental/return", async (req, res) => {
+  const { entryId, outlet, terminal, stationId, panToken, panLastDigits, panExpiry } = req.body;
+  const session = activeRentals[entryId];
+  if (!session) {
+    const response = { responseCode: "41", displayMessage: "Rental entry not found.", timeToDisplayMessage: "8" };
+    addRentalLog(req, response); return res.json(response);
+  }
+  // Card token verification (last-4 as proxy for encrypted token match)
+  if (panLastDigits && session.lastDigits && panLastDigits !== session.lastDigits) {
+    const response = { responseCode: "05", displayMessage: "Card does not match the original rental card.", timeToDisplayMessage: "8" };
+    addRentalLog(req, response); return res.json(response);
+  }
+  const endTime    = Date.now();
+  const timeUsedSec = Math.floor((endTime - session.startTime) / 1000);
+  let amountCents  = 0;
+  let displayMessage = "";
+  try {
+    if (rentalConfig.rentalScenario === 3) {
+      await jccRelease(session);
+      displayMessage = "Thank you! No charge for this rental.";
+    } else if (rentalConfig.rentalScenario === 2) {
+      amountCents = rentalConfig.fixedAmountCents;
+      const r = await jccCapture(session, amountCents);
+      if (!r || r.responseCode !== "00") {
+        addRentalPendingCapture(session, amountCents);
+        amountCents = 0;
+        displayMessage = "Return received. Payment pending — please contact staff.";
+      } else {
+        displayMessage = `Thank you! €${(amountCents/100).toFixed(2)} charged.`;
+      }
+    } else {
+      amountCents = calcRentalFee(session.startTime, endTime);
+      const r = await jccCapture(session, amountCents);
+      if (!r || r.responseCode !== "00") {
+        addRentalPendingCapture(session, amountCents);
+        amountCents = 0;
+        displayMessage = "Return received. Payment pending — please contact staff.";
+      } else {
+        const mins = Math.floor(timeUsedSec / 60);
+        const secs = timeUsedSec % 60;
+        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: €${(amountCents/100).toFixed(2)}`;
+      }
+    }
+  } catch(e) {
+    console.error("[RENTAL/return] JCC error:", e.message);
+    addRentalPendingCapture(session, amountCents || calcRentalFee(session.startTime, endTime));
+    displayMessage = "Return received. Payment pending — please contact staff.";
+  }
+  rentalItemAvailability[session.itemId] = true;
+  delete activeRentals[entryId];
+  console.log(`[RENTAL] Return — entryId=${entryId} timeUsed=${timeUsedSec}s charged=€${(amountCents/100).toFixed(2)}`);
+  const response = {
+    responseCode:         "00",
+    entryId,
+    amountCharged:        String(amountCents),
+    timeUsedSeconds:      String(timeUsedSec),
+    displayMessage,
+    timeToDisplayMessage: String(rentalConfig.returnDisplaySecs || 10)
+  };
+  addRentalLog(req, response); res.json(response);
+});
+
 // ── POST /rental/start ────────────────────────────────────────────────────────
 // Android pre-auth approved → store rental session
 app.post("/rental/start", (req, res) => {
@@ -3298,6 +3539,18 @@ app.post("/admin/rental-clear", (req, res) => { activeRentals = {}; res.json({ o
 
 // ── GET /admin/rental-pending-captures ───────────────────────────────────────
 app.get("/admin/rental-pending-captures", (req, res) => res.json(rentalPendingCaptures));
+
+// ── POST /admin/rental-item-avail ────────────────────────────────────────────
+// Toggle item availability in the catalogue (simulate dock state)
+app.post("/admin/rental-item-avail", (req, res) => {
+  const { itemId, available } = req.body;
+  if (!rentalConfig.items.find(i => i.itemId === itemId)) {
+    return res.json({ ok: false, error: `Item ${itemId} not in catalogue` });
+  }
+  rentalItemAvailability[itemId] = available === true || available === "true";
+  console.log(`[RENTAL_ITEM] ${itemId} = ${rentalItemAvailability[itemId] ? "available" : "rented"}`);
+  res.json({ ok: true });
+});
 
 
 // ── START ─────────────────────────────────────────────────────────────────────
