@@ -29,6 +29,7 @@ data class EcrResponse(
     val isBocLoyalty: String      = "",   // Field 77: "0" or "1"
     val orderNumber: String       = "",   // Field 89: mirrored order number
     val panEncrypted: String      = "",   // Field 61: encrypted PAN hex
+    val firstDigits: String       = "",   // First 6 digits of PAN (BIN) — now returned by ECR
 
     // Derived convenience fields
     val isApproved: Boolean       = false,

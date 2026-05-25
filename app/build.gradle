@@ -15,23 +15,6 @@ android {
         versionName "1.0"
     }
 
-    // ?? Build flavors: mock vs production ?????????????????????????????????????
-    flavorDimensions "env"
-    productFlavors {
-        mock {
-            dimension "env"
-            applicationIdSuffix ".mock"
-            versionNameSuffix "-mock"
-            buildConfigField "boolean", "USE_MOCK", "true"
-            resValue "string", "app_flavor", "MOCK"
-        }
-        production {
-            dimension "env"
-            buildConfigField "boolean", "USE_MOCK", "false"
-            resValue "string", "app_flavor", ""
-        }
-    }
-
     buildFeatures {
         buildConfig true
     }
@@ -57,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
     implementation "androidx.activity:activity-ktx:1.8.0"

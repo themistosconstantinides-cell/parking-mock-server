@@ -17,6 +17,7 @@ class PinActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pin)
+        ParkingAudio.stop()
 
         val edtPin   = findViewById<EditText>(R.id.edtPin)
         val btn      = findViewById<Button>(R.id.btnEnter)

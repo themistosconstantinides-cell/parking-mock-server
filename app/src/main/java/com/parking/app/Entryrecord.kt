@@ -14,22 +14,23 @@ import java.util.Locale
  */
 data class EntryRecord(
     // Card identification
-    val token: String,          // SHA-512 hash — used to match entry/exit
-    val lastDigits: String,     // Last 4 digits of PAN
-    val firstDigits: String,    // First 6 digits (empty until ECR supports it)
-    val expiryDate: String,     // YYMM
+    val token: String,           // SHA-512 hash — used to match entry/exit
+    val lastDigits: String,      // Last 4 digits of PAN
+    val firstDigits: String,     // First 6 digits (empty until ECR supports it)
+    val expiryDate: String,      // YYMM
 
     // Pre-auth transaction fields
-    val terminalId: String,     // TID from ECR field 6
-    val authCode: String,       // Authorization code from ECR field 21
-    val rrn: String,            // Retrieval Reference Number from ECR field 17
-    val receiptNumber: String,  // Transaction receipt number from ECR field 19
+    val terminalId: String,      // TID from ECR field 6
+    val authCode: String,        // Authorization code from ECR field 21
+    val rrn: String,             // Retrieval Reference Number from ECR field 17
+    val receiptNumber: String,   // Transaction receipt number from ECR field 19
     val preAuthAmountCents: Int, // Amount that was pre-authorized
 
     // Metadata
-    val inputType: String,      // "Bank Card" or "Monthly Card"
-    val timeOfInput: String,    // Timestamp when Continue was pressed (YYYYMMDDHHmmss)
-    val outlet: String
+    val inputType: String,       // "Bank Card" or "Monthly Card"
+    val timeOfInput: String,     // Timestamp when Continue was pressed (YYYYMMDDHHmmss)
+    val outlet: String,
+    val companyCode: String      // From parkingInit response — sent back in entranceCall
 ) {
     /**
      * tokenCode used in TopUp/Capture/Release API calls:
@@ -48,11 +49,12 @@ data class EntryRecord(
             inputType: String,
             timeOfInput: String,
             preAuthAmountCents: Int,
-            outlet: String
+            outlet: String,
+            companyCode: String
         ): EntryRecord = EntryRecord(
             token              = token,
             lastDigits         = ecr.accountNumber.takeLast(4),
-            firstDigits        = "",  // not yet returned by ECR — future field
+            firstDigits        = ecr.firstDigits.take(6),  // Real BIN from ECR (empty if not yet available)
             expiryDate         = ecr.expiryDate,
             terminalId         = ecr.terminalId,
             authCode           = ecr.authCode,
@@ -61,7 +63,8 @@ data class EntryRecord(
             preAuthAmountCents = preAuthAmountCents,
             inputType          = inputType,
             timeOfInput        = timeOfInput,
-            outlet             = outlet
+            outlet             = outlet,
+            companyCode        = companyCode
         )
     }
 }

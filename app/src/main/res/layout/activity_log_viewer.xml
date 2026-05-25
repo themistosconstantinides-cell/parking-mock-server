@@ -47,6 +47,14 @@
 
     </LinearLayout>
 
+    <!-- Loading spinner -->
+    <ProgressBar
+        android:id="@+id/progressLoad"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone"/>
+
     <!-- Log output -->
     <ScrollView
         android:id="@+id/scrollLogs"

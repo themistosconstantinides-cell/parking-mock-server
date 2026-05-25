@@ -34,14 +34,106 @@
             android:inputType="textUri"
             android:layout_marginBottom="8dp"/>
 
+        <!-- ── HMAC authentication ────────────────────────────────────────── -->
         <EditText
-            android:id="@+id/edtPort"
+            android:id="@+id/edtHmacClientId"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Show Rates on Screen (1=Yes, 0=No)"
-            android:inputType="number"
-            android:text="1"
-            android:layout_marginBottom="16dp"/>
+            android:hint="HMAC Client ID"
+            android:inputType="text"
+            android:layout_marginBottom="4dp"/>
+
+        <EditText
+            android:id="@+id/edtHmacSecret"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="HMAC Secret (Base64)"
+            android:inputType="textPassword"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="HMAC Authentication"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/btnHmac"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+        <!-- ─────────────────────────────────────────────────────────────── -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Show Rates on Screen"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/btnShowRates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+
+        <!-- ── Monthly Card Input Method ────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Monthly Card Input Method"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgMonthlyMethod"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rbKeyIn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Key-in"
+                android:textColor="#333333"
+                android:textSize="15sp"
+                android:checked="true"/>
+
+            <RadioButton
+                android:id="@+id/rbContactless"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Contactless (Mifare)"
+                android:textColor="#333333"
+                android:textSize="15sp"/>
+
+        </RadioGroup>
+        <!-- ─────────────────────────────────────────────────────────────── -->
 
         <Button
             android:id="@+id/btnSave"
@@ -83,23 +175,55 @@
             android:text="CONTINUE"
             android:layout_marginBottom="8dp"/>
 
-        <Button
-            android:id="@+id/btnVehiclePresent"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="VEHICLE PRESENT: YES"
-            android:backgroundTint="#238636"
-            android:textColor="#FFFFFF"
-            android:layout_marginBottom="8dp"/>
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
 
-        <Button
-            android:id="@+id/btnExitScenario"
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Voice"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/btnVoice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="EXIT SCENARIO: 3 - TopUp Needed"
-            android:backgroundTint="#E65100"
-            android:textColor="#FFFFFF"
-            android:layout_marginBottom="8dp"/>
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Vehicle Check Interval (sec)"
+                android:textColor="#C9D1D9"
+                android:textSize="13sp"/>
+
+            <EditText
+                android:id="@+id/edtTellInterval"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:text="3"
+                android:textColor="#C9D1D9"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:textAlignment="center"/>
+
+        </LinearLayout>
 
         <Button
             android:id="@+id/btnLogs"

@@ -65,6 +65,15 @@ object EcrParser {
             // 23-27 = loyalty/batch fields
             val panEncrypted    = get(28)
             val track2Data      = get(29)
+
+            // Extract first 6 digits (BIN):
+            // Pre-Auth/PAN Capture: accountNumber may contain BIN+last4 (10 chars) or just last4 (4 chars)
+            // If accountNumber is longer than 4 chars the leading digits are the BIN
+            val firstDigits = when {
+                accountNumber.length > 4 -> accountNumber.take(accountNumber.length - 4)
+                track2Data.isNotBlank()  -> track2Data.take(6)   // PAN Capture — extract from track2
+                else                     -> ""                    // Not available yet
+            }
             // 30-35 = other fields
             val isBocLoyalty    = get(36)
             // 37-41 = other fields
@@ -73,7 +82,7 @@ object EcrParser {
             val isApproved  = responseCode == "00"
             val amountEuros = originalAmount.toDoubleOrNull()?.div(100.0) ?: 0.0
 
-            AppLogger.logRequest("ECR_PARSE", "type=$transactionType code=$responseCode tid=$terminalId auth=$authCode rrn=$rrn")
+            AppLogger.logRequest("ECR_PARSE", "type=$transactionType code=$responseCode tid=$terminalId auth=$authCode rrn=$rrn first6=$firstDigits")
 
             EcrResponse(
                 systemId             = systemId,
@@ -97,6 +106,7 @@ object EcrParser {
                 isBocLoyalty         = isBocLoyalty,
                 orderNumber          = orderNumber,
                 panEncrypted         = panEncrypted,
+                firstDigits          = firstDigits,
                 isApproved           = isApproved,
                 amountEuros          = amountEuros
             )

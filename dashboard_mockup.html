@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RPS Admin — Dashboard Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f4f6fb; display: flex; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { width: 210px; background: #fff; border-right: 1px solid #e5e8ef; padding: 0; flex-shrink: 0; }
+  .sidebar-logo { padding: 18px 20px 12px; font-size: 18px; font-weight: 700; color: #2563eb; border-bottom: 1px solid #e5e8ef; }
+  .sidebar nav a { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 13.5px; color: #555; text-decoration: none; }
+  .sidebar nav a.active { background: #eff6ff; color: #2563eb; font-weight: 600; border-left: 3px solid #2563eb; }
+  .sidebar nav a:hover:not(.active) { background: #f8faff; }
+  .sidebar-logout { padding: 16px 20px; border-top: 1px solid #e5e8ef; margin-top: auto; }
+  .sidebar-logout a { color: #e53e3e; font-size: 13px; text-decoration: none; }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; }
+
+  /* TOP BAR */
+  .topbar { background: #fff; border-bottom: 1px solid #e5e8ef; padding: 10px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .topbar-title { font-size: 22px; font-weight: 700; color: #1a202c; }
+  .topbar-title span { font-size: 13px; font-weight: 400; color: #888; margin-left: 10px; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  /* NEW: Company selector */
+  .company-select { display: flex; align-items: center; gap: 8px; background: #eff6ff; border: 1.5px solid #2563eb; border-radius: 8px; padding: 6px 14px; font-size: 13px; color: #2563eb; font-weight: 600; cursor: pointer; }
+  .company-select select { border: none; background: transparent; color: #2563eb; font-weight: 600; font-size: 13px; outline: none; cursor: pointer; }
+  .user-badge { font-size: 13px; color: #444; text-align: right; }
+  .user-badge strong { display: block; }
+
+  /* CONTENT */
+  .content { padding: 24px 28px; flex: 1; }
+
+  /* SUMMARY CARDS */
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .card-label { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .card-value { font-size: 28px; font-weight: 700; color: #1a202c; }
+  .card-value.blue { color: #2563eb; }
+  .card-value.green { color: #16a34a; }
+  .card-icon { float: right; font-size: 28px; opacity: .18; }
+
+  /* SPACES ROW */
+  .spaces-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .space-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .space-title { font-size: 13px; font-weight: 600; color: #444; margin-bottom: 10px; }
+  .space-number { font-size: 36px; font-weight: 800; color: #1a202c; }
+  .space-number span { font-size: 16px; color: #aaa; font-weight: 400; }
+  .space-sub { font-size: 12px; color: #888; margin-top: 2px; margin-bottom: 10px; }
+  .progress-bar { height: 7px; background: #e5e8ef; border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #2563eb; border-radius: 99px; }
+  .progress-fill.purple { background: #7c3aed; }
+
+  /* COMPANY TABLE */
+  .section-title { font-size: 14px; font-weight: 700; color: #1a202c; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .company-table-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 20px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #f8faff; padding: 10px 16px; text-align: left; font-size: 11.5px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid #e5e8ef; }
+  tbody td { padding: 11px 16px; border-bottom: 1px solid #f0f2f7; color: #333; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #f8faff; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-red { background: #fee2e2; color: #dc2626; }
+  .badge-green { background: #dcfce7; color: #16a34a; }
+  .badge-blue { background: #dbeafe; color: #2563eb; }
+
+  /* PENDING HELP */
+  .pending-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+  .pending-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 0; }
+  .pending-title { font-size: 14px; font-weight: 700; color: #d97706; display: flex; align-items: center; gap: 8px; }
+  .pending-count { background: #fef3c7; color: #d97706; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .pending-count.red { background: #fee2e2; color: #dc2626; }
+
+  /* NEW: Age filter tabs */
+  .filter-tabs { display: flex; gap: 0; border: 1.5px solid #e5e8ef; border-radius: 8px; overflow: hidden; margin: 12px 18px 0; width: fit-content; }
+  .filter-tab { padding: 5px 16px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; color: #888; border: none; }
+  .filter-tab.active { background: #2563eb; color: #fff; }
+  .filter-tab .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .dot-red { background: #dc2626; }
+  .dot-yellow { background: #d97706; }
+  .dot-gray { background: #aaa; }
+
+  .pending-list { padding: 8px 0 4px; }
+  .pending-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 11px 18px; border-bottom: 1px solid #f0f2f7; }
+  .pending-item:last-child { border-bottom: none; }
+  .pending-item-left strong { font-size: 13px; color: #1a202c; }
+  .pending-item-left p { font-size: 12px; color: #888; margin-top: 2px; }
+  .pending-item-right { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .age-badge { font-size: 11px; color: #888; }
+  .age-badge.fresh { color: #16a34a; font-weight: 600; }
+  .age-badge.stale { color: #d97706; font-weight: 600; }
+
+  .older-group { padding: 10px 18px; background: #f8faff; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #888; cursor: pointer; }
+  .older-group span { color: #2563eb; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">RPS Admin</div>
+  <nav>
+    <a href="#" class="active">&#9783; Dashboard</a>
+    <a href="#">&#9783; Companies</a>
+    <a href="#">&#9783; Parking Areas</a>
+    <a href="#">&#9783; Terminals</a>
+    <a href="#">&#9783; Charging Rules</a>
+    <a href="#">&#9783; Day Categories</a>
+    <a href="#">&#9783; Special Days</a>
+    <a href="#">&#9783; Monthly Cards</a>
+    <a href="#">&#9783; Users</a>
+    <a href="#">&#9783; Help Requests</a>
+    <a href="#">&#9783; Open Barrier</a>
+    <a href="#">&#9783; Reports</a>
+    <a href="#">&#9783; Error Messages</a>
+    <a href="#">&#9783; Token Discounts</a>
+    <a href="#">&#9783; Search</a>
+  </nav>
+  <div class="sidebar-logout"><a href="#">&#8594; Logout</a></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Dashboard <span>Today, 5/23/2026</span></div>
+    </div>
+    <div class="topbar-right">
+      <!-- IDEA 2: Company selector -->
+      <div class="company-select">
+        🏢
+        <select>
+          <option>All Companies</option>
+          <option>123Printec</option>
+          <option>Marina Parking</option>
+          <option>Airport Parking</option>
+        </select>
+      </div>
+      <div class="user-badge">
+        <strong>System Administrator</strong>
+        <span style="color:#888;font-size:12px">SuperAdmin</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- SUMMARY CARDS -->
+    <div class="cards-row">
+      <div class="card"><div class="card-icon">🚗</div><div class="card-label">Total Entries</div><div class="card-value">9</div></div>
+      <div class="card"><div class="card-icon">🚪</div><div class="card-label">Total Exits</div><div class="card-value">9</div></div>
+      <div class="card"><div class="card-icon">💰</div><div class="card-label">Revenue</div><div class="card-value green">817.60 EUR</div></div>
+      <div class="card"><div class="card-icon">⏱</div><div class="card-label">Avg Stay</div><div class="card-value blue">58 min</div></div>
+    </div>
+
+    <!-- SPACES -->
+    <div class="spaces-row">
+      <div class="space-card">
+        <div class="space-title">📈 Normal Spaces</div>
+        <div class="space-number">2<span>/18</span></div>
+        <div class="space-sub">11.1% occupied</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:11%"></div></div>
+      </div>
+      <div class="space-card">
+        <div class="space-title">🪪 Monthly Spaces</div>
+        <div class="space-number" style="color:#7c3aed">0<span>/10</span></div>
+        <div class="space-sub">0.0% occupied</div>
+        <div class="progress-bar"><div class="progress-fill purple" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- IDEA 2: Per-company summary table -->
+    <div class="section-title">🏢 Company Overview</div>
+    <div class="company-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Entries</th>
+            <th>Exits</th>
+            <th>Revenue</th>
+            <th>Normal Spaces</th>
+            <th>Monthly Spaces</th>
+            <th>Pending Help</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>123Printec</strong></td>
+            <td>5</td>
+            <td>5</td>
+            <td>€450.20</td>
+            <td>1/10</td>
+            <td>0/5</td>
+            <td><span class="badge badge-red">2 today</span></td>
+          </tr>
+          <tr>
+            <td><strong>Marina Parking</strong></td>
+            <td>4</td>
+            <td>4</td>
+            <td>€367.40</td>
+            <td>1/8</td>
+            <td>0/5</td>
+            <td><span class="badge badge-green">0</span></td>
+          </tr>
+          <tr>
+            <td><strong>Airport Parking</strong></td>
+            <td>0</td>
+            <td>0</td>
+            <td>€0.00</td>
+            <td>0/12</td>
+            <td>0/6</td>
+            <td><span class="badge badge-blue">28 old</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- IDEA 1: Pending Help with age filter tabs -->
+    <div class="pending-wrap">
+      <div class="pending-header">
+        <div class="pending-title">
+          ⚠ Pending Help Requests
+          <span class="pending-count red">2 today</span>
+          <span class="pending-count" style="margin-left:4px">28 older</span>
+        </div>
+      </div>
+
+      <!-- Age filter tabs -->
+      <div class="filter-tabs">
+        <button class="filter-tab active"><span class="dot dot-red"></span>Today (2)</button>
+        <button class="filter-tab"><span class="dot dot-yellow"></span>Last 24h (6)</button>
+        <button class="filter-tab"><span class="dot dot-gray"></span>All (30)</button>
+      </div>
+
+      <div class="pending-list">
+        <div class="pending-item">
+          <div class="pending-item-left">
+            <strong>123Printec — Printec</strong>
+            <p>Help Button</p>
+            <p style="font-size:11px;color:#bbb;margin-top:2px">5/23/2026, 9:17:13 AM</p>
+          </div>
+          <div class="pending-item-right">
+            <span class="age-badge fresh">12 min ago</span>
+            <span class="badge badge-blue">ENTRANCE</span>
+            <span class="badge badge-red">Pending</span>
+          </div>
+        </div>
+        <div class="pending-item">
+          <div class="pending-item-left">
+            <strong>123Printec — Printec</strong>
+            <p>ECR Decline. Barrier failed</p>
+            <p style="font-size:11px;color:#bbb;margin-top:2px">5/23/2026, 9:05:44 AM</p>
+          </div>
+          <div class="pending-item-right">
+            <span class="age-badge fresh">24 min ago</span>
+            <span class="badge badge-red" style="background:#fce7f3;color:#9d174d">EXIT</span>
+            <span class="badge badge-red">Pending</span>
+          </div>
+        </div>
+        <!-- Collapsed older group -->
+        <div class="older-group">
+          ⏱ 28 older requests not shown — <span>&nbsp;show all →</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

@@ -20,11 +20,14 @@ object TokenHelper {
         outlet: String,
         appPanSeq: String = "01"
     ): String {
-        val raw = firstSix.padEnd(6, '0').take(6) +
+        // Use real BIN if available, fallback to 000000 if ECR doesn't return it yet
+        val bin = if (firstSix.length == 6) firstSix else firstSix.padEnd(6, '0').take(6)
+        val raw = bin +
                 lastFour.padEnd(4, '0').take(4) +
                 expiryYYMM.padEnd(4, '0').take(4) +
                 outlet.padEnd(10, '0').take(10) +
                 appPanSeq.padEnd(2, '0').take(2)
+        AppLogger.logRequest("TOKEN", "SHA512 input: ${bin}****${lastFour.takeLast(4)} exp=$expiryYYMM outlet=$outlet → ${sha512(raw).take(16)}...")
         return sha512(raw)
     }
 

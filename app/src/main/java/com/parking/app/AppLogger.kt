@@ -54,4 +54,13 @@ object AppLogger {
         Log.e(TAG, text)
         write(text)
     }
+
+    /**
+     * Verbose — LogCat only, never written to file.
+     * Use for high-frequency / raw data logs (poll responses, JSON bodies, etc.)
+     * that are useful for live debugging but would bloat the log file.
+     */
+    fun logVerbose(type: String, msg: String) {
+        Log.d(TAG, "${now()} | VERBOSE [$type] | $msg")
+    }
 }
