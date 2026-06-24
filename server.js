@@ -2388,6 +2388,40 @@ app.post("/entranceCall", async (req, res) => {
           receiptNumber, referenceNo, preAuthAmount, expiryDate,
           outlet, terminal, inputType } = req.body;
 
+  // ── CarWash entrance — skip barrier / space / duplicate logic ────────────
+  if (req.body.application === "CarWash") {
+    if (!token) {
+      const r = { responseCode:"99", responseDescription:"Missing token", displayMessage:"Error. Please try again.", timeToDisplayMessage:"8" };
+      addCarWashLog(req, r); return res.json(r);
+    }
+    const isMonthly = inputType === "Monthly Card";
+    // Validate monthly card against CarWash allowed list (if configured)
+    if (isMonthly && carWashConfig.monthlyCardsBins) {
+      const allowed = carWashConfig.monthlyCardsBins.split(";").map(c => c.trim()).filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes(lastDigits || "")) {
+        const r = { responseCode:"56", responseDescription:"Monthly card not recognised", displayMessage:"Monthly card not recognised. Please contact staff.", timeToDisplayMessage:"8" };
+        addCarWashLog(req, r); return res.json(r);
+      }
+    }
+    activeEntries[token] = {
+      token, lastDigits, authCode, timeOfInput,
+      tokenCode:          tokenCode || token,
+      receiptNumber:      receiptNumber || "",
+      originalRefNum:     referenceNo || receiptNumber || "",
+      preAuthAmountCents: isMonthly ? 0 : parseInt(preAuthAmount || carWashConfig.maxWashAmountCents || 500),
+      expiryDate:         expiryDate || "0000",
+      outlet:             outlet   || carWashConfig.outlet,
+      terminal:           terminal || carWashConfig.terminal,
+      inputType:          inputType || "Bank Card",
+      isCarWash:          true,
+      isMonthly,
+      entryTime:          Date.now()
+    };
+    console.log(`[entranceCall/CarWash] stored washId=${req.body.washId} last4=${lastDigits} isMonthly=${isMonthly}`);
+    const r = { responseCode:"00", responseDescription:"Successful Response", displayMessage:"Wash started! Enjoy.", timeToDisplayMessage:"5" };
+    addCarWashLog(req, r); return res.json(r);
+  }
+
   // Validate monthly card against allowed list
   if (inputType === "Monthly Card" && config.monthlyEnabled && config.monthlyCardsBins) {
     const allowedCards = config.monthlyCardsBins.split(";").map(c => c.trim()).filter(Boolean);
@@ -2580,6 +2614,62 @@ app.post("/exitCall", async (req, res) => {
   const { token } = req.body;
   const entry = token ? activeEntries[token] : null;
   const inputType = req.body.inputType || (entry && entry.inputType) || "Bank Card";
+
+  // ── CarWash exit — proportional charge, no barrier ───────────────────────
+  if (req.body.application === "CarWash" || (entry && entry.isCarWash)) {
+    if (!entry) {
+      const r = { responseCode:"41", responseDescription:"Session not found", amountCharged:"0", moneyToPay:"0", displayMessage:"Session not found. Please contact staff.", timeToDisplayMessage:"10" };
+      addCarWashLog(req, r); return res.json(r);
+    }
+    delete activeEntries[token];
+    const timeUsed = Math.round((Date.now() - entry.entryTime) / 1000);
+    const reason   = req.body.reason || "manual";
+    const mins     = Math.floor(timeUsed / 60);
+    const secs     = timeUsed % 60;
+
+    // Monthly card — free, no JCC
+    if (entry.isMonthly) {
+      console.log(`[exitCall/CarWash] Monthly card — free washId=${req.body.washId}`);
+      const r = { responseCode:"00", responseDescription:"Successful Response", amountCharged:"0", moneyToPay:"0", timeUsedSeconds:String(timeUsed), displayMessage:`Monthly Card — Free Wash\nTime used: ${mins}m ${secs}s`, timeToDisplayMessage:"5" };
+      addCarWashLog(req, r); return res.json(r);
+    }
+
+    // Void — controller failed or app restart
+    if (reason === "controller_failed" || reason === "app_restart") {
+      console.log(`[exitCall/CarWash] Void pre-auth — reason=${reason} washId=${req.body.washId}`);
+      try { await jccRelease(entry); } catch(e) { console.error("[exitCall/CarWash VOID]", e.message); }
+      const r = { responseCode:"00", responseDescription:"Pre-auth voided. No charge applied.", amountCharged:"0", moneyToPay:"0", timeUsedSeconds:"0", displayMessage:"Pre-auth voided. No charge applied.", timeToDisplayMessage:"10" };
+      addCarWashLog(req, r); return res.json(r);
+    }
+
+    // Proportional capture
+    const maxSecs     = carWashConfig.maxWashTimeSeconds || 300;
+    const ratio       = Math.min(timeUsed / maxSecs, 1.0);
+    const amountCents = Math.round(entry.preAuthAmountCents * ratio);
+    console.log(`[exitCall/CarWash] Proportional: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% → €${(amountCents/100).toFixed(2)}`);
+
+    let captureOk = false;
+    if (amountCents > 0) {
+      try {
+        const cr = await jccCapture(entry, amountCents);
+        captureOk = cr && cr.responseCode === "00";
+        if (!captureOk) addWashPendingCapture(entry, amountCents);
+      } catch(e) { console.error("[exitCall/CarWash CAPTURE]", e.message); addWashPendingCapture(entry, amountCents); }
+    } else {
+      try { await jccRelease(entry); } catch(e) { console.error("[exitCall/CarWash RELEASE]", e.message); }
+    }
+
+    const r = {
+      responseCode:         "00",
+      responseDescription:  "Successful Response",
+      amountCharged:        String(amountCents),
+      moneyToPay:           String(amountCents),
+      timeUsedSeconds:      String(timeUsed),
+      displayMessage:       `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)}`,
+      timeToDisplayMessage: "8"
+    };
+    addCarWashLog(req, r); return res.json(r);
+  }
 
   // ── Monthly Card exit — always free, no JCC calls ────────────────────────
   if (inputType === "Monthly Card") {
