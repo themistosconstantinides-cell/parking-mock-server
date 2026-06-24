@@ -333,6 +333,32 @@ let activeWashSessions   = {};
 let washPendingCaptures  = [];
 let carWashLogs          = [];
 
+// ── Petrolina State ───────────────────────────────────────────────────────────
+let petrolinaConfig = {
+  outlet:           "",
+  terminal:         "",
+  pumpLabel:        "Pump 1",
+  helpPhone:        "99123456",
+  maxPreAuthCents:  20000,           // €200 fill-up ceiling
+  fuelGrades: [
+    { code: "unleaded95", label: "Unleaded 95", pricePerLiter: 1720 },
+    { code: "unleaded98", label: "Unleaded 98", pricePerLiter: 1890 },
+    { code: "diesel",     label: "Diesel",      pricePerLiter: 1650 }
+  ],
+  callbackDelaySec:  8,              // auto-fire callback N sec after authorize
+  actualAmountCents: 0,              // 0 = random up to pre-auth
+  authorizeResult:  "ok",           // "ok" | "fail"
+  responseCode:     "00"
+};
+let petrolinaLogs   = [];
+let pendingPetroAuth = null;         // last /pump/authorize request
+
+function addPetroLog(method, path, req, res) {
+  petrolinaLogs.unshift({ time: new Date().toLocaleTimeString(), method, path, req, res });
+  if (petrolinaLogs.length > 200) petrolinaLogs.pop();
+  console.log(`[PETRO] ${method} ${path} → ${JSON.stringify(res).substring(0,80)}`);
+}
+
 function addCarWashLog(req, response) {
   carWashLogs.unshift({
     id: Date.now(), time: new Date().toLocaleString(),
@@ -801,6 +827,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
   <button class="tab-btn active" onclick="showTab('parking',this)">&#x1F697; Parking</button>
   <button class="tab-btn" onclick="showTab('rental',this)">&#x1F512; Rental</button>
   <button class="tab-btn" onclick="showTab('carwash',this)">&#x1F6BF; Car Wash</button>
+  <button class="tab-btn" onclick="showTab('petrolina',this)" style="color:#e07b00">&#x26FD; Petrolina</button>
 </div>
 
 <div id="tab-parking" class="tab-content active">
@@ -1485,6 +1512,102 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 </div>
 <div id="cwLogCount" style="color:#8b949e;font-size:11px;margin-bottom:8px"></div>
 <div id="cwLogDiv"><p style="color:#8b949e">Loading...</p></div>
+</div>
+
+<!-- ═══ PETROLINA TAB ═══ -->
+<div id="tab-petrolina" class="tab-content">
+<h1>&#x26FD; Petrolina Mock Controller</h1>
+<p style="color:#8b949e">Simulates the Petrolina pump controller. The S1U2 app points to this server for <code>/pump/init</code>, <code>/pump/authorize</code> and <code>/pump/help</code>. Use the manual callback button to simulate fueling completion.</p>
+
+<h2>&#x1F4F1; Terminal Configuration</h2>
+<div class="pos-box" style="border:1px solid #e07b00;background:#161b22;border-radius:6px;padding:14px;margin-bottom:14px">
+<h3 style="color:#e07b00">&#x26FD; Petrolina POS</h3>
+<table>
+<tr><th style="width:180px">Parameter</th><th>Value</th><th style="width:100px"></th></tr>
+<tr><td>Outlet</td>
+  <td><input class="t" id="ptOutlet" value="${petrolinaConfig.outlet}" maxlength="10" placeholder="10 digits"></td>
+  <td><button class="btn" onclick="ptSv('outlet','ptOutlet')">Save</button></td></tr>
+<tr><td>Terminal ID</td>
+  <td><input class="t" id="ptTerminal" value="${petrolinaConfig.terminal}" maxlength="12" placeholder="12 digits"></td>
+  <td><button class="btn" onclick="ptSv('terminal','ptTerminal')">Save</button></td></tr>
+<tr><td>Pump Label</td>
+  <td><input class="m" id="ptPumpLabel" value="${petrolinaConfig.pumpLabel}" placeholder="e.g. Pump 1"></td>
+  <td><button class="btn" onclick="ptSv('pumpLabel','ptPumpLabel')">Save</button></td></tr>
+<tr><td>Help Phone</td>
+  <td><input class="m" id="ptHelpPhone" value="${petrolinaConfig.helpPhone}"></td>
+  <td><button class="btn" onclick="ptSv('helpPhone','ptHelpPhone')">Save</button></td></tr>
+<tr><td>Max Pre-Auth (cents)</td>
+  <td>${petrolinaConfig.maxPreAuthCents} = &#x20AC;${(petrolinaConfig.maxPreAuthCents/100).toFixed(2)}</td>
+  <td><input class="n" type="number" id="ptMaxPreAuth" value="${petrolinaConfig.maxPreAuthCents}">
+  <button class="btn" onclick="ptSet('maxPreAuthCents',Number(document.getElementById('ptMaxPreAuth').value))">Set</button></td></tr>
+</table>
+</div>
+
+<h2>&#x26FD; Fuel Grades</h2>
+<table>
+<tr><th>Code</th><th>Label</th><th>Price (cents/L)</th><th>&#x20AC;/L</th></tr>
+${petrolinaConfig.fuelGrades.map(g=>`<tr>
+  <td style="color:#58a6ff;font-family:monospace">${g.code}</td>
+  <td>${g.label}</td>
+  <td>${g.pricePerLiter}</td>
+  <td style="color:#3fb950">&#x20AC;${(g.pricePerLiter/1000).toFixed(3)}</td>
+</tr>`).join('')}
+</table>
+<p style="color:#8b949e;font-size:12px">Fuel grades are configured in server.js <code>petrolinaConfig.fuelGrades</code>.</p>
+
+<h2>&#x1F9EA; Simulation Controls</h2>
+<table>
+<tr><th style="width:240px">Setting</th><th>Current</th><th>Edit</th></tr>
+<tr><td>Auto-callback delay (sec)<br><span style="color:#8b949e;font-size:11px">How long after /pump/authorize before callback fires</span></td>
+  <td>${petrolinaConfig.callbackDelaySec}s</td>
+  <td><input type="number" id="ptDelay" value="${petrolinaConfig.callbackDelaySec}" style="width:80px">
+  <button class="btn" onclick="ptSet('callbackDelaySec',Number(document.getElementById('ptDelay').value))">Set</button></td></tr>
+<tr><td>Actual amount (cents)<br><span style="color:#8b949e;font-size:11px">0 = random (€5 to pre-auth max)</span></td>
+  <td>${petrolinaConfig.actualAmountCents} ${petrolinaConfig.actualAmountCents?'= &#x20AC;'+(petrolinaConfig.actualAmountCents/100).toFixed(2):'(random)'}</td>
+  <td><input type="number" id="ptActual" value="${petrolinaConfig.actualAmountCents}" style="width:100px">
+  <button class="btn" onclick="ptSet('actualAmountCents',Number(document.getElementById('ptActual').value))">Set</button></td></tr>
+<tr><td>Authorize result</td>
+  <td id="ptAuthResultVal" style="color:${petrolinaConfig.authorizeResult==='ok'?'#3fb950':'#ff6b6b'};font-weight:bold">${petrolinaConfig.authorizeResult==='ok'?'&#x2705; OK':'&#x274C; FAIL'}</td>
+  <td>
+    <button class="btn green" onclick="ptSet2('authorizeResult','ok')">&#x2705; OK</button>
+    <button class="btn red" onclick="ptSet2('authorizeResult','fail')">&#x274C; Fail</button>
+  </td></tr>
+<tr><td>Force init error (responseCode)</td>
+  <td>${petrolinaConfig.responseCode}</td>
+  <td>
+    <button class="btn green" onclick="ptSet2('responseCode','00')">00 OK</button>
+    <button class="btn red" onclick="ptSet2('responseCode','91')">91 Error</button>
+  </td></tr>
+</table>
+
+<h2>&#x1F504; Manual Callback — Simulate Fueling Done</h2>
+<p style="color:#8b949e;font-size:12px">Fires <code>POST /pump/complete</code> to the S1U2 app. Use when you want to trigger completion immediately without waiting for the auto-delay.</p>
+
+<div id="ptPendingDiv" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px">
+  <span style="color:#8b949e">Loading pending auth...</span>
+</div>
+
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+  <span style="color:#8b949e">Amount (cents):</span>
+  <input type="number" id="ptManualAmount" value="3500" style="width:110px">
+  <span style="color:#8b949e;font-size:11px">(= &#x20AC;<span id="ptManualEuros">35.00</span>)</span>
+  <button class="btn orange" style="background:#e07b00;padding:8px 20px;font-size:13px" onclick="ptFireCallback()">&#x26FD; Fire Callback Now</button>
+  <span id="ptCallbackResult" style="font-size:12px"></span>
+</div>
+
+<h2>&#x1F4CB; Petrolina Request Log</h2>
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="btn gray" onclick="ptSetFilter('')">All</button>
+  <button class="btn" style="background:#1f6feb" onclick="ptSetFilter('pump/init')">Init</button>
+  <button class="btn green" onclick="ptSetFilter('pump/authorize')">Authorize</button>
+  <button class="btn orange" onclick="ptSetFilter('CALLBACK')">Callback</button>
+  <button class="btn gray" onclick="ptSetFilter('pump/help')">Help</button>
+  <span style="margin-left:auto">
+    <button class="btn red" onclick="ptClearLogs()">&#x1F5D1; Clear</button>
+  </span>
+</div>
+<div id="ptLogCount" style="color:#8b949e;font-size:11px;margin-bottom:8px"></div>
+<div id="ptLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
 <script>
@@ -2264,6 +2387,81 @@ loadPendingCaptures();setInterval(loadPendingCaptures,10000);
 loadRentalLogs();setInterval(loadRentalLogs,3000);
 loadRentals();setInterval(loadRentals,5000);
 loadRentalPending();setInterval(loadRentalPending,8000);
+
+// ── Petrolina JS ─────────────────────────────────────────────────────────────
+let ptAllLogs=[]; let ptFilter='';
+
+function ptSetFilter(f){ptFilter=f;ptRenderLogs();}
+
+function ptRenderLogs(){
+  const logs=ptFilter?ptAllLogs.filter(l=>(l.method+' '+l.path).toLowerCase().includes(ptFilter.toLowerCase())):ptAllLogs;
+  const el=document.getElementById('ptLogDiv');
+  const cnt=document.getElementById('ptLogCount');
+  if(!el) return;
+  cnt.textContent='Showing '+logs.length+' of '+ptAllLogs.length+' entries';
+  if(!logs.length){el.innerHTML='<p style="color:#8b949e">No logs yet.</p>';return;}
+  el.innerHTML='<table><tr><th style="width:75px">Time</th><th style="width:50px">Method</th><th style="width:160px">Endpoint</th><th>Request</th><th>Response</th></tr>'+
+    logs.map(function(l){
+      const col=l.path.includes('authorize')?'#3fb950':l.path.includes('CALLBACK')?'#e07b00':l.path.includes('help')?'#8b949e':'#58a6ff';
+      return '<tr><td style="color:#8b949e">'+l.time+'</td>'+
+        '<td style="color:#8b949e">'+l.method+'</td>'+
+        '<td style="color:'+col+';font-family:monospace">'+l.path+'</td>'+
+        '<td><pre style="max-height:80px;overflow:auto;background:#0d1117;padding:4px;font-size:10px;margin:0">'+JSON.stringify(l.req,null,1)+'</pre></td>'+
+        '<td><pre style="max-height:80px;overflow:auto;background:#0d1117;padding:4px;font-size:10px;margin:0">'+JSON.stringify(l.res,null,1)+'</pre></td></tr>';
+    }).join('')+'</table>';
+}
+
+async function loadPtLogs(){
+  try{const r=await fetch('/petrolina/logs');ptAllLogs=await r.json();ptRenderLogs();}catch(e){}
+}
+
+async function loadPtPending(){
+  try{
+    const p=await fetch('/petrolina/pending').then(r=>r.json());
+    const el=document.getElementById('ptPendingDiv');if(!el)return;
+    if(p){
+      el.innerHTML='<b style="color:#3fb950">&#x2705; Active auth:</b>'+
+        ' grade=<b>'+p.gradeCode+'</b>'+
+        ' max=<b>&#x20AC;'+(p.maxAmountCents/100).toFixed(2)+'</b>'+
+        ' callback=<b style="color:#58a6ff">'+p.callbackUrl+'</b>'+
+        ' <span style="color:#8b949e;font-size:11px">('+Math.round((Date.now()-p.authorizedAt)/1000)+'s ago)</span>';
+    } else {
+      el.innerHTML='<span style="color:#8b949e">No pending auth — app has not called /pump/authorize yet.</span>';
+    }
+  }catch(e){}
+}
+
+async function ptSet(k,v){
+  await fetch('/petrolina/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+  location.reload();
+}
+async function ptSet2(k,v){ await ptSet(k,v); }
+async function ptSv(key,id){
+  const v=document.getElementById(id).value;
+  await fetch('/petrolina/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  location.reload();
+}
+async function ptFireCallback(){
+  const cents=parseInt(document.getElementById('ptManualAmount').value)||3500;
+  const r=await fetch('/petrolina/fire-callback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actualAmountCents:cents})});
+  const j=await r.json();
+  const el=document.getElementById('ptCallbackResult');
+  el.textContent=j.ok?'Sent €'+(cents/100).toFixed(2)+' to '+j.sentTo:'❌ '+j.error;
+  el.style.color=j.ok?'#3fb950':'#ff6b6b';
+  setTimeout(loadPtLogs,1000);
+}
+async function ptClearLogs(){
+  if(!confirm('Clear Petrolina logs?')) return;
+  await fetch('/petrolina/clear-logs',{method:'POST'});
+  ptAllLogs=[];ptRenderLogs();
+}
+const ptAmtInput=document.getElementById('ptManualAmount');
+if(ptAmtInput) ptAmtInput.addEventListener('input',function(){
+  const el=document.getElementById('ptManualEuros');
+  if(el) el.textContent=(parseInt(this.value||0)/100).toFixed(2);
+});
+loadPtLogs(); setInterval(loadPtLogs,4000);
+loadPtPending(); setInterval(loadPtPending,3000);
 </script></body></html>`);
 });
 
@@ -2387,40 +2585,6 @@ app.post("/entranceCall", async (req, res) => {
   const { token, lastDigits, authCode, timeOfInput, tokenCode,
           receiptNumber, referenceNo, preAuthAmount, expiryDate,
           outlet, terminal, inputType } = req.body;
-
-  // ── CarWash entrance — skip barrier / space / duplicate logic ────────────
-  if (req.body.application === "CarWash") {
-    if (!token) {
-      const r = { responseCode:"99", responseDescription:"Missing token", displayMessage:"Error. Please try again.", timeToDisplayMessage:"8" };
-      addCarWashLog(req, r); return res.json(r);
-    }
-    const isMonthly = inputType === "Monthly Card";
-    // Validate monthly card against CarWash allowed list (if configured)
-    if (isMonthly && carWashConfig.monthlyCardsBins) {
-      const allowed = carWashConfig.monthlyCardsBins.split(";").map(c => c.trim()).filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes(lastDigits || "")) {
-        const r = { responseCode:"56", responseDescription:"Monthly card not recognised", displayMessage:"Monthly card not recognised. Please contact staff.", timeToDisplayMessage:"8" };
-        addCarWashLog(req, r); return res.json(r);
-      }
-    }
-    activeEntries[token] = {
-      token, lastDigits, authCode, timeOfInput,
-      tokenCode:          tokenCode || token,
-      receiptNumber:      receiptNumber || "",
-      originalRefNum:     referenceNo || receiptNumber || "",
-      preAuthAmountCents: isMonthly ? 0 : parseInt(preAuthAmount || carWashConfig.maxWashAmountCents || 500),
-      expiryDate:         expiryDate || "0000",
-      outlet:             outlet   || carWashConfig.outlet,
-      terminal:           terminal || carWashConfig.terminal,
-      inputType:          inputType || "Bank Card",
-      isCarWash:          true,
-      isMonthly,
-      entryTime:          Date.now()
-    };
-    console.log(`[entranceCall/CarWash] stored washId=${req.body.washId} last4=${lastDigits} isMonthly=${isMonthly}`);
-    const r = { responseCode:"00", responseDescription:"Successful Response", displayMessage:"Wash started! Enjoy.", timeToDisplayMessage:"5" };
-    addCarWashLog(req, r); return res.json(r);
-  }
 
   // Validate monthly card against allowed list
   if (inputType === "Monthly Card" && config.monthlyEnabled && config.monthlyCardsBins) {
@@ -2614,62 +2778,6 @@ app.post("/exitCall", async (req, res) => {
   const { token } = req.body;
   const entry = token ? activeEntries[token] : null;
   const inputType = req.body.inputType || (entry && entry.inputType) || "Bank Card";
-
-  // ── CarWash exit — proportional charge, no barrier ───────────────────────
-  if (req.body.application === "CarWash" || (entry && entry.isCarWash)) {
-    if (!entry) {
-      const r = { responseCode:"41", responseDescription:"Session not found", amountCharged:"0", moneyToPay:"0", displayMessage:"Session not found. Please contact staff.", timeToDisplayMessage:"10" };
-      addCarWashLog(req, r); return res.json(r);
-    }
-    delete activeEntries[token];
-    const timeUsed = Math.round((Date.now() - entry.entryTime) / 1000);
-    const reason   = req.body.reason || "manual";
-    const mins     = Math.floor(timeUsed / 60);
-    const secs     = timeUsed % 60;
-
-    // Monthly card — free, no JCC
-    if (entry.isMonthly) {
-      console.log(`[exitCall/CarWash] Monthly card — free washId=${req.body.washId}`);
-      const r = { responseCode:"00", responseDescription:"Successful Response", amountCharged:"0", moneyToPay:"0", timeUsedSeconds:String(timeUsed), displayMessage:`Monthly Card — Free Wash\nTime used: ${mins}m ${secs}s`, timeToDisplayMessage:"5" };
-      addCarWashLog(req, r); return res.json(r);
-    }
-
-    // Void — controller failed or app restart
-    if (reason === "controller_failed" || reason === "app_restart") {
-      console.log(`[exitCall/CarWash] Void pre-auth — reason=${reason} washId=${req.body.washId}`);
-      try { await jccRelease(entry); } catch(e) { console.error("[exitCall/CarWash VOID]", e.message); }
-      const r = { responseCode:"00", responseDescription:"Pre-auth voided. No charge applied.", amountCharged:"0", moneyToPay:"0", timeUsedSeconds:"0", displayMessage:"Pre-auth voided. No charge applied.", timeToDisplayMessage:"10" };
-      addCarWashLog(req, r); return res.json(r);
-    }
-
-    // Proportional capture
-    const maxSecs     = carWashConfig.maxWashTimeSeconds || 300;
-    const ratio       = Math.min(timeUsed / maxSecs, 1.0);
-    const amountCents = Math.round(entry.preAuthAmountCents * ratio);
-    console.log(`[exitCall/CarWash] Proportional: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% → €${(amountCents/100).toFixed(2)}`);
-
-    let captureOk = false;
-    if (amountCents > 0) {
-      try {
-        const cr = await jccCapture(entry, amountCents);
-        captureOk = cr && cr.responseCode === "00";
-        if (!captureOk) addWashPendingCapture(entry, amountCents);
-      } catch(e) { console.error("[exitCall/CarWash CAPTURE]", e.message); addWashPendingCapture(entry, amountCents); }
-    } else {
-      try { await jccRelease(entry); } catch(e) { console.error("[exitCall/CarWash RELEASE]", e.message); }
-    }
-
-    const r = {
-      responseCode:         "00",
-      responseDescription:  "Successful Response",
-      amountCharged:        String(amountCents),
-      moneyToPay:           String(amountCents),
-      timeUsedSeconds:      String(timeUsed),
-      displayMessage:       `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)}`,
-      timeToDisplayMessage: "8"
-    };
-    addCarWashLog(req, r); return res.json(r);
-  }
 
   // ── Monthly Card exit — always free, no JCC calls ────────────────────────
   if (inputType === "Monthly Card") {
@@ -3661,6 +3769,108 @@ app.post("/admin/rental-item-avail", (req, res) => {
   res.json({ ok: true });
 });
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PETROLINA API  (called by S1U2 app)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const http = require("http");
+
+// POST /pump/init — returns pump label + fuel grades for this terminal
+app.post("/pump/init", (req, res) => {
+  if (petrolinaConfig.responseCode !== "00") {
+    const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "Configuration error" };
+    addPetroLog("POST", "/pump/init", req.body, body);
+    return res.json(body);
+  }
+  const body = {
+    pumpLabel:       petrolinaConfig.pumpLabel,
+    fuelGrades:      petrolinaConfig.fuelGrades,
+    maxPreAuthCents: petrolinaConfig.maxPreAuthCents,
+    helpPhone:       petrolinaConfig.helpPhone
+  };
+  addPetroLog("POST", "/pump/init", req.body, body);
+  res.json(body);
+});
+
+// POST /pump/authorize — records auth, schedules callback
+app.post("/pump/authorize", (req, res) => {
+  if (petrolinaConfig.authorizeResult !== "ok") {
+    const body = { status: "error", message: "Pump not available — try another pump" };
+    addPetroLog("POST", "/pump/authorize", req.body, body);
+    return res.json(body);
+  }
+  pendingPetroAuth = { ...req.body, authorizedAt: Date.now() };
+  const body = { status: "ok", message: "Pump unlocked" };
+  addPetroLog("POST", "/pump/authorize", req.body, body);
+  res.json(body);
+  if (req.body.callbackUrl) {
+    console.log(`[PETRO] Callback to ${req.body.callbackUrl} in ${petrolinaConfig.callbackDelaySec}s`);
+    setTimeout(() => firePetroCallback(req.body), petrolinaConfig.callbackDelaySec * 1000);
+  }
+});
+
+// POST /pump/help
+app.post("/pump/help", (req, res) => {
+  const body = { message: "Help has been called. Staff will assist you shortly." };
+  addPetroLog("POST", "/pump/help", req.body, body);
+  res.json(body);
+});
+
+// ── Petrolina callback helper ─────────────────────────────────────────────────
+function firePetroCallback(auth) {
+  const maxCents    = auth.maxAmountCents || 5000;
+  const actualCents = petrolinaConfig.actualAmountCents > 0
+    ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
+    : Math.floor(Math.random() * (maxCents - 500) + 500);
+  const liters = parseFloat((actualCents / (petrolinaConfig.fuelGrades[0]?.pricePerLiter || 1650)).toFixed(3));
+  const payload = JSON.stringify({ pumpId: auth.pumpId || 1, actualAmountCents: actualCents, liters });
+  console.log(`[PETRO_CB] → ${auth.callbackUrl}  ${payload}`);
+  try {
+    const url = new URL(auth.callbackUrl);
+    const req = (url.protocol === "https:" ? require("https") : http).request({
+      hostname: url.hostname, port: url.port || (url.protocol==="https:"?443:80),
+      path: url.pathname, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
+    }, (r) => {
+      let data=""; r.on("data",c=>data+=c);
+      r.on("end",()=>{
+        console.log(`[PETRO_CB] ← HTTP ${r.statusCode} ${data}`);
+        addPetroLog("CALLBACK→APP", auth.callbackUrl, {actualAmountCents:actualCents,liters}, JSON.parse(data||"{}"));
+      });
+    });
+    req.on("error", e => { console.error(`[PETRO_CB] FAILED: ${e.message}`); addPetroLog("CALLBACK→APP", auth.callbackUrl, {actualAmountCents:actualCents}, {error:e.message}); });
+    req.write(payload); req.end();
+  } catch(e) {
+    console.error(`[PETRO_CB] URL parse error: ${e.message}`);
+    addPetroLog("CALLBACK→APP", auth.callbackUrl||"?", {actualAmountCents:actualCents}, {error:e.message});
+  }
+}
+
+// ── Petrolina admin endpoints ─────────────────────────────────────────────────
+app.get("/petrolina/logs",    (req, res) => res.json(petrolinaLogs));
+app.post("/petrolina/clear-logs", (req, res) => { petrolinaLogs = []; res.json({ ok: true }); });
+app.get("/petrolina/pending", (req, res) => res.json(pendingPetroAuth));
+
+app.post("/petrolina/config", (req, res) => {
+  const { key, value } = req.body;
+  if (!(key in petrolinaConfig)) return res.status(400).json({ ok: false, error: `Unknown key: ${key}` });
+  const existing = petrolinaConfig[key];
+  if (typeof existing === "number")       petrolinaConfig[key] = Number(value);
+  else if (typeof existing === "boolean") petrolinaConfig[key] = value === true || value === "true";
+  else                                    petrolinaConfig[key] = value;
+  console.log(`[PETRO_CFG] ${key} = ${JSON.stringify(petrolinaConfig[key])}`);
+  res.json({ ok: true });
+});
+
+app.post("/petrolina/fire-callback", (req, res) => {
+  const url     = req.body.callbackUrl || pendingPetroAuth?.callbackUrl;
+  const cents   = parseInt(req.body.actualAmountCents) || petrolinaConfig.actualAmountCents || 3500;
+  if (!url) return res.json({ ok: false, error: "No callbackUrl — app must call /pump/authorize first" });
+  firePetroCallback({ callbackUrl: url, maxAmountCents: cents, pumpId: pendingPetroAuth?.pumpId || 1 });
+  const liters = parseFloat((cents / (petrolinaConfig.fuelGrades[0]?.pricePerLiter || 1650)).toFixed(3));
+  res.json({ ok: true, sentTo: url, actualAmountCents: cents, liters });
+});
 
 // ── START ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
