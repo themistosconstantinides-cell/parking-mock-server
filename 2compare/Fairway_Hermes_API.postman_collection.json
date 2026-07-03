@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "Fairway API – Hermes Airports",
+    "description": "OAuth2 token + Fairway API calls for Hermes Airports (RESA).\nStep 1: Run '1. Get Token' — the access_token is saved automatically.\nStep 2: Run any API method request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "identity_url",  "value": "https://identity.hermesairports.com" },
+    { "key": "api_url",       "value": "https://fairway-api.hermesairports.com/action/execute" },
+    { "key": "client_id",     "value": "resa.fairway.web.external.cardreader" },
+    { "key": "client_secret", "value": "TYbUUraX0U+JhJaqJ5pYaw==" },
+    { "key": "scope",         "value": "resa.fairway.api resa.fairway.api.cardreader" },
+    { "key": "access_token",  "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Get Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "if (json.access_token) {",
+              "    pm.collectionVariables.set('access_token', json.access_token);",
+              "    console.log('Token saved. Expires in: ' + json.expires_in + 's');",
+              "} else {",
+              "    console.error('No access_token in response!');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "grant_type",     "value": "client_credentials", "type": "text" },
+            { "key": "client_id",      "value": "{{client_id}}",      "type": "text" },
+            { "key": "client_secret",  "value": "{{client_secret}}",  "type": "text" },
+            { "key": "scope",          "value": "{{scope}}",          "type": "text" }
+          ]
+        },
+        "url": {
+          "raw": "{{identity_url}}/connect/token",
+          "host": ["{{identity_url}}"],
+          "path": ["connect", "token"]
+        }
+      }
+    },
+    {
+      "name": "2. OpenGate – Discover Parameters (help)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+          { "key": "Content-Type",  "value": "application/json",        "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"help\": 1\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{api_url}}/OpenGate",
+          "host": ["{{api_url}}"],
+          "path": ["OpenGate"]
+        }
+      }
+    },
+    {
+      "name": "3. OpenGate – Call",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+          { "key": "Content-Type",  "value": "application/json",        "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"gate\": \"GATE_01\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{api_url}}/OpenGate",
+          "host": ["{{api_url}}"],
+          "path": ["OpenGate"]
+        },
+        "description": "gate parameter is not used by the server yet — any value works.\nExpected response:\n{\n  \"data\": [{ \"resultOK\": true, \"resultCode\": \"OK\", \"resultMessage\": null }]\n}"
+      }
+    },
+    {
+      "name": "── MOCK SERVER ──",
+      "item": [
+        {
+          "name": "Mock – Get Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) pm.collectionVariables.set('access_token', json.access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type",    "value": "client_credentials",              "type": "text" },
+                { "key": "client_id",     "value": "hermes-parking",                  "type": "text" },
+                { "key": "client_secret", "value": "secret123",                       "type": "text" },
+                { "key": "scope",         "value": "fairway.api",                     "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "https://parking-mock-server.onrender.com/connect/token",
+              "host": ["https://parking-mock-server.onrender.com"],
+              "path": ["connect", "token"]
+            }
+          }
+        },
+        {
+          "name": "Mock – OpenGate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}", "type": "text" },
+              { "key": "Content-Type",  "value": "application/json",        "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gate\": \"GATE_01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "https://parking-mock-server.onrender.com/fairway/OpenGate",
+              "host": ["https://parking-mock-server.onrender.com"],
+              "path": ["fairway", "OpenGate"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -368,6 +368,12 @@ let fairwayCurrentToken = null;
 let fairwayTokenExpiry  = 0;
 // Per-method mock data — params describe inputs, data is what the API returns
 let fairwayMethods = {
+  "OpenGate": {
+    params: [
+      { name: "gate", type: "varchar" }
+    ],
+    data: [{ resultOK: true, resultCode: "OK", resultMessage: null }]
+  },
   "parking_entry": {
     params: [
       { name: "plateNumber",   type: "varchar"  },
