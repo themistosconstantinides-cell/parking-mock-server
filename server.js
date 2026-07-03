@@ -3,6 +3,7 @@ const https   = require("https");
 const app     = express();
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));  // Fairway /connect/token uses form-urlencoded
 
 // ── Email alerts via Resend HTTP API ─────────────────────────────────────────
 // Set RESEND_KEY and ALERT_EMAIL in Render environment variables
@@ -352,6 +353,68 @@ let petrolinaConfig = {
 };
 let petrolinaLogs   = [];
 let pendingPetroAuth = null;         // last /pump/authorize request
+
+// ── Fairway State ─────────────────────────────────────────────────────────────
+let fairwayConfig = {
+  clientId:       "hermes-parking",
+  clientSecret:   "secret123",
+  scope:          "fairway.api",
+  tokenExpiresIn: 3600,
+  requireAuth:    true,
+  responseCode:   "200",   // "200"=OK, "401"=auth fail, "500"=server error
+};
+let fairwayLogs        = [];
+let fairwayCurrentToken = null;
+let fairwayTokenExpiry  = 0;
+// Per-method mock data — params describe inputs, data is what the API returns
+let fairwayMethods = {
+  "parking_entry": {
+    params: [
+      { name: "plateNumber",   type: "varchar"  },
+      { name: "entryDateTime", type: "datetime" },
+      { name: "terminalId",    type: "varchar"  }
+    ],
+    data: [{ status: "OK", recordId: "PARK001" }]
+  },
+  "parking_exit": {
+    params: [
+      { name: "plateNumber",  type: "varchar"  },
+      { name: "exitDateTime", type: "datetime" },
+      { name: "terminalId",   type: "varchar"  }
+    ],
+    data: [{ status: "OK", fee: 500, durationMins: 120 }]
+  },
+  "departure_flights": {
+    params: [
+      { name: "datebegin",   type: "datetime" },
+      { name: "dateend",     type: "datetime" },
+      { name: "airlinecode", type: "varchar"  }
+    ],
+    data: [
+      { flightNo: "CY100", airlineCode: "CY", departure: "2026-07-03T10:00:00", gate: "A1", status: "ON TIME" },
+      { flightNo: "FR234", airlineCode: "FR", departure: "2026-07-03T11:30:00", gate: "B3", status: "ON TIME" }
+    ]
+  },
+  "arrival_flights": {
+    params: [
+      { name: "datebegin",   type: "datetime" },
+      { name: "dateend",     type: "datetime" },
+      { name: "airlinecode", type: "varchar"  }
+    ],
+    data: [
+      { flightNo: "CY101", airlineCode: "CY", arrival: "2026-07-03T09:30:00", gate: "A2", status: "LANDED" }
+    ]
+  }
+};
+
+function addFairwayLog(method, path, reqBody, resBody) {
+  fairwayLogs.unshift({
+    time: new Date().toLocaleTimeString(), method, path,
+    request: reqBody, response: resBody
+  });
+  if (fairwayLogs.length > 200) fairwayLogs.pop();
+  console.log(`[FAIRWAY] ${method} ${path} → ${JSON.stringify(resBody).substring(0,80)}`);
+}
 
 function addPetroLog(method, path, req, res) {
   petrolinaLogs.unshift({ time: new Date().toLocaleTimeString(), method, path, req, res });
@@ -828,6 +891,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
   <button class="tab-btn" onclick="showTab('rental',this)">&#x1F512; Rental</button>
   <button class="tab-btn" onclick="showTab('carwash',this)">&#x1F6BF; Car Wash</button>
   <button class="tab-btn" onclick="showTab('petrolina',this)" style="color:#e07b00">&#x26FD; Petrolina</button>
+  <button class="tab-btn" onclick="showTab('fairway',this)" style="color:#1D9E75">&#x2708;&#xFE0F; Fairway</button>
 </div>
 
 <div id="tab-parking" class="tab-content active">
@@ -1608,6 +1672,97 @@ ${petrolinaConfig.fuelGrades.map(g=>`<tr>
 </div>
 <div id="ptLogCount" style="color:#8b949e;font-size:11px;margin-bottom:8px"></div>
 <div id="ptLogDiv"><p style="color:#8b949e">Loading...</p></div>
+</div>
+
+<!-- ═══ FAIRWAY TAB ═══ -->
+<div id="tab-fairway" class="tab-content">
+<h1>&#x2708;&#xFE0F; Fairway API Mock</h1>
+<p style="color:#8b949e">Simulates <code>http://identity.hermesairports.com</code> (OAuth2 token) and <code>https://fairway-api.hermesairports.com</code> (API methods).</p>
+<p style="color:#8b949e;font-size:12px">
+  App points to: <code style="color:#58a6ff">${process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'}/connect/token</code> for auth
+  &nbsp;|&nbsp; <code style="color:#58a6ff">${process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'}/fairway/</code> for API methods
+</p>
+
+<h2>&#x1F511; OAuth2 Credentials</h2>
+<div class="pos-box" style="border-color:#1D9E75">
+<table>
+<tr><th style="width:180px">Parameter</th><th>Value</th><th style="width:100px"></th></tr>
+<tr>
+  <td>Client ID</td>
+  <td><input class="m" id="fwClientId" value="${fairwayConfig.clientId}"></td>
+  <td><button class="btn" onclick="fwSv('clientId','fwClientId')">Save</button></td>
+</tr>
+<tr>
+  <td>Client Secret</td>
+  <td><input class="m" id="fwClientSecret" value="${fairwayConfig.clientSecret}"></td>
+  <td><button class="btn" onclick="fwSv('clientSecret','fwClientSecret')">Save</button></td>
+</tr>
+<tr>
+  <td>Scope</td>
+  <td><input class="m" id="fwScope" value="${fairwayConfig.scope}"></td>
+  <td><button class="btn" onclick="fwSv('scope','fwScope')">Save</button></td>
+</tr>
+<tr>
+  <td>Token expires_in (sec)</td>
+  <td><input class="n" type="number" id="fwExpiry" value="${fairwayConfig.tokenExpiresIn}"></td>
+  <td><button class="btn" onclick="fwSet('tokenExpiresIn',Number(document.getElementById('fwExpiry').value))">Set</button></td>
+</tr>
+<tr>
+  <td>Require Bearer Auth</td>
+  <td>${fairwayConfig.requireAuth ? '&#x2705; Yes' : '&#x26D4; No (open)'}</td>
+  <td>
+    <button class="btn green" onclick="fwSet('requireAuth',true)">&#x2705; Yes</button>
+    <button class="btn red" onclick="fwSet('requireAuth',false)">&#x26D4; No</button>
+  </td>
+</tr>
+<tr>
+  <td>Force Response Code</td>
+  <td>${fairwayConfig.responseCode}</td>
+  <td>
+    <button class="btn green" onclick="fwSet2('responseCode','200')">200 OK</button>
+    <button class="btn red" onclick="fwSet2('responseCode','401')">401 Unauthorized</button>
+    <button class="btn red" onclick="fwSet2('responseCode','500')">500 Error</button>
+  </td>
+</tr>
+</table>
+</div>
+
+<h2>&#x1F9EE; Current Token</h2>
+<div id="fwTokenDiv" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;font-size:12px;font-family:monospace">
+${fairwayCurrentToken
+  ? `<span style="color:#3fb950">Active — expires in ${Math.max(0,Math.floor((fairwayTokenExpiry-Date.now())/1000))}s</span><br><span style="color:#8b949e">${fairwayCurrentToken}</span>`
+  : '<span style="color:#8b949e">No token issued yet — app must call POST /connect/token first</span>'}
+</div>
+<button class="btn red" onclick="fwClearToken()" style="margin-top:8px">&#x1F5D1; Invalidate Token</button>
+
+<h2>&#x1F4E1; API Methods</h2>
+<p style="color:#8b949e;font-size:12px">Each method maps to <code>POST /fairway/{methodName}</code>. Pass <code>help=1</code> to discover parameters.</p>
+<table>
+<tr><th>Method</th><th>Parameters</th><th>Mock Data (JSON)</th><th></th></tr>
+${Object.entries(fairwayMethods).map(([name, def]) => `
+<tr style="vertical-align:top">
+  <td style="font-family:monospace;color:#58a6ff;padding-top:10px">${name}</td>
+  <td style="font-size:11px;color:#8b949e;padding-top:10px">${def.params.map(p=>p.name+' ('+p.type+')').join('<br>')}</td>
+  <td><textarea id="fwMethod_${name}" rows="3" style="width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px;font-family:monospace;font-size:11px;border-radius:4px">${JSON.stringify(def.data,null,2)}</textarea></td>
+  <td style="padding-top:6px"><button class="btn" onclick="fwSaveMethod('${name}')">Save</button></td>
+</tr>`).join('')}
+</table>
+<div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+  <input class="m" id="fwNewMethodName" placeholder="new_method_name">
+  <button class="btn green" onclick="fwAddMethod()">+ Add Method</button>
+</div>
+
+<h2>&#x1F4CB; Fairway Request Log</h2>
+<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+  <button class="btn gray" onclick="fwSetFilter('')">All</button>
+  <button class="btn green" onclick="fwSetFilter('/connect/token')">Token</button>
+  <button class="btn" style="background:#1f6feb" onclick="fwSetFilter('parking')">Parking</button>
+  <button class="btn" style="background:#6e40c9" onclick="fwSetFilter('flight')">Flights</button>
+  <span style="margin-left:auto">
+    <button class="btn red" onclick="fwClearLogs()">&#x1F5D1; Clear</button>
+  </span>
+</div>
+<div id="fwLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
 <script>
@@ -2462,6 +2617,70 @@ if(ptAmtInput) ptAmtInput.addEventListener('input',function(){
 });
 loadPtLogs(); setInterval(loadPtLogs,4000);
 loadPtPending(); setInterval(loadPtPending,3000);
+
+// ── Fairway Tab JS ───────────────────────────────────────────────────────────
+let fwFilter='', fwAllLogs=[];
+function fwSetFilter(f){fwFilter=f;fwRenderLogs();}
+function fwRenderLogs(){
+  const filtered=fwFilter?fwAllLogs.filter(l=>(l.path||'').toLowerCase().includes(fwFilter.toLowerCase())):fwAllLogs;
+  const el=document.getElementById('fwLogDiv');if(!el)return;
+  if(!filtered.length){el.innerHTML='<p style="color:#8b949e">No Fairway requests yet</p>';return;}
+  el.innerHTML=filtered.map(function(l){
+    const isToken=l.path&&l.path.includes('token');
+    const borderCol=isToken?'#e3b341':'#1D9E75';
+    const rc=l.response&&l.response.error?'ERR':(l.response&&l.response.access_token?'TOKEN':'OK');
+    const rcCol=l.response&&l.response.error?'#ff6b6b':'#3fb950';
+    return '<div style="background:#0d1117;border:1px solid '+borderCol+';border-radius:6px;padding:10px;margin-bottom:8px">'+
+      '<div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
+        '<span style="color:#8b949e;font-size:11px">'+l.time+'</span>'+
+        '<span style="color:'+borderCol+';font-weight:bold;font-size:12px">'+l.method+' '+l.path+'</span>'+
+        '<span style="margin-left:auto;color:'+rcCol+';font-size:12px;font-weight:bold">'+rc+'</span>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+        '<div><div style="color:#8b949e;font-size:10px;margin-bottom:2px">REQUEST</div><pre>'+JSON.stringify(l.request,null,2)+'</pre></div>'+
+        '<div><div style="color:#3fb950;font-size:10px;margin-bottom:2px">RESPONSE</div><pre>'+JSON.stringify(l.response,null,2)+'</pre></div>'+
+      '</div></div>';
+  }).join('');
+}
+async function loadFwLogs(){
+  try{const r=await fetch('/fairway/logs');fwAllLogs=await r.json();fwRenderLogs();}catch(e){}
+}
+async function fwClearLogs(){
+  if(!confirm('Clear Fairway logs?'))return;
+  await fetch('/fairway/logs',{method:'DELETE'});fwAllLogs=[];fwRenderLogs();
+}
+async function fwSet(k,v){
+  await fetch('/admin/fairway-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k,value:v})});
+  location.reload();
+}
+async function fwSet2(k,v){ await fwSet(k,v); }
+async function fwSv(key,id){
+  const v=document.getElementById(id).value.trim();
+  const r=await fetch('/admin/fairway-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
+  const d=await r.json();
+  if(d.ok) location.reload(); else alert('Error: '+d.error);
+}
+async function fwClearToken(){
+  await fetch('/admin/fairway-clear-token',{method:'POST'});location.reload();
+}
+async function fwSaveMethod(name){
+  try{
+    const v=document.getElementById('fwMethod_'+name).value;
+    const data=JSON.parse(v);
+    const r=await fetch('/admin/fairway-method',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,data})});
+    const d=await r.json();
+    if(d.ok) alert('Saved: '+name); else alert('Error: '+d.error);
+  }catch(e){alert('Invalid JSON: '+e.message);}
+}
+async function fwAddMethod(){
+  const name=document.getElementById('fwNewMethodName').value.trim();
+  if(!name){alert('Enter a method name');return;}
+  const r=await fetch('/admin/fairway-method',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name,data:[{result:"ok"}],params:[{name:"param1",type:"varchar"}]})});
+  const d=await r.json();
+  if(d.ok) location.reload(); else alert('Error: '+d.error);
+}
+loadFwLogs(); setInterval(loadFwLogs,4000);
 </script></body></html>`);
 });
 
@@ -3870,6 +4089,119 @@ app.post("/petrolina/fire-callback", (req, res) => {
   firePetroCallback({ callbackUrl: url, maxAmountCents: cents, pumpId: pendingPetroAuth?.pumpId || 1 });
   const liters = parseFloat((cents / (petrolinaConfig.fuelGrades[0]?.pricePerLiter || 1650)).toFixed(3));
   res.json({ ok: true, sentTo: url, actualAmountCents: cents, liters });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FAIRWAY API  (RESA / Hermes Airports)
+// POST /connect/token   — OAuth2 client_credentials (identity server)
+// POST /fairway/:method — Fairway API call (Bearer token required)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── POST /connect/token — OAuth2 token endpoint ───────────────────────────────
+app.post("/connect/token", (req, res) => {
+  const { grant_type, client_id, client_secret, scope } = req.body;
+  if (grant_type !== "client_credentials") {
+    const r = { error: "unsupported_grant_type", error_description: "Only client_credentials is supported" };
+    addFairwayLog("POST", "/connect/token", req.body, r);
+    return res.status(400).json(r);
+  }
+  if (fairwayConfig.responseCode === "401" ||
+      client_id !== fairwayConfig.clientId ||
+      client_secret !== fairwayConfig.clientSecret) {
+    const r = { error: "invalid_client", error_description: "Invalid client_id or client_secret" };
+    addFairwayLog("POST", "/connect/token", { grant_type, client_id, scope }, r);
+    return res.status(401).json(r);
+  }
+  if (fairwayConfig.responseCode === "500") {
+    const r = { error: "server_error", error_description: "Internal server error" };
+    addFairwayLog("POST", "/connect/token", req.body, r);
+    return res.status(500).json(r);
+  }
+  const token = require("crypto").randomBytes(32).toString("hex");
+  fairwayCurrentToken  = token;
+  fairwayTokenExpiry   = Date.now() + fairwayConfig.tokenExpiresIn * 1000;
+  const response = {
+    access_token: token,
+    expires_in:   fairwayConfig.tokenExpiresIn,
+    token_type:   "Bearer",
+    scope:        scope || fairwayConfig.scope
+  };
+  addFairwayLog("POST", "/connect/token", { grant_type, client_id, scope }, response);
+  res.json(response);
+});
+
+// ── POST /fairway/:apimethod — Fairway API ────────────────────────────────────
+app.post("/fairway/:apimethod", (req, res) => {
+  const method = req.params.apimethod;
+
+  // Bearer auth check
+  if (fairwayConfig.requireAuth) {
+    const auth  = req.headers["authorization"] || "";
+    const token = auth.startsWith("Bearer ") ? auth.substring(7) : null;
+    if (!token || token !== fairwayCurrentToken || Date.now() > fairwayTokenExpiry) {
+      const r = { error: "Unauthorized", error_description: "Invalid or expired Bearer token" };
+      addFairwayLog("POST", `/fairway/${method}`, req.body, r);
+      return res.status(401).json(r);
+    }
+  }
+
+  if (fairwayConfig.responseCode === "500") {
+    const r = { error: "InternalServerError", error_description: "Server error (forced)" };
+    addFairwayLog("POST", `/fairway/${method}`, req.body, r);
+    return res.status(500).json(r);
+  }
+
+  const def = fairwayMethods[method];
+  if (!def) {
+    const r = { error: "MethodNotFound", error_description: `Unknown API method: ${method}` };
+    addFairwayLog("POST", `/fairway/${method}`, req.body, r);
+    return res.status(404).json(r);
+  }
+
+  // help=1 → parameter discovery
+  if (req.body.help !== undefined) {
+    const response = { Data: def.params.map(p => ({ name: p.name, type: p.type })) };
+    addFairwayLog("POST", `/fairway/${method}?help`, req.body, response);
+    return res.json(response);
+  }
+
+  const response = { Data: def.data };
+  addFairwayLog("POST", `/fairway/${method}`, req.body, response);
+  res.json(response);
+});
+
+// ── Fairway admin endpoints ───────────────────────────────────────────────────
+app.get("/fairway/logs",    (req, res) => res.json(fairwayLogs));
+app.delete("/fairway/logs", (req, res) => { fairwayLogs = []; res.json({ ok: true }); });
+
+app.post("/admin/fairway-config", (req, res) => {
+  const { key, value } = req.body;
+  if (!(key in fairwayConfig)) return res.status(400).json({ ok: false, error: `Unknown key: ${key}` });
+  const existing = fairwayConfig[key];
+  if (typeof existing === "boolean")  fairwayConfig[key] = value === true || value === "true";
+  else if (typeof existing === "number") fairwayConfig[key] = Number(value);
+  else fairwayConfig[key] = value;
+  console.log(`[FAIRWAY_CFG] ${key} = ${JSON.stringify(fairwayConfig[key])}`);
+  res.json({ ok: true });
+});
+
+app.post("/admin/fairway-clear-token", (req, res) => {
+  fairwayCurrentToken = null;
+  fairwayTokenExpiry  = 0;
+  res.json({ ok: true });
+});
+
+app.post("/admin/fairway-method", (req, res) => {
+  const { name, data, params } = req.body;
+  if (!name) return res.status(400).json({ ok: false, error: "name required" });
+  if (!fairwayMethods[name]) {
+    fairwayMethods[name] = { params: params || [], data: data || [] };
+  } else {
+    if (data    !== undefined) fairwayMethods[name].data   = data;
+    if (params  !== undefined) fairwayMethods[name].params = params;
+  }
+  console.log(`[FAIRWAY_METHOD] ${name} updated`);
+  res.json({ ok: true });
 });
 
 // ── START ─────────────────────────────────────────────────────────────────────
