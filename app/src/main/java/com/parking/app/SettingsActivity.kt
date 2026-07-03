@@ -23,7 +23,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var edtOutlet:       EditText
     private lateinit var edtTerminal:     EditText
     private lateinit var edtUrl:          EditText
-    private lateinit var edtTellInterval: EditText
+    private lateinit var edtTellInterval:      EditText
+    private lateinit var edtDefaultFixAmount:  EditText
     private lateinit var edtHmacClientId: EditText
     private lateinit var edtHmacSecret:   EditText
     private lateinit var btnSave:         Button
@@ -60,7 +61,8 @@ class SettingsActivity : AppCompatActivity() {
         btnVoice         = findViewById(R.id.btnVoice)
         btnHmac          = findViewById(R.id.btnHmac)
         btnShowRates     = findViewById(R.id.btnShowRates)
-        edtTellInterval  = findViewById(R.id.edtTellInterval)
+        edtTellInterval      = findViewById(R.id.edtTellInterval)
+        edtDefaultFixAmount  = findViewById(R.id.edtDefaultFixAmount)
         txtInitStatus    = findViewById(R.id.txtInitStatus)
         progressInit     = findViewById(R.id.progressInit)
         rgMonthlyMethod  = findViewById(R.id.rgMonthlyMethod)
@@ -76,6 +78,8 @@ class SettingsActivity : AppCompatActivity() {
         edtTerminal.setText(prefs.getString("terminal",      ""))
         edtUrl.setText(prefs.getString("server_url",         ""))
         edtTellInterval.setText(prefs.getInt("tell_interval_sec", 3).toString())
+        val savedFixCents = prefs.getInt("default_fix_amount_cents", 0)
+        if (savedFixCents > 0) edtDefaultFixAmount.setText("%.2f".format(savedFixCents / 100.0))
         btnShowRates.isChecked = prefs.getBoolean("show_rates", true)
 
         // Load saved monthly input method
@@ -114,6 +118,8 @@ class SettingsActivity : AppCompatActivity() {
             }
             val tellInterval  = edtTellInterval.text.toString().trim().toIntOrNull()?.coerceIn(1, 60) ?: 3
             val monthlyMethod = if (rbContactless.isChecked) "contactless" else "keyin"
+            val fixAmountCents = (edtDefaultFixAmount.text.toString().trim().toDoubleOrNull()
+                ?.times(100)?.toInt() ?: 0).coerceAtLeast(0)
             prefs.edit()
                 .putString("outlet",                outlet)
                 .putString("terminal",              terminal)
@@ -123,6 +129,7 @@ class SettingsActivity : AppCompatActivity() {
                 .putString("hmac_client_id",        edtHmacClientId.text.toString().trim())
                 .putString("hmac_secret",           edtHmacSecret.text.toString().trim())
                 .putString("monthly_input_method",  monthlyMethod)
+                .putInt("default_fix_amount_cents", fixAmountCents)
                 .apply()
             Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show()
             showStatus("", isError = false)

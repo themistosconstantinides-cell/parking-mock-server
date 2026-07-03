@@ -1,7 +1,11 @@
 package com.parking.app
 
 import android.content.Context
+import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.ToneGenerator
+import android.os.Handler
+import android.os.Looper
 
 /**
  * Plays pre-recorded audio files from res/raw/.
@@ -54,6 +58,20 @@ object ParkingAudio {
             player = mp
         } catch (e: Exception) {
             AppLogger.logError("AUDIO", "Playback error: ${e.message}")
+        }
+    }
+
+    /**
+     * Short confirmation beep — plays regardless of voice enabled state.
+     * Used for hardware card-read feedback (monthly card detected).
+     */
+    fun beep() {
+        try {
+            val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90)
+            tg.startTone(ToneGenerator.TONE_PROP_BEEP, 180)
+            Handler(Looper.getMainLooper()).postDelayed({ tg.release() }, 300)
+        } catch (e: Exception) {
+            AppLogger.logError("AUDIO", "Beep error: ${e.message}")
         }
     }
 

@@ -47,8 +47,8 @@ class EcrManager(private val context: Context) {
         if (isMiddlewareAvailable()) {
             sendViaMiddleware(requestString, onResult)
         } else {
-            AppLogger.logRequest("ECR", "Middleware not found — using simulator")
-            sendViaMockSimulator(ecrRequest, onResult)
+            AppLogger.logError("ECR", "Middleware not found — payment app not installed")
+            onResult(MiddlewareResult("99", null))
         }
     }
 
@@ -115,17 +115,6 @@ class EcrManager(private val context: Context) {
             timeoutRunnable = null
             AppLogger.logRequest("ECR", "Timeout cancelled — response received")
         }
-    }
-
-    private fun sendViaMockSimulator(ecrRequest: EcrRequest, onResult: (MiddlewareResult) -> Unit) {
-        Handler(Looper.getMainLooper()).postDelayed({
-            val mockResponse = MiddlewareSimulator.startTransaction(
-                type   = ecrRequest.transactionType,
-                amount = ecrRequest.originalAmount
-            )
-            AppLogger.logResponse("SIM", mockResponse.take(120))
-            onResult(MiddlewareResult("00", EcrParser.parse(mockResponse)))
-        }, 2000)
     }
 
     fun unregisterReceiver() {

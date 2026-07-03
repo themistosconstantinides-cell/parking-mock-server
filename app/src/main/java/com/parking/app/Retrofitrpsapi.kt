@@ -85,7 +85,7 @@ class RetrofitRpsApi(
             put("application",      "Parking")
             put("intallationPoint", "Entrance")
             put("outlet",           entry.outlet)
-            put("terminal",         entry.terminalId)
+            put("terminal",         entry.configuredTerminal)
             put("token",            entry.token)
             put("inputType",        entry.inputType)
             put("lastDigits",       entry.lastDigits)
@@ -139,10 +139,10 @@ class RetrofitRpsApi(
         responseCode: String,
         referenceNo: String,
         originalRefNum: String,
-        recordId: String,
         outlet: String,
         terminal: String,
         companyCode: String,
+        inputType: String,
         callback: (String) -> Unit
     ) {
         val body = JSONObject().apply {
@@ -152,7 +152,7 @@ class RetrofitRpsApi(
             put("outlet",           outlet)
             put("terminal",         terminal)
             put("token",            token)
-            put("inputType",        "Card")
+            put("inputType",        inputType)
             put("lastDigits",       lastDigits)
             put("firstDigits",      firstDigits)
             put("timeOfInput",      timeOfInput)
@@ -161,7 +161,6 @@ class RetrofitRpsApi(
             put("responseCode",     responseCode)
             put("referenceNo",      referenceNo)
             put("originalRefNum",   originalRefNum)
-            put("recordId",         recordId)
         }
         post("exitPayment", body, callback)
     }

@@ -35,6 +35,7 @@ sealed class ParkingUiState {
     object ReturnToIdle              : ParkingUiState()
     object LaunchMonthlyKeyIn        : ParkingUiState()
     object LaunchMonthlyContactless  : ParkingUiState()  // CtCL Mifare card read
+    data class PromptLostTicket(val amountCents: Int) : ParkingUiState()
 }
 
 class ParkingViewModel(application: Application) : AndroidViewModel(application) {
@@ -60,6 +61,8 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
     var busy                  = false
     var showRates             = true   // controlled by Settings "Show Rates" field
     var fixAmountCents        = -1     // -1 = off, >0 = fixed price SALE mode (entrance only)
+    var lostTicketAmountCents = -1     // -1 = off, >0 = lost ticket fee charged at exit (from defaultAmount)
+    var defaultFixAmountCents = 0      // local Settings fallback when server sends defaultAmount=0
 
     // ── Voice & language (from parkingInit — server controlled) ──────────────
     var voiceAssistantEnabled = true   // "1" = on, "0" = off
@@ -232,6 +235,12 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                 } else {
                     AppLogger.logVerbose("KEEP_ALIVE", "OK — normal:$newNormal monthly:$newMonthly")
                 }
+                // Pick up minimumAmountPreAuth changes without a full re-init
+                val newMinAmount = json.optString("minimumAmountPreAuth", "").toIntOrNull()
+                if (newMinAmount != null && newMinAmount != minAmountCents) {
+                    AppLogger.logRequest("KEEP_ALIVE", "minimumAmountPreAuth changed: $minAmountCents → $newMinAmount")
+                    minAmountCents = newMinAmount
+                }
                 refreshIdleState()
                 return
             }
@@ -243,6 +252,13 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
             defaultAmountCents = json.optString("defaultAmount", "800").toIntOrNull() ?: 800
             fixAmountCents     = json.optString("fixAmountSolution", "-1").toIntOrNull() ?: -1
             AppLogger.logRequest("INIT", "fixAmountSolution=$fixAmountCents ${if (fixAmountCents > 0) "→ SALE mode (entrance only)" else "→ pre-auth mode"}")
+            lostTicketAmountCents = json.optString("defaultAmount", "-1").toIntOrNull() ?: -1
+            if (lostTicketAmountCents <= 0 && defaultFixAmountCents > 0) {
+                lostTicketAmountCents = defaultFixAmountCents
+                AppLogger.logRequest("INIT", "defaultAmount=0 from server — using local default: $lostTicketAmountCents cents")
+            } else {
+                AppLogger.logRequest("INIT", "defaultAmount=$lostTicketAmountCents ${if (lostTicketAmountCents > 0) "→ lost-ticket enabled" else "→ lost-ticket disabled"}")
+            }
             helpPhone          = json.optString("phoneForHelp", "")
             monthlyBins        = json.optString("monthlyCardsBins", "").replace(";", ",")
             keepAliveFreq      = json.optString("keepAliveFreq", "10").toIntOrNull() ?: 10
@@ -485,7 +501,7 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                     handleEcrResult(result, "ENTRANCE") { ecr ->
                         val lastFour = ecr.accountNumber.takeLast(4)
                         val token    = TokenHelper.buildBankCardToken(ecr.firstDigits.take(6).ifBlank { "000000" }, lastFour, ecr.expiryDate, outlet)
-                        val entry    = EntryRecord.fromEcrResponse(ecr, token, "Bank Card", timeOfInput, fixAmountCents, outlet, companyCode)
+                        val entry    = EntryRecord.fromEcrResponse(ecr, token, "Bank Card", timeOfInput, fixAmountCents, outlet, companyCode, terminal)
                         callEntranceApi(entry)
                     }
                 }
@@ -499,8 +515,8 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                     handleEcrResult(result, "ENTRANCE") { ecr ->
                         val lastFour = ecr.accountNumber.takeLast(4)
                         val token    = TokenHelper.buildBankCardToken(ecr.firstDigits.take(6).ifBlank { "000000" }, lastFour, ecr.expiryDate, outlet)
-                        val entry    = EntryRecord.fromEcrResponse(ecr, token, "Bank Card", timeOfInput, minAmountCents, outlet, companyCode)
-                        callEntranceApi(entry)
+                        val entry    = EntryRecord.fromEcrResponse(ecr, token, "Bank Card", timeOfInput, minAmountCents, outlet, companyCode, terminal)
+                        callEntranceApi(entry, preAuthEcr = ecr)  // pass ecr so denial can void it
                     }
                 }
             }
@@ -557,15 +573,17 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
     fun runMonthlyKeyInFlow(cardNumber: String) {
         val timeOfInput = lastMonthlyTimeOfInput
         AppLogger.logRequest("MONTHLY_KEYIN", "Processing card: *${cardNumber.takeLast(4)}")
+        ParkingAudio.beep()
         uiState.value = ParkingUiState.Loading("Validating monthly card...")
         val token = TokenHelper.buildMonthlyCardToken(cardNumber, outlet)
         if (mode == "ENTRANCE") {
             val entry = EntryRecord(
                 token              = token,
-                lastDigits         = cardNumber,   // full card number — no auth/expiry for monthly
+                lastDigits         = cardNumber.takeLast(4),   // last 4 digits only
                 firstDigits        = "",
                 expiryDate         = "",
                 terminalId         = terminal,
+                configuredTerminal = terminal,
                 authCode           = "111111",          // spec §1.7: hardcoded for monthly card entrance
                 rrn                = "112233445566",     // spec §1.7: hardcoded referenceNo for monthly card
                 receiptNumber      = "",
@@ -577,17 +595,20 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
             )
             callEntranceApi(entry)
         } else {
-            callExitApi(token, cardNumber, "", "Monthly Card", timeOfInput)  // full card number as identifier
+            callExitApi(token, cardNumber.takeLast(4), "", "Monthly Card", timeOfInput)  // last 4 digits only
         }
     }
 
     // ── Help flow ─────────────────────────────────────────────────────────────
     fun runHelpFlow() {
+        if (busy) return
+        busy = true
         Thread {
             AppLogger.logRequest("HELP", "sending")
             rpsApi.help(outlet, terminal, companyCode, mode.capitalize(Locale.getDefault()), "Help Button") { res ->
                 AppLogger.logResponse("HELP", res)
                 postOnMain {
+                    busy = false
                     try {
                         val json  = JSONObject(res)
                         val msg   = json.optString("displayMessage", "Please wait for assistance.")
@@ -603,7 +624,7 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ── RPS API calls ─────────────────────────────────────────────────────────
-    private fun callEntranceApi(entry: EntryRecord) {
+    private fun callEntranceApi(entry: EntryRecord, preAuthEcr: EcrResponse? = null) {
         AppLogger.logRequest("RPS_ENTRANCE", "sending outlet=${entry.outlet} terminal=${entry.terminalId} inputType=${entry.inputType}")
         AppLogger.logRequest("RPS_ENTRANCE", "token=${entry.token.take(20)}... tokenCode=${entry.tokenCode}")
         Thread {
@@ -639,10 +660,22 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                             }
                             else -> {
                                 AppLogger.logError("RPS_ENTRANCE", "Denied: $code — $msg")
+                                // Void the pre-auth silently — SALE mode passes null so no void there
+                                if (preAuthEcr != null) voidPreAuth(preAuthEcr)
+                                val displayMsg = when {
+                                    // Duplicate card — already has an active entry
+                                    msg.contains("already", ignoreCase = true) ->
+                                        "This card was already used without Exit.\nPlease use a different card."
+                                    // Other denial — show server reason + reversal note
+                                    preAuthEcr != null ->
+                                        "${msg.ifBlank { "Please contact staff." }}\n\nThe pre-authorization of " +
+                                        "€%.2f will be reversed.".format(minAmountCents / 100.0)
+                                    else -> msg.ifBlank { "Please contact staff." }
+                                }
                                 uiState.value = ParkingUiState.ShowMessage(
                                     "Access Denied",
-                                    msg.ifBlank { "Please contact staff." },
-                                    secs
+                                    displayMsg,
+                                    secs.coerceAtLeast(8L)
                                 )
                             }
                         }
@@ -696,7 +729,30 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                                 )
                             }
                             "-2" -> runExitPaymentFlow(moneyToPay, recordId, token, lastDigits, timeOfInput, msg, secs)
-                            "0"  -> { busy = false; cancelBusySafetyTimer(); AppLogger.logError("RPS_EXIT", "Barrier failed"); callHelpBackground("Barrier failed"); uiState.value = ParkingUiState.ShowMessage("Technical Issue Detected", msg, secs) }
+                            "0"  -> {
+                                busy = false
+                                cancelBusySafetyTimer()
+                                when (code) {
+                                    "05" -> {
+                                        // Card has no entry record — prompt for lost ticket payment if configured
+                                        AppLogger.logRequest("RPS_EXIT", "responseCode=05 — no entry record; lostTicketAmountCents=$lostTicketAmountCents")
+                                        if (lostTicketAmountCents > 0) {
+                                            uiState.value = ParkingUiState.PromptLostTicket(lostTicketAmountCents)
+                                        } else {
+                                            uiState.value = ParkingUiState.ShowMessage(
+                                                title           = "No Entry Found",
+                                                body            = msg.ifBlank { "Please contact staff." },
+                                                autoDismissSecs = secs
+                                            )
+                                        }
+                                    }
+                                    else -> {
+                                        AppLogger.logError("RPS_EXIT", "Barrier not opened — code=$code")
+                                        callHelpBackground("Barrier failed code=$code")
+                                        uiState.value = ParkingUiState.ShowMessage("Technical Issue Detected", msg.ifBlank { "Please contact staff." }, secs)
+                                    }
+                                }
+                            }
                             else -> { busy = false; cancelBusySafetyTimer(); uiState.value = ParkingUiState.ShowMessage("Error", msg.ifBlank { "Please contact staff." }, secs) }
                         }
                     } catch (e: Exception) {
@@ -712,7 +768,7 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun runExitPaymentFlow(
-        amountCents: Int, recordId: String, token: String,
+        amountCents: Int, @Suppress("UNUSED_PARAMETER") recordId: String, token: String,
         lastDigits: String, exitTimeOfInput: String,
         displayMsg: String, displaySecs: Long
     ) {
@@ -735,7 +791,7 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                             rpsApi.exitPayment(
                                 token, lastDigits, "", exitTimeOfInput,
                                 amountCents, ecr.authCode, ecr.responseCode,
-                                ecr.rrn, ecr.receiptNumber, recordId,
+                                ecr.rrn, ecr.receiptNumber,
                                 outlet, terminal, companyCode
                             ) { res ->
                                 AppLogger.logResponse("RPS_EXIT_PAYMENT", res)
@@ -756,9 +812,9 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                                                 uiState.value = ParkingUiState.ShowMessage("Technical Issue Detected", "Please contact our staff.", 10L)
                                             }
                                             barrierOpen == "1" -> uiState.value = ParkingUiState.ShowMessage(
-                                                title           = "Payment OK",
-                                                body            = msg,
-                                                autoDismissSecs = secs
+                                                title           = "Thank you!",
+                                                body            = "Payment approved.\nPlease proceed.",
+                                                autoDismissSecs = 10L
                                             )
                                             else -> {
                                                 AppLogger.logError("RPS_EXIT_PAYMENT", "Barrier not open: $barrierOpen")
@@ -777,6 +833,75 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }, 5_000L)
+    }
+
+    // ── Manual exit payment (lost card via Help button) ───────────────────
+    fun runManualPaymentFlow() {
+        if (lostTicketAmountCents <= 0) return
+        busy = true
+        startBusySafetyTimer()
+        val timeOfInput     = currentTimestamp()
+        val amountFormatted = "€%.2f".format(lostTicketAmountCents / 100.0)
+        AppLogger.logRequest("MANUAL_PAY", "Starting — amount=$lostTicketAmountCents")
+        uiState.value = ParkingUiState.Loading("Processing $amountFormatted...")
+        val request = EcrRequest.sale(lostTicketAmountCents, generateOrderNo())
+        ecrManager.sendTransaction(request) { result ->
+            postOnMain {
+                handleEcrResult(result, "MANUAL_PAY") { ecr ->
+                    val lastFour = ecr.accountNumber.takeLast(4)
+                    val token    = TokenHelper.buildBankCardToken(
+                        ecr.firstDigits.take(6).ifBlank { "000000" }, lastFour, ecr.expiryDate, outlet
+                    )
+                    callExitFixedPaymentApi(ecr, token, lastFour, timeOfInput)
+                }
+            }
+        }
+    }
+
+    private fun callExitFixedPaymentApi(ecr: EcrResponse, token: String, lastDigits: String, timeOfInput: String) {
+        AppLogger.logRequest("RPS_MANUAL_PAY", "token=${token.take(20)}... amt=$lostTicketAmountCents auth=${ecr.authCode}")
+        Thread {
+            rpsApi.exitPayment(
+                token, lastDigits, "", timeOfInput,
+                lostTicketAmountCents, ecr.authCode, ecr.responseCode,
+                ecr.rrn, ecr.receiptNumber,
+                outlet, terminal, companyCode,
+                inputType = "Lost Card"
+            ) { res ->
+                AppLogger.logResponse("RPS_MANUAL_PAY", res)
+                postOnMain {
+                    busy = false
+                    cancelBusySafetyTimer()
+                    try {
+                        val json        = JSONObject(res)
+                        val code        = json.optString("responseCode", "99")
+                        val secs        = json.optString("timeToDisplayMessage", "5").toLongOrNull() ?: 5L
+                        val barrierOpen = json.optString("barrierOpen", "1")
+                        updateAvailablePlaces(json)
+                        when {
+                            code == "99" -> {
+                                AppLogger.logError("RPS_MANUAL_PAY", "Network error")
+                                callHelpBackground("ManualPay network error")
+                                uiState.value = ParkingUiState.ShowMessage("Connection Error", "Unable to reach server.\nPlease contact staff.", 10L)
+                            }
+                            barrierOpen == "1" -> uiState.value = ParkingUiState.ShowMessage(
+                                title           = "Thank you!",
+                                body            = "Payment approved.\nPlease proceed.",
+                                autoDismissSecs = 10L
+                            )
+                            else -> {
+                                AppLogger.logError("RPS_MANUAL_PAY", "Barrier not open: $barrierOpen code=$code")
+                                callHelpBackground("ManualPay barrier failed")
+                                uiState.value = ParkingUiState.ShowMessage("Technical Issue Detected", "Please contact our staff.", secs)
+                            }
+                        }
+                    } catch (_: Exception) {
+                        callHelpBackground("ManualPay parse error")
+                        uiState.value = ParkingUiState.ShowMessage("Technical Issue Detected", "Please contact our staff.", 8L)
+                    }
+                }
+            }
+        }.start()
     }
 
     // ── ECR result handler ────────────────────────────────────────────────────
@@ -808,6 +933,16 @@ class ParkingViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+    private fun voidPreAuth(ecr: EcrResponse) {
+        AppLogger.logRequest("ECR_VOID", "Reversing pre-auth receipt=${ecr.receiptNumber} amt=${ecr.originalAmount}")
+        Thread {
+            val voidReq = EcrRequest.void(ecr.receiptNumber, generateOrderNo())
+            ecrManager.sendTransaction(voidReq) { result ->
+                AppLogger.logResponse("ECR_VOID", "mw=${result.middlewareCode} ecr=${result.ecrResponse?.responseCode}")
+            }
+        }.start()
+    }
+
     private fun callHelpBackground(reason: String) {
         Thread {
             AppLogger.logRequest("HELP_AUTO", reason)

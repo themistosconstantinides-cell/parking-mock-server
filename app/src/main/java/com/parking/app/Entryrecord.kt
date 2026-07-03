@@ -20,11 +20,12 @@ data class EntryRecord(
     val expiryDate: String,      // YYMM
 
     // Pre-auth transaction fields
-    val terminalId: String,      // TID from ECR field 6
-    val authCode: String,        // Authorization code from ECR field 21
-    val rrn: String,             // Retrieval Reference Number from ECR field 17
-    val receiptNumber: String,   // Transaction receipt number from ECR field 19
-    val preAuthAmountCents: Int, // Amount that was pre-authorized
+    val terminalId: String,        // ECR hardware TID — used only inside tokenCode
+    val configuredTerminal: String, // Settings terminal — sent as "terminal" in entranceCall
+    val authCode: String,          // Authorization code from ECR field 21
+    val rrn: String,               // Retrieval Reference Number from ECR field 17
+    val receiptNumber: String,     // Transaction receipt number from ECR field 19
+    val preAuthAmountCents: Int,   // Amount that was pre-authorized
 
     // Metadata
     val inputType: String,       // "Bank Card" or "Monthly Card"
@@ -50,13 +51,15 @@ data class EntryRecord(
             timeOfInput: String,
             preAuthAmountCents: Int,
             outlet: String,
-            companyCode: String
+            companyCode: String,
+            configuredTerminal: String
         ): EntryRecord = EntryRecord(
             token              = token,
             lastDigits         = ecr.accountNumber.takeLast(4),
-            firstDigits        = ecr.firstDigits.take(6),  // Real BIN from ECR (empty if not yet available)
+            firstDigits        = ecr.firstDigits.take(6),
             expiryDate         = ecr.expiryDate,
-            terminalId         = ecr.terminalId,
+            terminalId         = ecr.terminalId,       // ECR TID — for tokenCode only
+            configuredTerminal = configuredTerminal,   // Settings terminal — sent in entranceCall
             authCode           = ecr.authCode,
             rrn                = ecr.rrn,
             receiptNumber      = ecr.receiptNumber,

@@ -27,10 +27,10 @@ interface RpsApi {
         responseCode: String,
         referenceNo: String,
         originalRefNum: String,
-        recordId: String,
         outlet: String,
         terminal: String,
         companyCode: String,
+        inputType: String = "Card",
         callback: (String) -> Unit
     )
     fun help(

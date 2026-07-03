@@ -409,6 +409,36 @@ class MainActivity : AppCompatActivity() {
                     ParkingAudio.stop()
                     showContactlessOverlay()
                 }
+                is ParkingUiState.PromptLostTicket -> {
+                    stopTellPoller()
+                    stopWelcomeRepeat()
+                    showLoading(false)
+                    setButtons(false)
+                    val amount = "€%.2f".format(state.amountCents / 100.0)
+                    ParkingAudio.contactStaff(this)
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("No Entry Found")
+                        .setMessage("Would you like to pay the lost ticket fee ($amount)?")
+                        .setPositiveButton("Pay $amount") { _, _ ->
+                            AppLogger.logButton("LOST_TICKET_PAY")
+                            viewModel.runManualPaymentFlow()
+                        }
+                        .setNegativeButton("Call for Help") { _, _ ->
+                            AppLogger.logButton("LOST_TICKET_HELP")
+                            viewModel.runHelpFlow()
+                        }
+                        .setOnDismissListener {
+                            hideSystemUI()
+                            if (viewModel.uiState.value is ParkingUiState.PromptLostTicket) {
+                                // dismissed without choosing — reset
+                                viewModel.busy = false
+                                viewModel.cancelBusySafetyTimer()
+                                if (viewModel.hasTellConfig) startTellPoller()
+                                viewModel.returnToIdleNoReinit()
+                            }
+                        }
+                        .show()
+                }
             }
         }
 
@@ -428,7 +458,49 @@ class MainActivity : AppCompatActivity() {
 
         btnHelp.setOnClickListener {
             AppLogger.logButton("HELP")
-            viewModel.runHelpFlow()
+            if (viewModel.mode == "EXIT" && viewModel.lostTicketAmountCents > 0 && !viewModel.busy) {
+                val amount = "€%.2f".format(viewModel.lostTicketAmountCents / 100.0)
+                val view   = layoutInflater.inflate(R.layout.dialog_help_exit, null)
+                view.findViewById<android.widget.TextView>(R.id.txtHelpMessage).text =
+                    "If you do not have the same card you used at Entrance,\n" +
+                    "you will be charged $amount as the lost ticket fee."
+                view.findViewById<android.widget.Button>(R.id.btnHelpPay).text = "💳  Pay $amount"
+                view.findViewById<android.widget.Button>(R.id.btnHelpCall).text = "📞  Call for Help"
+                val dialog = android.app.AlertDialog.Builder(this)
+                    .setView(view)
+                    .setCancelable(true)
+                    .create()
+                val btnCancel = view.findViewById<android.widget.Button>(R.id.btnHelpCancel)
+                var secsLeft  = 30
+                val ticker    = object : Runnable {
+                    override fun run() {
+                        if (!dialog.isShowing) return
+                        btnCancel.text = "Cancel ($secsLeft)"
+                        if (secsLeft-- == 0) { dialog.dismiss(); return }
+                        handler.postDelayed(this, 1000)
+                    }
+                }
+                view.findViewById<android.widget.Button>(R.id.btnHelpPay).setOnClickListener {
+                    handler.removeCallbacks(ticker)
+                    dialog.dismiss()
+                    AppLogger.logButton("MANUAL_PAY")
+                    viewModel.runManualPaymentFlow()
+                }
+                view.findViewById<android.widget.Button>(R.id.btnHelpCall).setOnClickListener {
+                    handler.removeCallbacks(ticker)
+                    dialog.dismiss()
+                    viewModel.runHelpFlow()
+                }
+                btnCancel.setOnClickListener {
+                    handler.removeCallbacks(ticker)
+                    dialog.dismiss()
+                }
+                dialog.setOnDismissListener { handler.removeCallbacks(ticker); hideSystemUI() }
+                dialog.show()
+                handler.post(ticker)
+            } else {
+                viewModel.runHelpFlow()
+            }
         }
 
         btnLang.setOnClickListener {
@@ -528,6 +600,7 @@ class MainActivity : AppCompatActivity() {
         val prefs     = getSharedPreferences("APP_SETTINGS", MODE_PRIVATE)
         val showRates = prefs.getBoolean("show_rates", true)
         viewModel.showRates = showRates
+        viewModel.defaultFixAmountCents = prefs.getInt("default_fix_amount_cents", 0)
         ParkingAudio.setEnabled(prefs.getBoolean("voice_enabled", true))
         // Re-apply default language when returning from Settings
         if (prefs.getBoolean("pending_reinit", false)) {
@@ -665,6 +738,7 @@ class MainActivity : AppCompatActivity() {
                 if (contactlessOverlay.visibility != View.VISIBLE) return@post
                 if (uid != null) {
                     // Card read successfully
+                    ParkingAudio.beep()
                     progressContactless.visibility = View.GONE
                     txtContactlessStatus.text = "Card detected ✓"
                     txtContactlessStatus.setTextColor(0xFF4CAF50.toInt())
