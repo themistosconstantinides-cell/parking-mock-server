@@ -4142,6 +4142,24 @@ app.post("/help", (req, res) => {
   res.json(body);
 });
 
+// POST /loyaltyCheck — mock: any UID returns a canned member account
+const mockLoyaltyMembers = {
+  default: { maskedName: "Χαρ**** Πετρ****", points: 1250, cardNumber: "PL00001234" }
+};
+app.post("/loyaltyCheck", (req, res) => {
+  const uid = req.body.uid || req.body.UID || "";
+  const member = mockLoyaltyMembers[uid] || mockLoyaltyMembers.default;
+  const body = {
+    responseCode:        "00",
+    responseDescription: "OK",
+    maskedName:          member.maskedName,
+    points:              member.points,
+    cardNumber:          member.cardNumber
+  };
+  addPetroLog("POST", "/loyaltyCheck", req.body, body);
+  res.json(body);
+});
+
 // ── Petrolina callback helper ──────────────────────────────────────────────────
 function firePetroCompletion(transsegno, callbackBase) {
   const txn = petrolinaTransactions[transsegno] || {};
