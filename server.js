@@ -1645,8 +1645,60 @@ ${petrolinaConfig.pumpProducts.map(g=>`<tr>
 
 <h2>&#x1F9EA; Simulation Controls</h2>
 <table>
-<tr><th style="width:240px">Setting</th><th>Current</th><th>Edit</th></tr>
-<tr><td>Auto-completion callback delay (sec)<br><span style="color:#8b949e;font-size:11px">After /preAuthorization before /completion fires</span></td>
+<tr><th style="width:260px">Setting</th><th style="width:80px">Current</th><th>Edit</th></tr>
+
+<tr><td colspan="3" style="background:#161b22;color:#58a6ff;font-size:11px;letter-spacing:.08em;padding:6px 8px">TIMEOUTS (seconds) — returned to app via /petrolAppInit</td></tr>
+<tr><td>pumpSelectedTO<br><span style="color:#8b949e;font-size:11px">Wait for pump selection</span></td>
+  <td>${petrolinaConfig.pumpSelectedTO}s</td>
+  <td><input type="number" id="pt_pumpSelectedTO" value="${petrolinaConfig.pumpSelectedTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('pumpSelectedTO',Number(document.getElementById('pt_pumpSelectedTO').value))">Set</button></td></tr>
+<tr><td>memberOfMyPetrolinaTO<br><span style="color:#8b949e;font-size:11px">Wait for "are you a MyPetrolina member?" answer</span></td>
+  <td>${petrolinaConfig.memberOfMyPetrolinaTO}s</td>
+  <td><input type="number" id="pt_memberTO" value="${petrolinaConfig.memberOfMyPetrolinaTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('memberOfMyPetrolinaTO',Number(document.getElementById('pt_memberTO').value))">Set</button></td></tr>
+<tr><td>phoneForMyPetrolinaTO<br><span style="color:#8b949e;font-size:11px">Wait for phone number entry</span></td>
+  <td>${petrolinaConfig.phoneForMyPetrolinaTO}s</td>
+  <td><input type="number" id="pt_phoneTO" value="${petrolinaConfig.phoneForMyPetrolinaTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('phoneForMyPetrolinaTO',Number(document.getElementById('pt_phoneTO').value))">Set</button></td></tr>
+<tr><td>confirmMyPetrolinaTO<br><span style="color:#8b949e;font-size:11px">Wait for loyalty account confirmation</span></td>
+  <td>${petrolinaConfig.confirmMyPetrolinaTO}s</td>
+  <td><input type="number" id="pt_confirmTO" value="${petrolinaConfig.confirmMyPetrolinaTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('confirmMyPetrolinaTO',Number(document.getElementById('pt_confirmTO').value))">Set</button></td></tr>
+<tr><td>insertPetrolinaCardTO<br><span style="color:#8b949e;font-size:11px">Wait for Petrolina card insert + PIN</span></td>
+  <td>${petrolinaConfig.insertPetrolinaCardTO}s</td>
+  <td><input type="number" id="pt_insertCardTO" value="${petrolinaConfig.insertPetrolinaCardTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('insertPetrolinaCardTO',Number(document.getElementById('pt_insertCardTO').value))">Set</button></td></tr>
+<tr><td>fuelSelectionTO<br><span style="color:#8b949e;font-size:11px">Wait for fuel grade selection</span></td>
+  <td>${petrolinaConfig.fuelSelectionTO}s</td>
+  <td><input type="number" id="pt_fuelSelTO" value="${petrolinaConfig.fuelSelectionTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('fuelSelectionTO',Number(document.getElementById('pt_fuelSelTO').value))">Set</button></td></tr>
+<tr><td>selectAmountTO<br><span style="color:#8b949e;font-size:11px">Wait for amount selection</span></td>
+  <td>${petrolinaConfig.selectAmountTO}s</td>
+  <td><input type="number" id="pt_selAmtTO" value="${petrolinaConfig.selectAmountTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('selectAmountTO',Number(document.getElementById('pt_selAmtTO').value))">Set</button></td></tr>
+<tr><td>enterAmountTO<br><span style="color:#8b949e;font-size:11px">Wait for manual amount entry</span></td>
+  <td>${petrolinaConfig.enterAmountTO}s</td>
+  <td><input type="number" id="pt_entAmtTO" value="${petrolinaConfig.enterAmountTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('enterAmountTO',Number(document.getElementById('pt_entAmtTO').value))">Set</button></td></tr>
+<tr><td>displayStartFuelingTO<br><span style="color:#8b949e;font-size:11px">Wait before expecting completion callback</span></td>
+  <td>${petrolinaConfig.displayStartFuelingTO}s</td>
+  <td><input type="number" id="pt_startFuelTO" value="${petrolinaConfig.displayStartFuelingTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('displayStartFuelingTO',Number(document.getElementById('pt_startFuelTO').value))">Set</button></td></tr>
+<tr><td>displayAskKM<br><span style="color:#8b949e;font-size:11px">Wait for odometer entry (Petrolina card)</span></td>
+  <td>${petrolinaConfig.displayAskKM}s</td>
+  <td><input type="number" id="pt_askKmTO" value="${petrolinaConfig.displayAskKM}" style="width:70px">
+  <button class="btn" onclick="ptSet('displayAskKM',Number(document.getElementById('pt_askKmTO').value))">Set</button></td></tr>
+<tr><td>displayAskRegNo<br><span style="color:#8b949e;font-size:11px">Wait for car registration entry (Petrolina card)</span></td>
+  <td>${petrolinaConfig.displayAskRegNo}s</td>
+  <td><input type="number" id="pt_askRegTO" value="${petrolinaConfig.displayAskRegNo}" style="width:70px">
+  <button class="btn" onclick="ptSet('displayAskRegNo',Number(document.getElementById('pt_askRegTO').value))">Set</button></td></tr>
+<tr><td>displayScreenFuelingTO<br><span style="color:#8b949e;font-size:11px">How long to show the fueling progress screen</span></td>
+  <td>${petrolinaConfig.displayScreenFuelingTO}s</td>
+  <td><input type="number" id="pt_screenFuelTO" value="${petrolinaConfig.displayScreenFuelingTO}" style="width:70px">
+  <button class="btn" onclick="ptSet('displayScreenFuelingTO',Number(document.getElementById('pt_screenFuelTO').value))">Set</button></td></tr>
+
+<tr><td colspan="3" style="background:#161b22;color:#58a6ff;font-size:11px;letter-spacing:.08em;padding:6px 8px">SIMULATION</td></tr>
+<tr><td>Auto-completion callback delay (sec)<br><span style="color:#8b949e;font-size:11px">After /preAuthorization or /confirmPetrolinaCard, before callback fires</span></td>
   <td>${petrolinaConfig.callbackDelaySec}s</td>
   <td><input type="number" id="ptDelay" value="${petrolinaConfig.callbackDelaySec}" style="width:80px">
   <button class="btn" onclick="ptSet('callbackDelaySec',Number(document.getElementById('ptDelay').value))">Set</button></td></tr>
