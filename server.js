@@ -1,21 +1,21 @@
-const express = require("express");
+﻿const express = require("express");
 const https   = require("https");
 const app     = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));  // Fairway /connect/token uses form-urlencoded
 
-// ── Email alerts via Resend HTTP API ─────────────────────────────────────────
+// â”€â”€ Email alerts via Resend HTTP API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Set RESEND_KEY and ALERT_EMAIL in Render environment variables
-// No npm packages needed — uses built-in https module
+// No npm packages needed â€” uses built-in https module
 async function sendHelpAlert(req, isCarWash = false) {
   const apiKey = process.env.RESEND_KEY;
   const to     = (isCarWash ? carWashConfig.alertEmail : null)
               || req.body._overrideEmail
               || config.alertEmail
               || process.env.ALERT_EMAIL;
-  if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set — skipping"); return; }
-  if (!to)     { console.log("[EMAIL] No alert email configured — skipping"); return; }
+  if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set â€” skipping"); return; }
+  if (!to)     { console.log("[EMAIL] No alert email configured â€” skipping"); return; }
 
   const outlet   = req.body.outlet           || "?";
   const terminal = req.body.terminal         || "?";
@@ -27,9 +27,9 @@ async function sendHelpAlert(req, isCarWash = false) {
   console.log(`[EMAIL] Sending help alert to: ${to}`);
 
   const payload = JSON.stringify({
-    from:    "ParkTec Alerts <onboarding@resend.dev>",
+    from:    "Parqio Alerts <onboarding@resend.dev>",
     to:      [to],
-    subject: `ParkTec Help Alert - ${point} (${outlet})`,
+    subject: `Parqio Help Alert - ${point} (${outlet})`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:500px">
         <h2 style="color:#c0392b">Help Called at ${point}</h2>
@@ -41,7 +41,7 @@ async function sendHelpAlert(req, isCarWash = false) {
           <tr><td style="padding:6px;color:#666">Action</td><td style="padding:6px"><b>${action}</b></td></tr>
           <tr><td style="padding:6px;color:#666">Time</td><td style="padding:6px"><b>${time}</b></td></tr>
         </table>
-        <p style="color:#888;font-size:12px;margin-top:16px">ParkTec Parking System</p>
+        <p style="color:#888;font-size:12px;margin-top:16px">Parqio Parking System</p>
       </div>
     `
   });
@@ -65,7 +65,7 @@ async function sendHelpAlert(req, isCarWash = false) {
           if (isCarWash) carWashConfig.lastAlertSent = time;
           else config.lastAlertSent = time;
         } else {
-          console.error(`[EMAIL] Failed: HTTP ${res.statusCode} — ${data}`);
+          console.error(`[EMAIL] Failed: HTTP ${res.statusCode} â€” ${data}`);
         }
         resolve();
       });
@@ -80,7 +80,7 @@ async function sendHelpAlert(req, isCarWash = false) {
 }
 app.use(express.static("public"));
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let logs          = [];
 let activeEntries = {};
 let rejectionLog  = [];  // track rejected entrance attempts
@@ -104,15 +104,15 @@ function addEcrDecline(outlet, terminal, point, action) {
 }
 
 let config = {
-  // ── POS Devices ──────────────────────────────────────────────────────────────
-  // Entrance POS — configured in Android Settings on the entrance device
+  // â”€â”€ POS Devices â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Entrance POS â€” configured in Android Settings on the entrance device
   entranceOutlet:   "0000259010",
   entranceTerminal: "000025901090",
-  // Exit POS — configured in Android Settings on the exit device
+  // Exit POS â€” configured in Android Settings on the exit device
   exitOutlet:       "0000259010",
   exitTerminal:     "000025901091",
 
-  // ── parkingInit fields ────────────────────────────────────────────────────────
+  // â”€â”€ parkingInit fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   keepAliveFreq:          10,
   minimumAmountPreAuth:   300,
   defaultAmount:          800,
@@ -143,10 +143,10 @@ let config = {
   defaultLanguage:       "EN",    // EN, EL, RU, IW
   companyCode:           "MarinaParking",
 
-  // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
+  // â”€â”€ TELL Gate Control PRO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   tellEnabled:       false,
   tellApiKey:        "f2nIrJ8DBf4Gc8ar99IQeCVVm3pnWrVP",
-  tellPassword:      "1234",  // device admin password — used by app for addappid
+  tellPassword:      "1234",  // device admin password â€” used by app for addappid
   tellHwId:          "",
   tellHwName:        "ParkingBarrier",
   tellAppId:         "",
@@ -154,16 +154,16 @@ let config = {
   tellVehicleInputExit:     "in2",  // input pin for exit vehicle detection
   tellBarrierOutput: 1,
 
-  // ── JCC IPPI ──────────────────────────────────────────────────────────────────
+  // â”€â”€ JCC IPPI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   jccBaseUrl:   "https://test-apis.jccsecure.com",
   jccUseMock:          true,   // true = call own mock endpoints, false = call real JCC
-  parkingName:         "ParkTec",
+  parkingName:         "Parqio",
   topupAmount:         500,    // total exit fee in cents for scenario 3 (TopUp)
   captureRetryMins:    15,     // retry interval in minutes for failed captures
   captureMaxRetries:   5,      // max retry attempts before marking as FAILED
 };
 
-// ── Pending Captures (capture declined at exit — retry in background) ─────────
+// â”€â”€ Pending Captures (capture declined at exit â€” retry in background) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let pendingCaptures = [];  // { id, entry, amountCents, createdAt, retries, status, lastAttempt, lastError }
 
 function addPendingCapture(entry, amountCents) {
@@ -176,7 +176,7 @@ function addPendingCapture(entry, amountCents) {
     lastAttempt: null,
     lastError:   null
   });
-  console.log(`[PENDING_CAPTURE] Added ${id} — €${(amountCents/100).toFixed(2)} last4=${entry.lastDigits}`);
+  console.log(`[PENDING_CAPTURE] Added ${id} â€” â‚¬${(amountCents/100).toFixed(2)} last4=${entry.lastDigits}`);
 }
 
 async function retrySingleCapture(pc) {
@@ -191,7 +191,7 @@ async function retrySingleCapture(pc) {
       pc.lastError = r ? `${r.responseCode} ${r.responseText}` : "No response";
       if (pc.retries >= config.captureMaxRetries) {
         pc.status = "FAILED";
-        console.log(`[PENDING_CAPTURE] ${pc.id} FAILED after ${pc.retries} retries — manual action required`);
+        console.log(`[PENDING_CAPTURE] ${pc.id} FAILED after ${pc.retries} retries â€” manual action required`);
       } else {
         console.log(`[PENDING_CAPTURE] ${pc.id} retry ${pc.retries}/${config.captureMaxRetries} failed: ${pc.lastError}`);
       }
@@ -202,7 +202,7 @@ async function retrySingleCapture(pc) {
   }
 }
 
-// Background retry loop — checks every 60s, fires when interval elapsed
+// Background retry loop â€” checks every 60s, fires when interval elapsed
 function startCaptureRetryLoop() {
   let lastRun = Date.now();
   setInterval(async () => {
@@ -211,27 +211,27 @@ function startCaptureRetryLoop() {
     lastRun = Date.now();
     const pending = pendingCaptures.filter(pc => pc.status === "PENDING");
     if (pending.length === 0) return;
-    console.log(`[PENDING_CAPTURE] Background retry — ${pending.length} pending`);
+    console.log(`[PENDING_CAPTURE] Background retry â€” ${pending.length} pending`);
     for (const pc of pending) await retrySingleCapture(pc);
   }, 60 * 1000); // checks every 60s
 }
 
-// ── Rental State ─────────────────────────────────────────────────────────────
+// â”€â”€ Rental State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let rentalConfig = {
   rentalOutlet:          "",
   rentalTerminal:        "",
   rentalStationId:       "LIM-012",
-  rentalStationName:     "Limassol Marina — Station 12",
+  rentalStationName:     "Limassol Marina â€” Station 12",
   preAuthAmountCents:    1500,      // legacy field (used by /rental/start)
-  preAuthStandardCents:  1500,      // Standard pre-auth €15
-  preAuthPremiumCents:   3000,      // Premium pre-auth €30
+  preAuthStandardCents:  1500,      // Standard pre-auth â‚¬15
+  preAuthPremiumCents:   3000,      // Premium pre-auth â‚¬30
   maxRentalTimeMins:     120,
   rentalScenario:        1,         // 1=time-based, 2=fixed, 3=free+release
   fixedAmountCents:      300,
   unlockDisplaySecs:     15,
   returnDisplaySecs:     8,
   phoneForHelp:          "77002020",
-  displayMessage:        "Welcome to Limassol Marina — Station 12",
+  displayMessage:        "Welcome to Limassol Marina â€” Station 12",
   helpMessage:           "Help has been called. Staff will assist you shortly.",
   helpDisplayTime:       "10",
   alertEmail:            process.env.ALERT_EMAIL || "",
@@ -287,7 +287,7 @@ function addRentalLog(req, response) {
     request: req.body || {}, response
   });
   if (rentalLogs.length > 200) rentalLogs.pop();
-  console.log(`[RENTAL] ${req.method} ${req.originalUrl} → ${JSON.stringify(response).substring(0,80)}`);
+  console.log(`[RENTAL] ${req.method} ${req.originalUrl} â†’ ${JSON.stringify(response).substring(0,80)}`);
 }
 
 function addRentalPendingCapture(session, amountCents) {
@@ -297,7 +297,7 @@ function addRentalPendingCapture(session, amountCents) {
     createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
     retries: 0, status: "PENDING", lastAttempt: null, lastError: null
   });
-  console.log(`[RENTAL_PENDING] Added ${id} — €${(amountCents/100).toFixed(2)} rentalId=${session.rentalId}`);
+  console.log(`[RENTAL_PENDING] Added ${id} â€” â‚¬${(amountCents/100).toFixed(2)} rentalId=${session.rentalId}`);
 }
 
 function calcRentalFee(startTimeMs, endTimeMs) {
@@ -309,7 +309,7 @@ function calcRentalFee(startTimeMs, endTimeMs) {
   return sorted[sorted.length - 1].fee;
 }
 
-// ── CarWash State ─────────────────────────────────────────────────────────────
+// â”€â”€ CarWash State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let carWashConfig = {
   outlet:                   "0000259010",
   terminal:                 "000025901025",
@@ -334,27 +334,34 @@ let activeWashSessions   = {};
 let washPendingCaptures  = [];
 let carWashLogs          = [];
 
-// ── Petrolina State ───────────────────────────────────────────────────────────
+// -- Petrolina State ----------------------------------------------------------
 let petrolinaConfig = {
-  outlet:           "",
   terminal:         "",
-  pumpLabel:        "Pump 1",
+  pumpNo:           "1",
+  stationName:      "Petrolina Station",
+  isLoyalty:        "0",
   helpPhone:        "99123456",
-  maxPreAuthCents:  20000,           // €200 fill-up ceiling
-  fuelGrades: [
-    { code: "unleaded95", label: "Unleaded 95", pricePerLiter: 1720 },
-    { code: "unleaded98", label: "Unleaded 98", pricePerLiter: 1890 },
-    { code: "diesel",     label: "Diesel",      pricePerLiter: 1650 }
+  pumpProducts: [
+    { productCode: "unleaded95", product: "Unleaded 95", pricePerLiter: 1720, image: "95petrolina.gif" },
+    { productCode: "unleaded98", product: "Unleaded 98", pricePerLiter: 1890, image: "98petrolina.gif" },
+    { productCode: "diesel",     product: "Diesel",      pricePerLiter: 1650, image: "diesel.gif"      }
   ],
-  callbackDelaySec:  8,              // auto-fire callback N sec after authorize
-  actualAmountCents: 0,              // 0 = random up to pre-auth
-  authorizeResult:  "ok",           // "ok" | "fail"
+  pumpSelectedTO:         8,
+  fuelSelectionTO:        9,
+  selectAmountTO:         8,
+  enterAmountTO:          8,
+  displayStartFuelingTO:  8,
+  displayScreenFuelingSecs: 240,
+  callbackDelaySec:  8,
+  actualAmountCents: 0,
+  preAuthResult:    "ok",
   responseCode:     "00"
 };
-let petrolinaLogs   = [];
-let pendingPetroAuth = null;         // last /pump/authorize request
+let petrolinaLogs        = [];
+let petrolinaTranCounter = 1000;
+let petrolinaTransactions = {};
 
-// ── Fairway State ─────────────────────────────────────────────────────────────
+// â”€â”€ Fairway State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let fairwayConfig = {
   clientId:       "hermes-parking",
   clientSecret:   "secret123",
@@ -366,7 +373,7 @@ let fairwayConfig = {
 let fairwayLogs        = [];
 let fairwayCurrentToken = null;
 let fairwayTokenExpiry  = 0;
-// Per-method mock data — params describe inputs, data is what the API returns
+// Per-method mock data â€” params describe inputs, data is what the API returns
 let fairwayMethods = {
   "OpenGate": {
     params: [
@@ -419,13 +426,13 @@ function addFairwayLog(method, path, reqBody, resBody) {
     request: reqBody, response: resBody
   });
   if (fairwayLogs.length > 200) fairwayLogs.pop();
-  console.log(`[FAIRWAY] ${method} ${path} → ${JSON.stringify(resBody).substring(0,80)}`);
+  console.log(`[FAIRWAY] ${method} ${path} â†’ ${JSON.stringify(resBody).substring(0,80)}`);
 }
 
 function addPetroLog(method, path, req, res) {
   petrolinaLogs.unshift({ time: new Date().toLocaleTimeString(), method, path, req, res });
   if (petrolinaLogs.length > 200) petrolinaLogs.pop();
-  console.log(`[PETRO] ${method} ${path} → ${JSON.stringify(res).substring(0,80)}`);
+  console.log(`[PETRO] ${method} ${path} â†’ ${JSON.stringify(res).substring(0,80)}`);
 }
 
 function addCarWashLog(req, response) {
@@ -435,7 +442,7 @@ function addCarWashLog(req, response) {
     request: req.body || {}, response
   });
   if (carWashLogs.length > 200) carWashLogs.pop();
-  console.log(`[CW] ${req.method} ${req.originalUrl} → ${JSON.stringify(response).substring(0,80)}`);
+  console.log(`[CW] ${req.method} ${req.originalUrl} â†’ ${JSON.stringify(response).substring(0,80)}`);
 }
 
 function addWashPendingCapture(session, amountCents) {
@@ -445,10 +452,10 @@ function addWashPendingCapture(session, amountCents) {
     createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
     retries: 0, status: "PENDING", lastAttempt: null, lastError: null
   });
-  console.log(`[CW_PENDING] Added ${id} — €${(amountCents/100).toFixed(2)} washId=${session.washId}`);
+  console.log(`[CW_PENDING] Added ${id} â€” â‚¬${(amountCents/100).toFixed(2)} washId=${session.washId}`);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function addLog(req, response) {
   logs.unshift({
     id:       Date.now(),
@@ -481,7 +488,7 @@ function ts() {
   return new Date().toISOString().replace(/[-:T.Z]/g,"").slice(0,14);
 }
 
-// ── HMAC Header Builder (JCC spec) ───────────────────────────────────────────
+// â”€â”€ HMAC Header Builder (JCC spec) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildHmacHeader(method, fullUrl, body, endpointType) {
   const creds     = jccConfig[endpointType] || jccConfig.topup;
   const appId     = creds.appId;
@@ -500,7 +507,7 @@ function buildHmacHeader(method, fullUrl, body, endpointType) {
   return `hmacauth ${appId}:${signature}:${nonce}:${timestamp}`;
 }
 
-// ── JCC HTTP POST helper ──────────────────────────────────────────────────────
+// â”€â”€ JCC HTTP POST helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function jccPost(path, body, endpointType) {
   return new Promise((resolve, reject) => {
     const baseUrl = config.jccUseMock
@@ -529,7 +536,7 @@ function jccPost(path, body, endpointType) {
       let data = "";
       r.on("data", c => data += c);
       r.on("end", () => {
-        console.log(`[JCC] ${fullUrl} → HTTP ${r.statusCode} | body: ${data.substring(0,200)}`);
+        console.log(`[JCC] ${fullUrl} â†’ HTTP ${r.statusCode} | body: ${data.substring(0,200)}`);
         if (!data || data.trim() === "" || data.trim() === "{}") {
           // JCC returns empty body on success for topup/capture/release
           if (r.statusCode === 200) {
@@ -549,7 +556,7 @@ function jccPost(path, body, endpointType) {
   });
 }
 
-// ── JCC DateTime format — Cyprus timezone +03:00 ─────────────────────────────
+// â”€â”€ JCC DateTime format â€” Cyprus timezone +03:00 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function jccDateTime() {
   const now    = new Date();
   const offset = '+03:00';
@@ -564,7 +571,7 @@ function jccDateTime() {
     pad(cy.getUTCSeconds()) + offset;
 }
 
-// ── JCC API Calls ─────────────────────────────────────────────────────────────
+// â”€â”€ JCC API Calls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function jccTopup(entry, topupAmountCents) {
   const body = {
     amount:       topupAmountCents,
@@ -668,7 +675,7 @@ function detectMode(reqBody) {
   return "Unknown";
 }
 
-// ── TELL API client ───────────────────────────────────────────────────────────
+// â”€â”€ TELL API client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function tellRequest(method, path, body) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
@@ -718,18 +725,18 @@ async function tellOpenBarrier() {
   return result.data && result.data.status === 0;
 }
 
-// ── Admin endpoints ───────────────────────────────────────────────────────────
+// â”€â”€ Admin endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/logs", (req, res) => res.json(logs));
 app.get("/admin/config", (req, res) => res.json(config));
 
-// ── GET /admin/entries ────────────────────────────────────────────────────────
+// â”€â”€ GET /admin/entries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/admin/entries", (req, res) => res.json(Object.values(activeEntries)));
 
-// ── GET /admin/rejections ─────────────────────────────────────────────────────
+// â”€â”€ GET /admin/rejections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/admin/rejections", (req, res) => res.json(rejectionLog));
 app.get("/admin/ecr-declines", (req, res) => res.json(ecrDeclineLog));
 
-// ── Pending Captures endpoints ────────────────────────────────────────────────
+// â”€â”€ Pending Captures endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/admin/pending-captures", (req, res) => res.json(pendingCaptures));
 
 app.post("/admin/retry-capture/:id", async (req, res) => {
@@ -748,7 +755,7 @@ app.delete("/admin/pending-captures/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── GET /admin/tell-status ────────────────────────────────────────────────────
+// â”€â”€ GET /admin/tell-status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/admin/tell-status", async (req, res) => {
   if (!config.tellEnabled || !config.tellHwId || !config.tellAppId) {
     return res.json({ available: false, reason: "TELL not configured" });
@@ -836,8 +843,8 @@ app.post("/admin/tell-open", async (req, res) => {
   }
 });
 
-// ── POST /admin/tell-register ─────────────────────────────────────────────────
-// Calls TELL /gc/addappid using hwId + hwName + password → saves appId to config
+// â”€â”€ POST /admin/tell-register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Calls TELL /gc/addappid using hwId + hwName + password â†’ saves appId to config
 app.post("/admin/tell-register", async (req, res) => {
   if (!config.tellHwId)
     return res.json({ok:false, error:"hwId must be configured first"});
@@ -855,7 +862,7 @@ app.post("/admin/tell-register", async (req, res) => {
   }
 });
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
+// â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/", (req, res) => {
   const sn = scenarioName(config.exitScenario);
   res.send(`<!DOCTYPE html><html><head><title>Parking RPS Mock</title>
@@ -911,7 +918,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 </p>
 
 <div class="pos-box entrance-box">
-<h3>🔵 Entrance POS</h3>
+<h3>ðŸ”µ Entrance POS</h3>
 <table>
 <tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
 <tr>
@@ -928,7 +935,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 </div>
 
 <div class="pos-box exit-box">
-<h3>🟠 Exit POS</h3>
+<h3>ðŸŸ  Exit POS</h3>
 <table>
 <tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
 <tr>
@@ -986,14 +993,14 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <button class="btn orange" onclick="set('flagsForAction','1000')">1000 Restart App</button>
 <button class="btn" onclick="set('flagsForAction','0100')">0100 Force Init</button>
 <button class="btn red" onclick="set('flagsForAction','1100')">1100 Init + Restart</button></td></tr>
-<tr><td>Voice Assistant</td><td>${config.voiceAssistant ? '🔊 ON' : '🔇 OFF'}</td>
-<td><button class="btn green" onclick="set('voiceAssistant',true)">🔊 ON</button>
-<button class="btn red" onclick="set('voiceAssistant',false)">🔇 OFF</button></td></tr>
+<tr><td>Voice Assistant</td><td>${config.voiceAssistant ? 'ðŸ”Š ON' : 'ðŸ”‡ OFF'}</td>
+<td><button class="btn green" onclick="set('voiceAssistant',true)">ðŸ”Š ON</button>
+<button class="btn red" onclick="set('voiceAssistant',false)">ðŸ”‡ OFF</button></td></tr>
 <tr><td>Default Language</td><td>${config.defaultLanguage}</td>
-<td><button class="btn green" onclick="set('defaultLanguage','EN')">🇬🇧 EN</button>
-<button class="btn" onclick="set('defaultLanguage','EL')">🇬🇷 EL</button>
-<button class="btn" onclick="set('defaultLanguage','RU')">🇷🇺 RU</button>
-<button class="btn" onclick="set('defaultLanguage','IW')">🇮🇱 IW</button></td></tr>
+<td><button class="btn green" onclick="set('defaultLanguage','EN')">ðŸ‡¬ðŸ‡§ EN</button>
+<button class="btn" onclick="set('defaultLanguage','EL')">ðŸ‡¬ðŸ‡· EL</button>
+<button class="btn" onclick="set('defaultLanguage','RU')">ðŸ‡·ðŸ‡º RU</button>
+<button class="btn" onclick="set('defaultLanguage','IW')">ðŸ‡®ðŸ‡± IW</button></td></tr>
 </table>
 
 <h2>&#x1F4E1; parkingInit Response Fields</h2>
@@ -1002,14 +1009,14 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Keep Alive (min)</td><td>${config.keepAliveFreq}</td>
 <td><input class="n" type="number" id="inKA" value="${config.keepAliveFreq}">
 <button class="btn" onclick="set('keepAliveFreq',Number(document.getElementById('inKA').value))">Set</button></td></tr>
-<tr><td>Min Pre-Auth (cents)</td><td>${config.minimumAmountPreAuth} = €${(config.minimumAmountPreAuth/100).toFixed(2)}</td>
+<tr><td>Min Pre-Auth (cents)</td><td>${config.minimumAmountPreAuth} = â‚¬${(config.minimumAmountPreAuth/100).toFixed(2)}</td>
 <td><input class="n" type="number" id="inPA" value="${config.minimumAmountPreAuth}">
 <button class="btn" onclick="set('minimumAmountPreAuth',Number(document.getElementById('inPA').value))">Set</button></td></tr>
-<tr><td>Fix Amount Solution (cents)</td><td>${config.fixAmountSolution} ${config.fixAmountSolution > 0 ? '= €'+(config.fixAmountSolution/100).toFixed(2)+' SALE mode' : '= OFF (pre-auth mode)'}</td>
+<tr><td>Fix Amount Solution (cents)</td><td>${config.fixAmountSolution} ${config.fixAmountSolution > 0 ? '= â‚¬'+(config.fixAmountSolution/100).toFixed(2)+' SALE mode' : '= OFF (pre-auth mode)'}</td>
 <td><input class="n" type="number" id="inFA" value="${config.fixAmountSolution}">
 <button class="btn" onclick="set('fixAmountSolution',Number(document.getElementById('inFA').value))">Set</button>
-<span style="color:#8b949e;font-size:11px;margin-left:6px">-1 = off, e.g. 500 = €5.00 fixed SALE</span></td></tr>
-<tr><td>Default Amount (cents)</td><td>${config.defaultAmount} = €${(config.defaultAmount/100).toFixed(2)}</td>
+<span style="color:#8b949e;font-size:11px;margin-left:6px">-1 = off, e.g. 500 = â‚¬5.00 fixed SALE</span></td></tr>
+<tr><td>Default Amount (cents)</td><td>${config.defaultAmount} = â‚¬${(config.defaultAmount/100).toFixed(2)}</td>
 <td><input class="n" type="number" id="inDA" value="${config.defaultAmount}">
 <button class="btn" onclick="set('defaultAmount',Number(document.getElementById('inDA').value))">Set</button></td></tr>
 <tr><td>Phone For Help</td><td>${config.phoneForHelp}</td>
@@ -1022,7 +1029,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <td><input class="m" id="inHDT" value="${config.helpDisplayTime}" style="width:60px">
 <button class="btn" onclick="sv('helpDisplayTime','inHDT')">Save</button></td></tr>
 <tr><td>Email Alerts</td>
-<td>${process.env.RESEND_KEY ? '✅ Resend active' : '⚠️ Not configured (set RESEND_KEY in Render)'}</td>
+<td>${process.env.RESEND_KEY ? 'âœ… Resend active' : 'âš ï¸ Not configured (set RESEND_KEY in Render)'}</td>
 <td style="font-size:11px;color:#8b949e">${config.lastAlertSent ? 'Last sent: '+config.lastAlertSent : 'No alerts sent yet'}</td></tr>
 <tr><td>Alert Email (recipient)</td>
 <td><input class="w" id="inAlertEmail" placeholder="recipient@email.com" value="${config.alertEmail}"></td>
@@ -1039,22 +1046,22 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <table>
 <tr><th>From (min)</th><th>To (min)</th><th>Fee (cents)</th><th>= Euro</th><th></th></tr>
 ${config.charges.map((c,i)=>`<tr>
-<td>${c.from}</td><td>${c.to||'∞'}</td><td>${c.fee}</td><td>€${(parseInt(c.fee)/100).toFixed(2)}</td>
+<td>${c.from}</td><td>${c.to||'âˆž'}</td><td>${c.fee}</td><td>â‚¬${(parseInt(c.fee)/100).toFixed(2)}</td>
 <td><button class="btn red" onclick="removeCharge(${i})">Remove</button></td>
 </tr>`).join('')}
 </table>
 <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
   <input class="n" type="number" id="chFrom" placeholder="from">
-  <input class="n" type="number" id="chTo" placeholder="to (blank=∞)">
+  <input class="n" type="number" id="chTo" placeholder="to (blank=âˆž)">
   <input class="n" type="number" id="chFee" placeholder="fee">
   <button class="btn green" onclick="addCharge()">+ Add Charge</button>
 </div>
 
 <h2>&#x1F6A7; TELL Gate Control PRO</h2>
 <div class="tell-box">
-<h3>Mode - currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
+<h3>Mode - currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'ðŸŸ¢ REAL TELL API ACTIVE':'âš« MOCK (TELL disabled)'}</span></h3>
 <button class="btn green" onclick="set('tellEnabled',true)">&#x1F7E2; Enable Real TELL API</button>
-<button class="btn gray" onclick="set('tellEnabled',false)">⚫ Use Mock</button>
+<button class="btn gray" onclick="set('tellEnabled',false)">âš« Use Mock</button>
 <p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; barrier opens on entranceCall/exitCall(free,capture)/exitPayment.</p>
 
 <h3>Device Settings</h3>
@@ -1084,12 +1091,12 @@ ${config.charges.map((c,i)=>`<tr>
 <h3>I/O Mapping</h3>
 <table>
 <tr><th>Function</th><th>Setting</th></tr>
-<tr><td>🔵 Entrance vehicle input</td>
+<tr><td>ðŸ”µ Entrance vehicle input</td>
 <td><select onchange="set('tellVehicleInputEntrance',this.value)">
 <option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 - dry contact</option>
 <option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 - dry contact</option>
 </select></td></tr>
-<tr><td>🟠 Exit vehicle input</td>
+<tr><td>ðŸŸ  Exit vehicle input</td>
 <td><select onchange="set('tellVehicleInputExit',this.value)">
 <option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 - dry contact</option>
 <option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 - dry contact</option>
@@ -1174,15 +1181,15 @@ ${config.charges.map((c,i)=>`<tr>
     <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF - all requests pass through</span></td></tr>
     <tr><td>JCC Target</td><td colspan="2">
       <select onchange="set('jccUseMock',this.value==='true')">
-        <option value="true"  ${config.jccUseMock?'selected':''}>🟡 MOCK (this server)</option>
-        <option value="false" ${!config.jccUseMock?'selected':''}>🟢 REAL JCC (${config.jccBaseUrl})</option>
+        <option value="true"  ${config.jccUseMock?'selected':''}>ðŸŸ¡ MOCK (this server)</option>
+        <option value="false" ${!config.jccUseMock?'selected':''}>ðŸŸ¢ REAL JCC (${config.jccBaseUrl})</option>
       </select>
     </td></tr>
     <tr><td>Parking Name</td><td><input id="parkingNameInput" value="${config.parkingName}" style="width:200px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('parkingName','parkingNameInput')">Save</button></td><td></td></tr>
     <tr><td>TopUp total amount (cents)</td><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('topupAmount','topupAmountInput')">Save</button>
-      <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = €5.00</span></td><td></td></tr>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = â‚¬5.00</span></td><td></td></tr>
     <tr><td>Capture Retry Interval (min)</td><td><input id="captureRetryMinsInput" value="${config.captureRetryMins}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('captureRetryMins','captureRetryMinsInput')">Save</button>
       <span style="color:#8b949e;font-size:11px;margin-left:8px">background retry every X minutes</span></td><td></td></tr>
@@ -1190,13 +1197,13 @@ ${config.charges.map((c,i)=>`<tr>
       <button class="btn" style="margin-left:6px" onclick="sv('captureMaxRetries','captureMaxRetriesInput')">Save</button>
       <span style="color:#8b949e;font-size:11px;margin-left:8px">mark as FAILED after N retries</span></td><td></td></tr>
   </table>
-  <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">💾 Save JCC HMAC Config</button>
+  <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">ðŸ’¾ Save JCC HMAC Config</button>
 </div>
 
 <div class="card" style="margin-top:12px">
   <h3>Active Transaction</h3>
   <div id="jccActiveTx"><span style="color:#888">Loading...</span></div>
-  <button class="btn red" onclick="clearJccTransaction()" style="margin-top:8px">🗑 Clear Transaction</button>
+  <button class="btn red" onclick="clearJccTransaction()" style="margin-top:8px">ðŸ—‘ Clear Transaction</button>
 </div>
 
 <div class="card" style="margin-top:12px">
@@ -1225,7 +1232,7 @@ ${config.charges.map((c,i)=>`<tr>
 
 </div>
 
-<!-- ═══ RENTAL TAB ═══ -->
+<!-- â•â•â• RENTAL TAB â•â•â• -->
 <div id="tab-rental" class="tab-content">
 <h1>&#x1F512; Rental RPS Mock</h1>
 <p style="color:#8b949e">All changes take effect immediately. Uses same JCC IPPI endpoints as Parking.</p>
@@ -1375,12 +1382,12 @@ ${config.charges.map((c,i)=>`<tr>
 <table>
 <tr><th>Up to (min)</th><th>Fee (cents)</th><th>= Euro</th><th></th></tr>
 ${rentalConfig.charges.map((c,i)=>`<tr>
-<td>${c.upToMins===-1?'∞':c.upToMins}</td><td>${c.fee}</td><td>&#x20AC;${(c.fee/100).toFixed(2)}</td>
+<td>${c.upToMins===-1?'âˆž':c.upToMins}</td><td>${c.fee}</td><td>&#x20AC;${(c.fee/100).toFixed(2)}</td>
 <td><button class="btn red" onclick="removeRentalCharge(${i})">Remove</button></td>
 </tr>`).join('')}
 </table>
 <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
-  <input class="n" type="number" id="rnChTo" placeholder="up to min (-1=∞)">
+  <input class="n" type="number" id="rnChTo" placeholder="up to min (-1=âˆž)">
   <input class="n" type="number" id="rnChFee" placeholder="fee cents">
   <button class="btn green" onclick="addRentalCharge()">+ Add Tier</button>
 </div>
@@ -1422,7 +1429,7 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <div id="rentalLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
-<!-- ═══ CARWASH TAB ═══ -->
+<!-- â•â•â• CARWASH TAB â•â•â• -->
 <div id="tab-carwash" class="tab-content">
 <h1>&#x1F6BF; Car Wash RPS Mock</h1>
 <p style="color:#8b949e">All changes take effect immediately. Uses same JCC IPPI endpoints as Parking.</p>
@@ -1586,63 +1593,66 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 
 <!-- ═══ PETROLINA TAB ═══ -->
 <div id="tab-petrolina" class="tab-content">
-<h1>&#x26FD; Petrolina Mock Controller</h1>
-<p style="color:#8b949e">Simulates the Petrolina pump controller. The S1U2 app points to this server for <code>/pump/init</code>, <code>/pump/authorize</code> and <code>/pump/help</code>. Use the manual callback button to simulate fueling completion.</p>
+<h1>&#x26FD; Petrolina Mock OPT Server</h1>
+<p style="color:#8b949e">Simulates the Petrolina OPT server. The S1U2 app calls <code>/petrolAppInit</code>, <code>/optTransaction</code>, <code>/preAuthorization</code>, <code>/abortTransaction</code>, <code>/help</code>. The OPT fires <code>POST /completion</code> back to the app.</p>
 
 <h2>&#x1F4F1; Terminal Configuration</h2>
 <div class="pos-box" style="border:1px solid #e07b00;background:#161b22;border-radius:6px;padding:14px;margin-bottom:14px">
-<h3 style="color:#e07b00">&#x26FD; Petrolina POS</h3>
+<h3 style="color:#e07b00">&#x26FD; Petrolina OPT</h3>
 <table>
 <tr><th style="width:180px">Parameter</th><th>Value</th><th style="width:100px"></th></tr>
-<tr><td>Outlet</td>
-  <td><input class="t" id="ptOutlet" value="${petrolinaConfig.outlet}" maxlength="10" placeholder="10 digits"></td>
-  <td><button class="btn" onclick="ptSv('outlet','ptOutlet')">Save</button></td></tr>
 <tr><td>Terminal ID</td>
-  <td><input class="t" id="ptTerminal" value="${petrolinaConfig.terminal}" maxlength="12" placeholder="12 digits"></td>
+  <td><input class="t" id="ptTerminal" value="${petrolinaConfig.terminal}" maxlength="12" placeholder="12 chars"></td>
   <td><button class="btn" onclick="ptSv('terminal','ptTerminal')">Save</button></td></tr>
-<tr><td>Pump Label</td>
-  <td><input class="m" id="ptPumpLabel" value="${petrolinaConfig.pumpLabel}" placeholder="e.g. Pump 1"></td>
-  <td><button class="btn" onclick="ptSv('pumpLabel','ptPumpLabel')">Save</button></td></tr>
+<tr><td>Pump No</td>
+  <td><input class="m" id="ptPumpNo" value="${petrolinaConfig.pumpNo}" placeholder="e.g. 1"></td>
+  <td><button class="btn" onclick="ptSv('pumpNo','ptPumpNo')">Save</button></td></tr>
+<tr><td>Station Name</td>
+  <td><input class="m" id="ptStationName" value="${petrolinaConfig.stationName}" placeholder="e.g. Petrolina Station"></td>
+  <td><button class="btn" onclick="ptSv('stationName','ptStationName')">Save</button></td></tr>
 <tr><td>Help Phone</td>
   <td><input class="m" id="ptHelpPhone" value="${petrolinaConfig.helpPhone}"></td>
   <td><button class="btn" onclick="ptSv('helpPhone','ptHelpPhone')">Save</button></td></tr>
-<tr><td>Max Pre-Auth (cents)</td>
-  <td>${petrolinaConfig.maxPreAuthCents} = &#x20AC;${(petrolinaConfig.maxPreAuthCents/100).toFixed(2)}</td>
-  <td><input class="n" type="number" id="ptMaxPreAuth" value="${petrolinaConfig.maxPreAuthCents}">
-  <button class="btn" onclick="ptSet('maxPreAuthCents',Number(document.getElementById('ptMaxPreAuth').value))">Set</button></td></tr>
+<tr><td>Loyalty (isLoyalty)</td>
+  <td>${petrolinaConfig.isLoyalty === "1" ? "&#x2705; Enabled" : "Disabled"}</td>
+  <td>
+    <button class="btn green" onclick="ptSet2('isLoyalty','1')">Enable</button>
+    <button class="btn gray" onclick="ptSet2('isLoyalty','0')">Disable</button>
+  </td></tr>
 </table>
 </div>
 
-<h2>&#x26FD; Fuel Grades</h2>
+<h2>&#x26FD; Pump Products</h2>
 <table>
-<tr><th>Code</th><th>Label</th><th>Price (cents/L)</th><th>&#x20AC;/L</th></tr>
-${petrolinaConfig.fuelGrades.map(g=>`<tr>
-  <td style="color:#58a6ff;font-family:monospace">${g.code}</td>
-  <td>${g.label}</td>
+<tr><th>Code</th><th>Product</th><th>Price (cents/L)</th><th>&#x20AC;/L</th><th>Image</th></tr>
+${petrolinaConfig.pumpProducts.map(g=>`<tr>
+  <td style="color:#58a6ff;font-family:monospace">${g.productCode}</td>
+  <td>${g.product}</td>
   <td>${g.pricePerLiter}</td>
   <td style="color:#3fb950">&#x20AC;${(g.pricePerLiter/1000).toFixed(3)}</td>
+  <td style="color:#8b949e;font-size:11px">${g.image}</td>
 </tr>`).join('')}
 </table>
-<p style="color:#8b949e;font-size:12px">Fuel grades are configured in server.js <code>petrolinaConfig.fuelGrades</code>.</p>
+<p style="color:#8b949e;font-size:12px">Products are configured in server.js <code>petrolinaConfig.pumpProducts</code>.</p>
 
 <h2>&#x1F9EA; Simulation Controls</h2>
 <table>
 <tr><th style="width:240px">Setting</th><th>Current</th><th>Edit</th></tr>
-<tr><td>Auto-callback delay (sec)<br><span style="color:#8b949e;font-size:11px">How long after /pump/authorize before callback fires</span></td>
+<tr><td>Auto-completion callback delay (sec)<br><span style="color:#8b949e;font-size:11px">After /preAuthorization before /completion fires</span></td>
   <td>${petrolinaConfig.callbackDelaySec}s</td>
   <td><input type="number" id="ptDelay" value="${petrolinaConfig.callbackDelaySec}" style="width:80px">
   <button class="btn" onclick="ptSet('callbackDelaySec',Number(document.getElementById('ptDelay').value))">Set</button></td></tr>
-<tr><td>Actual amount (cents)<br><span style="color:#8b949e;font-size:11px">0 = random (€5 to pre-auth max)</span></td>
+<tr><td>Actual amount (cents)<br><span style="color:#8b949e;font-size:11px">0 = random (&#x20AC;5 to pre-auth max)</span></td>
   <td>${petrolinaConfig.actualAmountCents} ${petrolinaConfig.actualAmountCents?'= &#x20AC;'+(petrolinaConfig.actualAmountCents/100).toFixed(2):'(random)'}</td>
   <td><input type="number" id="ptActual" value="${petrolinaConfig.actualAmountCents}" style="width:100px">
   <button class="btn" onclick="ptSet('actualAmountCents',Number(document.getElementById('ptActual').value))">Set</button></td></tr>
-<tr><td>Authorize result</td>
-  <td id="ptAuthResultVal" style="color:${petrolinaConfig.authorizeResult==='ok'?'#3fb950':'#ff6b6b'};font-weight:bold">${petrolinaConfig.authorizeResult==='ok'?'&#x2705; OK':'&#x274C; FAIL'}</td>
+<tr><td>Pre-auth result</td>
+  <td id="ptAuthResultVal" style="color:${petrolinaConfig.preAuthResult==='ok'?'#3fb950':'#ff6b6b'};font-weight:bold">${petrolinaConfig.preAuthResult==='ok'?'&#x2705; OK':'&#x274C; FAIL'}</td>
   <td>
-    <button class="btn green" onclick="ptSet2('authorizeResult','ok')">&#x2705; OK</button>
-    <button class="btn red" onclick="ptSet2('authorizeResult','fail')">&#x274C; Fail</button>
+    <button class="btn green" onclick="ptSet2('preAuthResult','ok')">&#x2705; OK</button>
+    <button class="btn red" onclick="ptSet2('preAuthResult','fail')">&#x274C; Fail</button>
   </td></tr>
-<tr><td>Force init error (responseCode)</td>
+<tr><td>Force error (responseCode)</td>
   <td>${petrolinaConfig.responseCode}</td>
   <td>
     <button class="btn green" onclick="ptSet2('responseCode','00')">00 OK</button>
@@ -1650,28 +1660,37 @@ ${petrolinaConfig.fuelGrades.map(g=>`<tr>
   </td></tr>
 </table>
 
-<h2>&#x1F504; Manual Callback — Simulate Fueling Done</h2>
-<p style="color:#8b949e;font-size:12px">Fires <code>POST /pump/complete</code> to the S1U2 app. Use when you want to trigger completion immediately without waiting for the auto-delay.</p>
-
-<div id="ptPendingDiv" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px">
-  <span style="color:#8b949e">Loading pending auth...</span>
+<h2>&#x1F504; Active Transactions</h2>
+<div id="ptTransDiv" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px">
+  <span style="color:#8b949e">Loading transactions...</span>
 </div>
 
-<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+<h2>&#x26A1; Manual OPT&#x2192;App Callbacks</h2>
+<p style="color:#8b949e;font-size:12px">Enter a transsegno and callbackBase (e.g. <code>http://192.168.x.x:8080</code>) then fire.</p>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+  <span style="color:#8b949e">transsegno:</span>
+  <input type="text" id="ptManualTranssegno" placeholder="e.g. 1001" style="width:120px">
+  <span style="color:#8b949e">callbackBase:</span>
+  <input type="text" id="ptManualCallbackBase" placeholder="http://192.168.x.x:8080" style="width:220px">
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
   <span style="color:#8b949e">Amount (cents):</span>
   <input type="number" id="ptManualAmount" value="3500" style="width:110px">
   <span style="color:#8b949e;font-size:11px">(= &#x20AC;<span id="ptManualEuros">35.00</span>)</span>
-  <button class="btn orange" style="background:#e07b00;padding:8px 20px;font-size:13px" onclick="ptFireCallback()">&#x26FD; Fire Callback Now</button>
+  <button class="btn orange" style="background:#e07b00;padding:8px 20px;font-size:13px" onclick="ptFireCompletion()">&#x26FD; Fire Completion</button>
+  <button class="btn red" style="padding:8px 20px;font-size:13px" onclick="ptFireReversal()">&#x21A9; Fire Reversal</button>
   <span id="ptCallbackResult" style="font-size:12px"></span>
 </div>
 
 <h2>&#x1F4CB; Petrolina Request Log</h2>
 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
   <button class="btn gray" onclick="ptSetFilter('')">All</button>
-  <button class="btn" style="background:#1f6feb" onclick="ptSetFilter('pump/init')">Init</button>
-  <button class="btn green" onclick="ptSetFilter('pump/authorize')">Authorize</button>
+  <button class="btn" style="background:#1f6feb" onclick="ptSetFilter('petrolAppInit')">Init</button>
+  <button class="btn green" onclick="ptSetFilter('optTransaction')">OPT Tran</button>
+  <button class="btn" style="background:#6e40c9" onclick="ptSetFilter('preAuthorization')">Pre-Auth</button>
   <button class="btn orange" onclick="ptSetFilter('CALLBACK')">Callback</button>
-  <button class="btn gray" onclick="ptSetFilter('pump/help')">Help</button>
+  <button class="btn gray" onclick="ptSetFilter('abortTransaction')">Abort</button>
+  <button class="btn gray" onclick="ptSetFilter('help')">Help</button>
   <span style="margin-left:auto">
     <button class="btn red" onclick="ptClearLogs()">&#x1F5D1; Clear</button>
   </span>
@@ -1680,7 +1699,7 @@ ${petrolinaConfig.fuelGrades.map(g=>`<tr>
 <div id="ptLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
-<!-- ═══ FAIRWAY TAB ═══ -->
+<!-- â•â•â• FAIRWAY TAB â•â•â• -->
 <div id="tab-fairway" class="tab-content">
 <h1>&#x2708;&#xFE0F; Fairway API Mock</h1>
 <p style="color:#8b949e">Simulates <code>http://identity.hermesairports.com</code> (OAuth2 token) and <code>https://fairway-api.hermesairports.com</code> (API methods).</p>
@@ -1736,8 +1755,8 @@ ${petrolinaConfig.fuelGrades.map(g=>`<tr>
 <h2>&#x1F9EE; Current Token</h2>
 <div id="fwTokenDiv" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;font-size:12px;font-family:monospace">
 ${fairwayCurrentToken
-  ? `<span style="color:#3fb950">Active — expires in ${Math.max(0,Math.floor((fairwayTokenExpiry-Date.now())/1000))}s</span><br><span style="color:#8b949e">${fairwayCurrentToken}</span>`
-  : '<span style="color:#8b949e">No token issued yet — app must call POST /connect/token first</span>'}
+  ? `<span style="color:#3fb950">Active â€” expires in ${Math.max(0,Math.floor((fairwayTokenExpiry-Date.now())/1000))}s</span><br><span style="color:#8b949e">${fairwayCurrentToken}</span>`
+  : '<span style="color:#8b949e">No token issued yet â€” app must call POST /connect/token first</span>'}
 </div>
 <button class="btn red" onclick="fwClearToken()" style="margin-top:8px">&#x1F5D1; Invalidate Token</button>
 
@@ -1850,7 +1869,7 @@ function renderLogs(){
     return '<div style="background:'+bg+';border:1px solid '+col+';border-radius:6px;padding:10px;margin-bottom:10px">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<span style="color:#8b949e;font-size:11px;min-width:130px">'+l.time+'</span>'+
-        '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'🔌 ':'')+l.method+' '+l.endpoint+'</span>'+
+        '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'ðŸ”Œ ':'')+l.method+' '+l.endpoint+'</span>'+
         (l.request&&l.request.outlet?modeTag(l.request.outlet):'')+
         (l.request&&l.request.versionName?'<span style="color:#8b949e;font-size:11px;margin-left:4px">v'+l.request.versionName+'</span>':'')+
         (rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
@@ -1909,7 +1928,7 @@ async function sv(key,id){
   const r=await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
   const d=await r.json();
   if(d.ok) location.reload();
-  else showS('✗ Error: '+d.error,true);
+  else showS('âœ— Error: '+d.error,true);
 }
 async function clearE(){await fetch('/admin/clear-entries',{method:'POST'});location.reload();}
 function showS(msg,err){
@@ -1922,8 +1941,8 @@ async function testConn(){
     const r=await fetch('/admin/tell-test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
     if(d.ok) showS('OK OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
-    else showS('✗ '+d.error,true);
-  }catch(e){showS('✗ '+e.message,true);}
+    else showS('âœ— '+d.error,true);
+  }catch(e){showS('âœ— '+e.message,true);}
 }
 async function openNow(){
   showS('Sending open command...',false);
@@ -1931,8 +1950,8 @@ async function openNow(){
     const r=await fetch('/admin/tell-open',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
     if(d.ok) showS('OK Barrier open command sent OK',false);
-    else showS('✗ '+d.error,true);
-  }catch(e){showS('✗ '+e.message,true);}
+    else showS('âœ— '+d.error,true);
+  }catch(e){showS('âœ— '+e.message,true);}
 }
 async function registerAppId(){
   const el=document.getElementById('regResult');
@@ -1946,11 +1965,11 @@ async function registerAppId(){
       el.textContent='OK App ID registered and saved: '+d.appId;
     } else {
       el.style.color='#f85149';
-      el.textContent='✗ '+d.error;
+      el.textContent='âœ— '+d.error;
     }
   }catch(e){
     el.style.color='#f85149';
-    el.textContent='✗ '+e.message;
+    el.textContent='âœ— '+e.message;
   }
 }
 
@@ -2115,11 +2134,11 @@ async function loadTellStatus(){
     }
     const s=d.status||{};
     const in1Color=s.in1===1?'#E65100':'#238636';
-    const in1Text=s.in1===1?'🟠 Car Present':'🟢 No Car';
+    const in1Text=s.in1===1?'ðŸŸ  Car Present':'ðŸŸ¢ No Car';
     const in2Color=s.in2===1?'#E65100':'#238636';
-    const in2Text=s.in2===1?'🟠 Car Present':'🟢 No Car';
+    const in2Text=s.in2===1?'ðŸŸ  Car Present':'ðŸŸ¢ No Car';
     const barrierColor=s.in4!==0?'#C62828':'#238636';
-    const barrierText=s.in4!==0?'🔴 Barrier OPEN':'🟢 Barrier Closed';
+    const barrierText=s.in4!==0?'ðŸ”´ Barrier OPEN':'ðŸŸ¢ Barrier Closed';
     const out1Color=s.out1===1?'#1F6FEB':'#30363d';
     el.innerHTML=
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in1Color+'">'+
@@ -2136,7 +2155,7 @@ async function loadTellStatus(){
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+out1Color+'">'+
         '<div style="font-size:11px;color:#8b949e">OUT1 - Relay</div>'+
-        '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'🔵 Active':'⚪ Idle')+'</div>'+
+        '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'ðŸ”µ Active':'âšª Idle')+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid #30363d">'+
         '<div style="font-size:11px;color:#8b949e">Ping / IP</div>'+
@@ -2273,7 +2292,7 @@ async function runEndOfDayCapture(){
     const r=await fetch('/admin/eod-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
     el.textContent='OK EOD Capture done - '+d.processed+' entries processed. '+d.results;
-  }catch(e){el.textContent='✗ Error: '+e.message;}
+  }catch(e){el.textContent='âœ— Error: '+e.message;}
 }
 
 async function saveJccConfig(){
@@ -2291,7 +2310,7 @@ async function saveJccConfig(){
   if(d.ok) alert('JCC config saved');
 }
 
-// ── Rental tab JS ────────────────────────────────────────────────────────────
+// â”€â”€ Rental tab JS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let rentalFilter='', rentalLogs=[];
 function setRentalFilter(f){rentalFilter=f;renderRentalLogs();}
 function renderRentalLogs(){
@@ -2410,7 +2429,7 @@ async function loadRentalPending(){
 }
 
 
-// ── Car Wash Tab JS ──────────────────────────────────────────────────────────
+// â”€â”€ Car Wash Tab JS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let cwFilter='', cwAllLogs=[];
 
 function cwSetFilter(f){cwFilter=f;cwRenderLogs();}
@@ -2508,7 +2527,7 @@ function cwRenderLogs(){
     ?cwAllLogs.filter(l=>l.endpoint.toLowerCase().includes(cwFilter.toLowerCase()))
     :cwAllLogs;
   const countEl=document.getElementById('cwLogCount');
-  if(countEl) countEl.textContent=filtered.length+' of '+cwAllLogs.length+' entries'+(cwFilter?' — filter: '+cwFilter:'');
+  if(countEl) countEl.textContent=filtered.length+' of '+cwAllLogs.length+' entries'+(cwFilter?' â€” filter: '+cwFilter:'');
   const el=document.getElementById('cwLogDiv');
   if(!el) return;
   if(!filtered.length){el.innerHTML='<p style="color:#8b949e">No entries match filter</p>';return;}
@@ -2549,7 +2568,7 @@ loadRentalLogs();setInterval(loadRentalLogs,3000);
 loadRentals();setInterval(loadRentals,5000);
 loadRentalPending();setInterval(loadRentalPending,8000);
 
-// ── Petrolina JS ─────────────────────────────────────────────────────────────
+// ── Petrolina JS ──────────────────────────────────────────────────────────────
 let ptAllLogs=[]; let ptFilter='';
 
 function ptSetFilter(f){ptFilter=f;ptRenderLogs();}
@@ -2561,9 +2580,9 @@ function ptRenderLogs(){
   if(!el) return;
   cnt.textContent='Showing '+logs.length+' of '+ptAllLogs.length+' entries';
   if(!logs.length){el.innerHTML='<p style="color:#8b949e">No logs yet.</p>';return;}
-  el.innerHTML='<table><tr><th style="width:75px">Time</th><th style="width:50px">Method</th><th style="width:160px">Endpoint</th><th>Request</th><th>Response</th></tr>'+
+  el.innerHTML='<table><tr><th style="width:75px">Time</th><th style="width:60px">Method</th><th style="width:180px">Endpoint</th><th>Request</th><th>Response</th></tr>'+
     logs.map(function(l){
-      const col=l.path.includes('authorize')?'#3fb950':l.path.includes('CALLBACK')?'#e07b00':l.path.includes('help')?'#8b949e':'#58a6ff';
+      const col=l.path.includes('preAuth')?'#3fb950':l.path.includes('CALLBACK')||l.path.includes('REVERSAL')?'#e07b00':l.path.includes('optTran')?'#6e40c9':l.path.includes('abort')?'#ff6b6b':l.path.includes('help')?'#8b949e':'#58a6ff';
       return '<tr><td style="color:#8b949e">'+l.time+'</td>'+
         '<td style="color:#8b949e">'+l.method+'</td>'+
         '<td style="color:'+col+';font-family:monospace">'+l.path+'</td>'+
@@ -2576,19 +2595,21 @@ async function loadPtLogs(){
   try{const r=await fetch('/petrolina/logs');ptAllLogs=await r.json();ptRenderLogs();}catch(e){}
 }
 
-async function loadPtPending(){
+async function loadPtTransactions(){
   try{
-    const p=await fetch('/petrolina/pending').then(r=>r.json());
-    const el=document.getElementById('ptPendingDiv');if(!el)return;
-    if(p){
-      el.innerHTML='<b style="color:#3fb950">&#x2705; Active auth:</b>'+
-        ' grade=<b>'+p.gradeCode+'</b>'+
-        ' max=<b>&#x20AC;'+(p.maxAmountCents/100).toFixed(2)+'</b>'+
-        ' callback=<b style="color:#58a6ff">'+p.callbackUrl+'</b>'+
-        ' <span style="color:#8b949e;font-size:11px">('+Math.round((Date.now()-p.authorizedAt)/1000)+'s ago)</span>';
-    } else {
-      el.innerHTML='<span style="color:#8b949e">No pending auth — app has not called /pump/authorize yet.</span>';
-    }
+    const txns=await fetch('/petrolina/transactions').then(r=>r.json());
+    const el=document.getElementById('ptTransDiv');if(!el)return;
+    const keys=Object.keys(txns);
+    if(!keys.length){el.innerHTML='<span style="color:#8b949e">No active transactions.</span>';return;}
+    el.innerHTML='<table><tr><th>transsegno</th><th>UUID</th><th>terminal</th><th>pumpId</th><th>state</th><th>callbackBase</th></tr>'+
+      keys.map(k=>{const t=txns[k];return '<tr>'+
+        '<td style="color:#58a6ff;font-family:monospace">'+t.transsegno+'</td>'+
+        '<td style="font-size:10px;color:#8b949e">'+t.uuid+'</td>'+
+        '<td>'+t.terminal+'</td>'+
+        '<td>'+t.pumpId+'</td>'+
+        '<td style="color:'+(t.state==='completed'?'#3fb950':t.state==='aborted'?'#ff6b6b':'#e07b00')+'">'+t.state+'</td>'+
+        '<td style="font-size:11px;color:#58a6ff">'+t.callbackBase+'</td>'+
+      '</tr>';}).join('')+'</table>';
   }catch(e){}
 }
 
@@ -2602,13 +2623,27 @@ async function ptSv(key,id){
   await fetch('/petrolina/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
   location.reload();
 }
-async function ptFireCallback(){
+async function ptFireCompletion(){
+  const transsegno=document.getElementById('ptManualTranssegno').value.trim();
+  const callbackBase=document.getElementById('ptManualCallbackBase').value.trim();
   const cents=parseInt(document.getElementById('ptManualAmount').value)||3500;
-  const r=await fetch('/petrolina/fire-callback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actualAmountCents:cents})});
+  if(!transsegno){alert('Enter a transsegno');return;}
+  const r=await fetch('/petrolina/fire-completion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transsegno,callbackBase,actualAmountCents:cents})});
   const j=await r.json();
   const el=document.getElementById('ptCallbackResult');
-  el.textContent=j.ok?'Sent €'+(cents/100).toFixed(2)+' to '+j.sentTo:'❌ '+j.error;
+  el.textContent=j.ok?'Completion sent to '+j.callbackBase:'ERROR: '+j.error;
   el.style.color=j.ok?'#3fb950':'#ff6b6b';
+  setTimeout(loadPtLogs,1000);
+}
+async function ptFireReversal(){
+  const transsegno=document.getElementById('ptManualTranssegno').value.trim();
+  const callbackBase=document.getElementById('ptManualCallbackBase').value.trim();
+  if(!transsegno){alert('Enter a transsegno');return;}
+  const r=await fetch('/petrolina/fire-reversal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transsegno,callbackBase,reverseReason:1})});
+  const j=await r.json();
+  const el=document.getElementById('ptCallbackResult');
+  el.textContent=j.ok?'Reversal sent to '+j.sentTo:'ERROR: '+j.error;
+  el.style.color=j.ok?'#e07b00':'#ff6b6b';
   setTimeout(loadPtLogs,1000);
 }
 async function ptClearLogs(){
@@ -2622,9 +2657,8 @@ if(ptAmtInput) ptAmtInput.addEventListener('input',function(){
   if(el) el.textContent=(parseInt(this.value||0)/100).toFixed(2);
 });
 loadPtLogs(); setInterval(loadPtLogs,4000);
-loadPtPending(); setInterval(loadPtPending,3000);
-
-// ── Fairway Tab JS ───────────────────────────────────────────────────────────
+loadPtTransactions(); setInterval(loadPtTransactions,3000);
+// â”€â”€ Fairway Tab JS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let fwFilter='', fwAllLogs=[];
 function fwSetFilter(f){fwFilter=f;fwRenderLogs();}
 function fwRenderLogs(){
@@ -2690,7 +2724,7 @@ loadFwLogs(); setInterval(loadFwLogs,4000);
 </script></body></html>`);
 });
 
-// ── POST /parkingInit ─────────────────────────────────────────────────────────
+// â”€â”€ POST /parkingInit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/parkingInit", (req, res) => {
   // Track app version for dashboard display
   const versionName = req.body.versionName || "";
@@ -2701,7 +2735,7 @@ app.post("/parkingInit", (req, res) => {
     console.log(`[parkingInit] App version: ${versionName} (${versionNumber})`);
   }
 
-  // ── CarWash init — clean response, no parking fields ─────────────────────────
+  // â”€â”€ CarWash init â€” clean response, no parking fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (req.body.application === "CarWash") {
     if (carWashConfig.responseCode !== "00") {
       const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
@@ -2724,7 +2758,7 @@ app.post("/parkingInit", (req, res) => {
       timeOfServer:             ts()
     };
     if (carWashConfig.flagsForAction !== "0000") {
-      console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent → auto-reset to 0000`);
+      console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent â†’ auto-reset to 0000`);
       carWashConfig.flagsForAction = "0000";
     }
     addCarWashLog(req, response); return res.json(response);
@@ -2736,10 +2770,10 @@ app.post("/parkingInit", (req, res) => {
     addLog(req, response); return res.json(response);
   }
 
-  // Identify which POS is calling — determines mode returned
+  // Identify which POS is calling â€” determines mode returned
   const mode = detectMode(req.body);
 
-  // Validate outlet — return 91 if unrecognised (both POS configured and neither matches)
+  // Validate outlet â€” return 91 if unrecognised (both POS configured and neither matches)
   if (mode === "Unknown" && config.entranceOutlet && config.exitOutlet) {
     const response = {responseCode:"91", responseDescription:"Invalid Outlet Number"};
     addLog(req, response); return res.json(response);
@@ -2765,7 +2799,7 @@ app.post("/parkingInit", (req, res) => {
     controller:                      config.tellEnabled ? "A" : "0",
     fixAmountSolution:               String(config.fixAmountSolution),
     charges,
-    // TELL credentials — only included when TELL is enabled
+    // TELL credentials â€” only included when TELL is enabled
     // App uses these to poll getStatus directly for vehicle detection
     ...(config.tellEnabled && config.tellHwId ? {
       tellApiUrl:        "https://api.tell.hu/gc",
@@ -2777,7 +2811,7 @@ app.post("/parkingInit", (req, res) => {
     } : {}),
     stationId:                       rentalConfig.rentalStationId   || "LIM-001",
     stationName:                     rentalConfig.rentalStationName || "Rental Station",
-    // Rental-specific fields — only included when app identifies as Rental
+    // Rental-specific fields â€” only included when app identifies as Rental
     ...(req.body.application === "Rental" ? {
       preAuthAmountCents: String(rentalConfig.preAuthAmountCents),
       maxRentalTimeMins:  String(rentalConfig.maxRentalTimeMins),
@@ -2793,19 +2827,19 @@ app.post("/parkingInit", (req, res) => {
     voiceAssistant:                  config.voiceAssistant ? "1" : "0",  // "1"=enabled, "0"=silent
     defaultLanguage:                 config.defaultLanguage               // "EN","EL","RU","IW"
   };
-  // Auto-reset flagsForAction to "0000" after sending — prevents loop on next keep-alive
+  // Auto-reset flagsForAction to "0000" after sending â€” prevents loop on next keep-alive
   if (config.flagsForAction !== "0000") {
-    console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent → auto-reset to 0000`);
+    console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent â†’ auto-reset to 0000`);
     config.flagsForAction = "0000";
   }
   if (req.body.application === "Rental" && rentalConfig.flagsForAction !== "0000") {
-    console.log(`[parkingInit/Rental] flagsForAction=${rentalConfig.flagsForAction} sent → auto-reset to 0000`);
+    console.log(`[parkingInit/Rental] flagsForAction=${rentalConfig.flagsForAction} sent â†’ auto-reset to 0000`);
     rentalConfig.flagsForAction = "0000";
   }
   addLog(req, response); res.json(response);
 });
 
-// ── POST /entranceCall ────────────────────────────────────────────────────────
+// â”€â”€ POST /entranceCall â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/entranceCall", async (req, res) => {
   const { token, lastDigits, authCode, timeOfInput, tokenCode,
           receiptNumber, referenceNo, preAuthAmount, expiryDate,
@@ -2823,7 +2857,7 @@ app.post("/entranceCall", async (req, res) => {
         timeToDisplayMessage: "8", responseCode: "56",
         responseDescription: "Monthly card not in allowed list"
       };
-      console.log(`[entranceCall] BLOCKED — Monthly card ${cardNumber} not in list`);
+      console.log(`[entranceCall] BLOCKED â€” Monthly card ${cardNumber} not in list`);
       addRejection("Not in allowed list", "Monthly Card", cardNumber, "56");
       addLog(req, response); return res.json(response);
     }
@@ -2833,15 +2867,15 @@ app.post("/entranceCall", async (req, res) => {
   if (token && activeEntries[token] && inputType === "Monthly Card") {
     const existing = activeEntries[token];
     const entryTime = new Date(existing.entryTime).toISOString().substring(11,19);
-    // No jccRelease needed — monthly cards have no pre-auth
+    // No jccRelease needed â€” monthly cards have no pre-auth
     const response = {
       outlet: outlet || config.entranceOutlet, terminal: terminal || config.entranceTerminal,
       installationPoint: "Entrance",
       displayMessage: `This card is already inside since ${entryTime}. Please exit first.`,
       timeToDisplayMessage: "8", responseCode: "41",
-      responseDescription: "Card already inside — exit required"
+      responseDescription: "Card already inside â€” exit required"
     };
-    console.log(`[entranceCall] BLOCKED monthly — already inside since ${entryTime}`);
+    console.log(`[entranceCall] BLOCKED monthly â€” already inside since ${entryTime}`);
     addRejection("Already inside since "+entryTime, "Monthly Card", existing.lastDigits, "41");
     addLog(req, response); return res.json(response);
   }
@@ -2864,16 +2898,16 @@ app.post("/entranceCall", async (req, res) => {
           expiryDate:         exp
         };
         await jccRelease(releaseEntry);
-        console.log(`[entranceCall] jccRelease called — duplicate bank card *${ld}`);
+        console.log(`[entranceCall] jccRelease called â€” duplicate bank card *${ld}`);
       } catch(e) { console.error("[entranceCall] jccRelease failed:", e.message); }
       const response = {
         outlet: outlet || config.entranceOutlet, terminal: terminal || config.entranceTerminal,
         installationPoint: "Entrance",
         displayMessage: `This card is already inside since ${entryTime}. Please exit first.`,
         timeToDisplayMessage: "8", responseCode: "41",
-        responseDescription: "Card already inside — exit required"
+        responseDescription: "Card already inside â€” exit required"
       };
-      console.log(`[entranceCall] BLOCKED bank card *${ld} — already inside since ${entryTime}`);
+      console.log(`[entranceCall] BLOCKED bank card *${ld} â€” already inside since ${entryTime}`);
       addRejection("Already inside since "+entryTime, "Bank Card", "*"+ld, "41");
       addLog(req, response); return res.json(response);
     }
@@ -2904,9 +2938,9 @@ app.post("/entranceCall", async (req, res) => {
     catch(e) { barrier = "tell-error: " + e.message; console.error("TELL entrance:", e.message); }
   }
 
-  // If barrier failed — release pre-auth (bank card only) and remove entry
+  // If barrier failed â€” release pre-auth (bank card only) and remove entry
   if (barrier !== "tell-ok" && barrier !== "mock-ok") {
-    console.log(`[entranceCall] Barrier failed (${barrier}) — removing entry${inputType === "Bank Card" ? " + releasing pre-auth" : ""}`);
+    console.log(`[entranceCall] Barrier failed (${barrier}) â€” removing entry${inputType === "Bank Card" ? " + releasing pre-auth" : ""}`);
     if (token && activeEntries[token]) {
       if (inputType === "Bank Card") {
         // Only bank cards have a pre-auth to release
@@ -2920,7 +2954,7 @@ app.post("/entranceCall", async (req, res) => {
             expiryDate:         expiryDate || "0000"
           };
           await jccRelease(releaseEntry);
-          console.log(`[entranceCall] jccRelease called — barrier failure`);
+          console.log(`[entranceCall] jccRelease called â€” barrier failure`);
         } catch(e) { console.error("[entranceCall] jccRelease failed:", e.message); }
       }
       releaseSpace(activeEntries[token]);
@@ -2964,7 +2998,7 @@ function releaseSpace(entry) {
   }
 }
 
-// ── Barrier open with 3 retries ───────────────────────────────────────────────
+// â”€â”€ Barrier open with 3 retries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function openBarrierWithRetry(maxRetries = 3, delayMs = 2000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -2980,11 +3014,11 @@ async function openBarrierWithRetry(maxRetries = 3, delayMs = 2000) {
     }
     if (attempt < maxRetries) await new Promise(r => setTimeout(r, delayMs));
   }
-  console.error("[BARRIER] All retries failed — calling staff");
+  console.error("[BARRIER] All retries failed â€” calling staff");
   return "failed";
 }
 
-// ── Fee calculation from entry time and charges table ─────────────────────────
+// â”€â”€ Fee calculation from entry time and charges table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function calculateFee(entryTime) {
   if (!entryTime) return config.minimumAmountPreAuth || 300;
   const mins = Math.floor((Date.now() - entryTime) / 60000);
@@ -2994,21 +3028,21 @@ function calculateFee(entryTime) {
     const to   = c.to ? parseInt(c.to) : Infinity;
     if (mins >= from && mins < to) return parseInt(c.fee);
   }
-  // Below first threshold — free
+  // Below first threshold â€” free
   return 0;
 }
 
-// ── POST /exitCall ────────────────────────────────────────────────────────────
+// â”€â”€ POST /exitCall â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/exitCall", async (req, res) => {
   const { token } = req.body;
   const entry = token ? activeEntries[token] : null;
   const inputType = req.body.inputType || (entry && entry.inputType) || "Bank Card";
 
-  // ── Monthly Card exit — always free, no JCC calls ────────────────────────
+  // â”€â”€ Monthly Card exit â€” always free, no JCC calls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (inputType === "Monthly Card") {
     if (!token || !activeEntries[token]) {
-      // Card not registered at entrance — reject
-      console.log(`[exitCall] Monthly Card exit — no entry found for token`);
+      // Card not registered at entrance â€” reject
+      console.log(`[exitCall] Monthly Card exit â€” no entry found for token`);
       const response = {
         barrierOpen:         "0",
         moneyToPay:          "0",
@@ -3019,7 +3053,7 @@ app.post("/exitCall", async (req, res) => {
       };
       addLog(req, response); return res.json(response);
     }
-    console.log(`[exitCall] Monthly Card exit — entry found, opening barrier`);
+    console.log(`[exitCall] Monthly Card exit â€” entry found, opening barrier`);
     releaseSpace(activeEntries[token]);
     delete activeEntries[token];
     const bm = await openBarrierWithRetry();
@@ -3027,7 +3061,7 @@ app.post("/exitCall", async (req, res) => {
       ? { barrierOpen:"0", moneyToPay:"0",
           displayMessage:"Technical issue. Please contact staff.",
           timeToDisplayMessage:"10", responseCode:"08",
-          responseDescription:"Barrier failed — staff called" }
+          responseDescription:"Barrier failed â€” staff called" }
       : { barrierOpen:"1", moneyToPay:"0",
           displayMessage:"Thank you! Have a nice day.",
           timeToDisplayMessage:"5", responseCode:"00",
@@ -3042,13 +3076,13 @@ app.post("/exitCall", async (req, res) => {
     return { barrierOpen:"0", moneyToPay:"0",
       displayMessage: msg || "Technical issue. Please contact staff.",
       timeToDisplayMessage:"10", responseCode:"08",
-      responseDescription:"Barrier failed — staff called" };
+      responseDescription:"Barrier failed â€” staff called" };
   }
 
   let response;
   switch(config.exitScenario) {
 
-    // ── Scenario 1: FREE ──────────────────────────────────────────────────────
+    // â”€â”€ Scenario 1: FREE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Release pre-auth, open barrier, no charge
     case 1: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
@@ -3064,7 +3098,7 @@ app.post("/exitCall", async (req, res) => {
       break;
     }
 
-    // ── Scenario 2: CAPTURE ───────────────────────────────────────────────────
+    // â”€â”€ Scenario 2: CAPTURE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Capture the calculated fee (must be <= preAuth), open barrier
     case 2: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
@@ -3073,8 +3107,8 @@ app.post("/exitCall", async (req, res) => {
       try { captureResult2 = await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
       const captureOk2 = captureResult2 && captureResult2.responseCode === "00";
       if (!captureOk2) {
-        // Capture declined — open barrier anyway, store for retry
-        console.log(`[JCC] Capture declined (${captureResult2?.responseCode}) — storing for retry`);
+        // Capture declined â€” open barrier anyway, store for retry
+        console.log(`[JCC] Capture declined (${captureResult2?.responseCode}) â€” storing for retry`);
         addPendingCapture(entry, captureAmt);
       }
       delete activeEntries[token];
@@ -3084,16 +3118,16 @@ app.post("/exitCall", async (req, res) => {
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:String(captureAmt),
             displayMessage: captureOk2
-              ? `Thank you! Charged €${(captureAmt/100).toFixed(2)}.`
-              : `Thank you! Charged €${(captureAmt/100).toFixed(2)}. (Payment pending)`,
+              ? `Thank you! Charged â‚¬${(captureAmt/100).toFixed(2)}.`
+              : `Thank you! Charged â‚¬${(captureAmt/100).toFixed(2)}. (Payment pending)`,
             timeToDisplayMessage:"5", responseCode:"00",
             responseDescription:"Successful Response" };
       break;
     }
 
-    // ── Scenario 3: TOPUP APPROVED ────────────────────────────────────────────
-    // TopUp succeeds → Capture full fee → open barrier
-    // If TopUp is declined by JCC → fall back to Scenario 4 behaviour (release + barrierOpen:"-2")
+    // â”€â”€ Scenario 3: TOPUP APPROVED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // TopUp succeeds â†’ Capture full fee â†’ open barrier
+    // If TopUp is declined by JCC â†’ fall back to Scenario 4 behaviour (release + barrierOpen:"-2")
     case 3: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
       const totalFee3 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
@@ -3102,61 +3136,61 @@ app.post("/exitCall", async (req, res) => {
       try { topupResult3 = await jccTopup(entry, topupAmt3); } catch(e) { console.error("[JCC TOPUP]", e.message); }
 
       const topupApproved = topupResult3 && topupResult3.responseCode === "00";
-      console.log(`[JCC] topup result: ${topupResult3?.responseCode} ${topupResult3?.responseText} → ${topupApproved ? "APPROVED" : "DECLINED"}`);
+      console.log(`[JCC] topup result: ${topupResult3?.responseCode} ${topupResult3?.responseText} â†’ ${topupApproved ? "APPROVED" : "DECLINED"}`);
 
       if (topupApproved) {
-        // TopUp approved → Capture full fee → open barrier
+        // TopUp approved â†’ Capture full fee â†’ open barrier
         let captureResult3 = null;
         try { captureResult3 = await jccCapture(entry, totalFee3); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
         const captureOk3 = captureResult3 && captureResult3.responseCode === "00";
         if (!captureOk3) {
-          console.log(`[JCC] Capture declined after TopUp (${captureResult3?.responseCode}) — storing for retry`);
+          console.log(`[JCC] Capture declined after TopUp (${captureResult3?.responseCode}) â€” storing for retry`);
           addPendingCapture(entry, totalFee3);
         }
         delete activeEntries[token];
         releaseSpace(entry);
         const b3 = await openBarrierWithRetry();
         response = b3 === "failed"
-          ? staffResponse(`Payment €${(totalFee3/100).toFixed(2)} processed. Barrier failed — staff called.`)
+          ? staffResponse(`Payment â‚¬${(totalFee3/100).toFixed(2)} processed. Barrier failed â€” staff called.`)
           : { barrierOpen:"1", moneyToPay:String(totalFee3),
               displayMessage: captureOk3
-                ? `Thank you! Total €${(totalFee3/100).toFixed(2)}.`
-                : `Thank you! Total €${(totalFee3/100).toFixed(2)}. (Payment pending)`,
+                ? `Thank you! Total â‚¬${(totalFee3/100).toFixed(2)}.`
+                : `Thank you! Total â‚¬${(totalFee3/100).toFixed(2)}. (Payment pending)`,
               timeToDisplayMessage:"5", responseCode:"00",
               responseDescription:"Successful Response" };
       } else {
-        // TopUp declined by JCC → Release pre-auth → ask app for full SALE
-        console.log("[JCC] TopUp declined — falling back to full SALE flow");
+        // TopUp declined by JCC â†’ Release pre-auth â†’ ask app for full SALE
+        console.log("[JCC] TopUp declined â€” falling back to full SALE flow");
         if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
         try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-        // Do NOT delete entry — app needs it alive to send exitPayment
+        // Do NOT delete entry â€” app needs it alive to send exitPayment
         response = { barrierOpen:"-2", moneyToPay:String(totalFee3),
           recordId: entry.recordId,
-          displayMessage:`Card declined. Please tap card for full €${(totalFee3/100).toFixed(2)}.`,
+          displayMessage:`Card declined. Please tap card for full â‚¬${(totalFee3/100).toFixed(2)}.`,
           timeToDisplayMessage:"10", responseCode:"31",
-          responseDescription:"TopUp declined — full SALE required" };
+          responseDescription:"TopUp declined â€” full SALE required" };
       }
       break;
     }
 
-    // ── Scenario 4: TOPUP DECLINED ────────────────────────────────────────────
-    // TopUp declined → Release pre-auth → ask app for full SALE (barrierOpen:"-2")
+    // â”€â”€ Scenario 4: TOPUP DECLINED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // TopUp declined â†’ Release pre-auth â†’ ask app for full SALE (barrierOpen:"-2")
     case 4: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
       const totalFee4 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
       // Generate recordId once and store it on the entry so it is stable across retries
       if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
       try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-      // Do NOT delete entry — app needs it alive to send exitPayment
+      // Do NOT delete entry â€” app needs it alive to send exitPayment
       response = { barrierOpen:"-2", moneyToPay:String(totalFee4),
         recordId: entry.recordId,
-        displayMessage:`Card declined. Please tap card for full €${(totalFee4/100).toFixed(2)}.`,
+        displayMessage:`Card declined. Please tap card for full â‚¬${(totalFee4/100).toFixed(2)}.`,
         timeToDisplayMessage:"10", responseCode:"31",
-        responseDescription:"TopUp declined — full SALE required" };
+        responseDescription:"TopUp declined â€” full SALE required" };
       break;
     }
 
-    // ── Scenario 5: BARRIER FAILED ────────────────────────────────────────────
+    // â”€â”€ Scenario 5: BARRIER FAILED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     case 5: default:
       response = staffResponse("Technical issue. Please contact staff.");
       break;
@@ -3164,7 +3198,7 @@ app.post("/exitCall", async (req, res) => {
   addLog(req, response); res.json(response);
 });
 
-// ── POST /exitPayment ─────────────────────────────────────────────────────────
+// â”€â”€ POST /exitPayment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/exitPayment", async (req, res) => {
   const { token } = req.body;
   const exitEntry = token ? activeEntries[token] : null;
@@ -3217,7 +3251,7 @@ app.post("/vehiclePresent", async (req, res) => {
   addLog(req, response); res.json(response);
 });
 
-// ── POST /help ────────────────────────────────────────────────────────────────
+// â”€â”€ POST /help â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/help", (req, res) => {
   const action      = req.body.action      || "";
   const application = req.body.application || "";
@@ -3241,7 +3275,7 @@ app.post("/help", (req, res) => {
       req.body.intallationPoint || "?",
       action
     );
-    console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} — ${action}`);
+    console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} â€” ${action}`);
   }
 
   const cfg = isCarWash ? carWashConfig : config;
@@ -3260,11 +3294,11 @@ app.post("/help", (req, res) => {
   addLog(req, response); res.json(response);
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Car Wash API
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-// ── POST /washStart ───────────────────────────────────────────────────────────
+// â”€â”€ POST /washStart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/washStart", (req, res) => {
   const { washId, token, authCode, lastDigits, expiryDate, tokenCode,
           receiptNumber, referenceNo, preAuthAmount, outlet, terminal, inputType } = req.body;
@@ -3299,7 +3333,7 @@ app.post("/washStart", (req, res) => {
     startTime:          Date.now()
   };
 
-  console.log(`[WASH_START] washId=${washId} last4=${lastDigits} preAuth=€${(parseInt(preAuthAmount||0)/100).toFixed(2)}`);
+  console.log(`[WASH_START] washId=${washId} last4=${lastDigits} preAuth=â‚¬${(parseInt(preAuthAmount||0)/100).toFixed(2)}`);
 
   const response = {
     responseCode:         "00",
@@ -3310,7 +3344,7 @@ app.post("/washStart", (req, res) => {
   addCarWashLog(req, response); res.json(response);
 });
 
-// ── POST /washStop ────────────────────────────────────────────────────────────
+// â”€â”€ POST /washStop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/washStop", async (req, res) => {
   const { washId, timeUsedSeconds, reason } = req.body;
   const session = washId ? activeWashSessions[washId] : null;
@@ -3327,26 +3361,26 @@ app.post("/washStop", async (req, res) => {
 
   delete activeWashSessions[washId];
 
-  // Always calculate time used server-side from session.startTime — more reliable than app-reported value
+  // Always calculate time used server-side from session.startTime â€” more reliable than app-reported value
   const timeUsed = Math.round((Date.now() - session.startTime) / 1000);
 
-  // Monthly card — no pre-auth was taken, free wash, no JCC calls
+  // Monthly card â€” no pre-auth was taken, free wash, no JCC calls
   if (session.isMonthly) {
     const mins = Math.floor(timeUsed / 60);
     const secs = timeUsed % 60;
-    console.log(`[WASH_STOP] Monthly card — free wash washId=${washId} timeUsed=${timeUsed}s`);
+    console.log(`[WASH_STOP] Monthly card â€” free wash washId=${washId} timeUsed=${timeUsed}s`);
     const response = {
       responseCode: "00", responseDescription: "Successful Response",
       amountCharged: "0", timeUsedSeconds: String(timeUsed),
-      displayMessage: `Monthly Card — Free Wash\nTime used: ${mins}m ${secs}s`,
+      displayMessage: `Monthly Card â€” Free Wash\nTime used: ${mins}m ${secs}s`,
       timeToDisplayMessage: "5"
     };
     addCarWashLog(req, response); return res.json(response);
   }
 
-  // Void pre-auth immediately — wash never started or crashed before completing
+  // Void pre-auth immediately â€” wash never started or crashed before completing
   if (reason === "controller_failed" || reason === "app_restart") {
-    console.log(`[WASH_STOP] Void pre-auth — reason=${reason} washId=${washId}`);
+    console.log(`[WASH_STOP] Void pre-auth â€” reason=${reason} washId=${washId}`);
     try { await jccRelease(session); } catch(e) { console.error("[WASH_STOP VOID]", e.message); }
     const response = {
       responseCode: "00", responseDescription: "Pre-auth voided. No charge applied.",
@@ -3360,11 +3394,11 @@ app.post("/washStop", async (req, res) => {
   let amountCents = 0;
   switch (carWashConfig.washScenario) {
     case 1: {
-      // Proportional to actual time used — capped at pre-auth amount
+      // Proportional to actual time used â€” capped at pre-auth amount
       const maxSecs = carWashConfig.maxWashTimeSeconds || 300;
       const ratio   = Math.min(timeUsed / maxSecs, 1.0);
       amountCents   = Math.round(session.preAuthAmountCents * ratio);
-      console.log(`[WASH_STOP] Proportional charge: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% → €${(amountCents/100).toFixed(2)}`);
+      console.log(`[WASH_STOP] Proportional charge: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% â†’ â‚¬${(amountCents/100).toFixed(2)}`);
       break;
     }
     case 2: amountCents = carWashConfig.maxWashAmountCents; break;  // fixed amount
@@ -3390,7 +3424,7 @@ app.post("/washStop", async (req, res) => {
   const captureOk = captureResult && captureResult.responseCode === "00";
   if (!captureOk) {
     addWashPendingCapture(session, amountCents);
-    console.log(`[WASH_STOP] Capture failed (${captureResult?.responseCode}) — stored for retry. washId=${washId}`);
+    console.log(`[WASH_STOP] Capture failed (${captureResult?.responseCode}) â€” stored for retry. washId=${washId}`);
   }
 
   const mins = Math.floor(timeUsed / 60);
@@ -3402,14 +3436,14 @@ app.post("/washStop", async (req, res) => {
     amountCharged:        String(amountCents),
     timeUsedSeconds:      String(timeUsed),
     displayMessage:       captureOk
-      ? `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)}`
-      : `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)} (pending)`,
+      ? `Time used: ${mins}m ${secs}s\nAmount charged: â‚¬${(amountCents/100).toFixed(2)}`
+      : `Time used: ${mins}m ${secs}s\nAmount charged: â‚¬${(amountCents/100).toFixed(2)} (pending)`,
     timeToDisplayMessage: "8"
   };
   addCarWashLog(req, response); res.json(response);
 });
 
-// ── CarWash Admin endpoints ───────────────────────────────────────────────────
+// â”€â”€ CarWash Admin endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/admin/carwash-config",  (req, res) => res.json(carWashConfig));
 app.get("/admin/carwash-sessions",(req, res) => res.json(Object.values(activeWashSessions)));
 app.get("/admin/carwash-logs",    (req, res) => res.json(carWashLogs));
@@ -3441,16 +3475,16 @@ app.post("/admin/carwash-clear-logs", (req, res) => {
   res.json({ ok: true });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // JCC IPPI Financial Services API  (mirroring test-apis.jccsecure.com)
 // Base path: /financialservices/v1/ippi
 // Auth: HMAC as per JCC spec (Authorization: hmacauth appId:sig:nonce:ts)
-// One active transaction stored in memory — cleared per transaction
-// ═══════════════════════════════════════════════════════════════════════════════
+// One active transaction stored in memory â€” cleared per transaction
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const crypto = require("crypto");
 
-// ── HMAC credentials per endpoint ─────────────────────────────────────────────
+// â”€â”€ HMAC credentials per endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let jccConfig = {
   topup:   { appId: "1cbb351c501647ef8f855335d2017dbc", apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=" },
   capture: { appId: "c677c1ba0bc349cfb04e2d10d67763f6", apiKey: "jzHup+gUjZo4XDKm54DtoIE9oK51THQ+Vp1AStzIfvI=" },
@@ -3460,7 +3494,7 @@ let jccConfig = {
   validateHmac: false
 };
 
-// ── In-memory transaction store (one at a time) ───────────────────────────────
+// â”€â”€ In-memory transaction store (one at a time) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let activeTransaction = null;
 let jccLogs = [];
 
@@ -3477,7 +3511,7 @@ function addJccLog(endpoint, req, res, hmacValid) {
   console.log(`[JCC] ${endpoint} | HMAC:${hmacValid} | res=${JSON.stringify(res).substring(0,80)}`);
 }
 
-// ── HMAC Validation ───────────────────────────────────────────────────────────
+// â”€â”€ HMAC Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function validateHmac(req) {
   try {
     const auth = req.headers["authorization"] || "";
@@ -3521,7 +3555,7 @@ function jccAuth(req, res, next) {
   next();
 }
 
-// ── Standard JCC success response ─────────────────────────────────────────────
+// â”€â”€ Standard JCC success response â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function jccOk(extra = {}) {
   return { responseCode: "00", responseDescription: "Successful Response", ...extra };
 }
@@ -3530,7 +3564,7 @@ function jccErr(code, desc) {
   return { responseCode: code, responseDescription: desc };
 }
 
-// ── POST /financialservices/v1/ippi/auth/topup ────────────────────────────────
+// â”€â”€ POST /financialservices/v1/ippi/auth/topup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/financialservices/v1/ippi/auth/topup", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -3549,7 +3583,7 @@ app.post("/financialservices/v1/ippi/auth/topup", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// ── POST /financialservices/v1/ippi/auth/capture ──────────────────────────────
+// â”€â”€ POST /financialservices/v1/ippi/auth/capture â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/financialservices/v1/ippi/auth/capture", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -3567,7 +3601,7 @@ app.post("/financialservices/v1/ippi/auth/capture", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// ── POST /financialservices/v1/ippi/auth/release (PreAuthorisationRelease) ────
+// â”€â”€ POST /financialservices/v1/ippi/auth/release (PreAuthorisationRelease) â”€â”€â”€â”€
 app.post("/financialservices/v1/ippi/auth/release", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -3585,7 +3619,7 @@ app.post("/financialservices/v1/ippi/auth/release", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// ── POST /financialservices/v1/ippi/void ─────────────────────────────────────
+// â”€â”€ POST /financialservices/v1/ippi/void â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/financialservices/v1/ippi/void", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -3602,7 +3636,7 @@ app.post("/financialservices/v1/ippi/void", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// ── POST /financialservices/v1/ippi/reversal ──────────────────────────────────
+// â”€â”€ POST /financialservices/v1/ippi/reversal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/financialservices/v1/ippi/reversal", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -3619,28 +3653,28 @@ app.post("/financialservices/v1/ippi/reversal", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// ── GET /jcc/transaction ── current active transaction ────────────────────────
+// â”€â”€ GET /jcc/transaction â”€â”€ current active transaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/jcc/transaction", (req, res) => {
   res.json({ activeTransaction });
 });
 
-// ── DELETE /jcc/transaction ── clear active transaction ───────────────────────
+// â”€â”€ DELETE /jcc/transaction â”€â”€ clear active transaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.delete("/jcc/transaction", (req, res) => {
   activeTransaction = null;
   res.json({ cleared: true });
 });
 
-// ── GET /jcc/logs ── JCC transaction logs ─────────────────────────────────────
+// â”€â”€ GET /jcc/logs â”€â”€ JCC transaction logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/jcc/logs", (req, res) => {
   res.json(jccLogs);
 });
 
-// ── GET /jcc/config ── get JCC HMAC config ───────────────────────────────────
+// â”€â”€ GET /jcc/config â”€â”€ get JCC HMAC config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/jcc/config", (req, res) => {
   res.json({ appId: jccConfig.appId, validateHmac: jccConfig.validateHmac });
 });
 
-// ── POST /jcc/config ── update JCC HMAC config ───────────────────────────────
+// â”€â”€ POST /jcc/config â”€â”€ update JCC HMAC config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/jcc/config", (req, res) => {
   const { topupAppId, topupApiKey, captureAppId, captureApiKey,
           releaseAppId, releaseApiKey, validateHmac } = req.body;
@@ -3654,7 +3688,7 @@ app.post("/jcc/config", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── POST /rental/init ─────────────────────────────────────────────────────────
+// â”€â”€ POST /rental/init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Android app calls this on startup to get station config + initial item list
 app.post("/rental/init", (req, res) => {
   if (rentalConfig.responseCode !== "00") {
@@ -3681,8 +3715,8 @@ app.post("/rental/init", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/keepAlive ────────────────────────────────────────────────────
-// Sent every 30s — returns refreshed item list + any pending flags
+// â”€â”€ POST /rental/keepAlive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Sent every 30s â€” returns refreshed item list + any pending flags
 app.post("/rental/keepAlive", (req, res) => {
   const response = {
     responseCode:   "00",
@@ -3693,8 +3727,8 @@ app.post("/rental/keepAlive", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/preAuthAmount ────────────────────────────────────────────────
-// Called just before ECR PreAuth — confirms item is still available and returns amount
+// â”€â”€ POST /rental/preAuthAmount â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Called just before ECR PreAuth â€” confirms item is still available and returns amount
 app.post("/rental/preAuthAmount", (req, res) => {
   const { itemId, itemType } = req.body;
   const item = rentalConfig.items.find(i => i.itemId === itemId);
@@ -3713,8 +3747,8 @@ app.post("/rental/preAuthAmount", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/entry ────────────────────────────────────────────────────────
-// ECR PreAuth approved → create rental record, generate unlock code
+// â”€â”€ POST /rental/entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ECR PreAuth approved â†’ create rental record, generate unlock code
 app.post("/rental/entry", (req, res) => {
   const { entryId, outlet, terminal, stationId, itemId, itemType, dock,
           authCode, receiptNumber, tokenCode, lastDigits, expiryDate, preAuthAmountCents } = req.body;
@@ -3726,7 +3760,7 @@ app.post("/rental/entry", (req, res) => {
     const response = { responseCode: rentalConfig.responseCode, responseDescription: "Service unavailable" };
     addRentalLog(req, response); return res.json(response);
   }
-  // Duplicate guard — return same unlock code
+  // Duplicate guard â€” return same unlock code
   if (activeRentals[entryId]) {
     const response = { responseCode: "00", entryId, unlockCode: activeRentals[entryId].unlockCode, duplicate: true };
     addRentalLog(req, response); return res.json(response);
@@ -3740,7 +3774,7 @@ app.post("/rental/entry", (req, res) => {
     unlockCode,
     startTime: Date.now()
   };
-  console.log(`[RENTAL] Entry — entryId=${entryId} item=${itemId} last4=****${lastDigits} code=${unlockCode}`);
+  console.log(`[RENTAL] Entry â€” entryId=${entryId} item=${itemId} last4=****${lastDigits} code=${unlockCode}`);
   const response = {
     responseCode:      "00",
     responseDescription: "Rental entry created",
@@ -3753,8 +3787,8 @@ app.post("/rental/entry", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/return ───────────────────────────────────────────────────────
-// ECR PAN-Capture approved → verify card, calc fee, JCC capture, release item
+// â”€â”€ POST /rental/return â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ECR PAN-Capture approved â†’ verify card, calc fee, JCC capture, release item
 app.post("/rental/return", async (req, res) => {
   const { entryId, outlet, terminal, stationId, panToken, panLastDigits, panExpiry } = req.body;
   const session = activeRentals[entryId];
@@ -3781,9 +3815,9 @@ app.post("/rental/return", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending — please contact staff.";
+        displayMessage = "Return received. Payment pending â€” please contact staff.";
       } else {
-        displayMessage = `Thank you! €${(amountCents/100).toFixed(2)} charged.`;
+        displayMessage = `Thank you! â‚¬${(amountCents/100).toFixed(2)} charged.`;
       }
     } else {
       amountCents = calcRentalFee(session.startTime, endTime);
@@ -3791,21 +3825,21 @@ app.post("/rental/return", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending — please contact staff.";
+        displayMessage = "Return received. Payment pending â€” please contact staff.";
       } else {
         const mins = Math.floor(timeUsedSec / 60);
         const secs = timeUsedSec % 60;
-        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: €${(amountCents/100).toFixed(2)}`;
+        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: â‚¬${(amountCents/100).toFixed(2)}`;
       }
     }
   } catch(e) {
     console.error("[RENTAL/return] JCC error:", e.message);
     addRentalPendingCapture(session, amountCents || calcRentalFee(session.startTime, endTime));
-    displayMessage = "Return received. Payment pending — please contact staff.";
+    displayMessage = "Return received. Payment pending â€” please contact staff.";
   }
   rentalItemAvailability[session.itemId] = true;
   delete activeRentals[entryId];
-  console.log(`[RENTAL] Return — entryId=${entryId} timeUsed=${timeUsedSec}s charged=€${(amountCents/100).toFixed(2)}`);
+  console.log(`[RENTAL] Return â€” entryId=${entryId} timeUsed=${timeUsedSec}s charged=â‚¬${(amountCents/100).toFixed(2)}`);
   const response = {
     responseCode:         "00",
     entryId,
@@ -3817,8 +3851,8 @@ app.post("/rental/return", async (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/start ────────────────────────────────────────────────────────
-// Android pre-auth approved → store rental session
+// â”€â”€ POST /rental/start â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Android pre-auth approved â†’ store rental session
 app.post("/rental/start", (req, res) => {
   const { rentalId, outlet, terminal, token, lastDigits, expiryDate,
           authCode, rrn, receiptNumber, tokenCode, preAuthAmountCents, timeOfStart } = req.body;
@@ -3836,7 +3870,7 @@ app.post("/rental/start", (req, res) => {
     preAuthAmountCents: parseInt(preAuthAmountCents || rentalConfig.preAuthAmountCents),
     timeOfStart, startTime: Date.now()
   };
-  console.log(`[RENTAL] Started — rentalId=${rentalId} last4=****${lastDigits}`);
+  console.log(`[RENTAL] Started â€” rentalId=${rentalId} last4=****${lastDigits}`);
   const response = {
     responseCode:  "00",
     responseDescription: "Rental started",
@@ -3847,8 +3881,8 @@ app.post("/rental/start", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/stop ─────────────────────────────────────────────────────────
-// Customer returns item → capture fee based on time used, then clear session
+// â”€â”€ POST /rental/stop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Customer returns item â†’ capture fee based on time used, then clear session
 app.post("/rental/stop", async (req, res) => {
   const { rentalId, timeOfStop, reason } = req.body;
   const session = activeRentals[rentalId];
@@ -3867,7 +3901,7 @@ app.post("/rental/stop", async (req, res) => {
 
   try {
     if (rentalConfig.rentalScenario === 3) {
-      // Free — release the pre-auth
+      // Free â€” release the pre-auth
       await jccRelease(session);
       amountCents = 0;
       displayMessage = "Thank you! No charge for this rental.";
@@ -3878,9 +3912,9 @@ app.post("/rental/stop", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending — please contact staff.";
+        displayMessage = "Return received. Payment pending â€” please contact staff.";
       } else {
-        displayMessage = "Thank you! €" + (amountCents / 100).toFixed(2) + " charged.";
+        displayMessage = "Thank you! â‚¬" + (amountCents / 100).toFixed(2) + " charged.";
       }
     } else {
       // Scenario 1: time-based
@@ -3889,21 +3923,21 @@ app.post("/rental/stop", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending — please contact staff.";
+        displayMessage = "Return received. Payment pending â€” please contact staff.";
       } else {
         const mins = Math.floor(timeUsedSec / 60);
         const secs = timeUsedSec % 60;
-        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: €${(amountCents/100).toFixed(2)}`;
+        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: â‚¬${(amountCents/100).toFixed(2)}`;
       }
     }
   } catch(e) {
     console.error(`[RENTAL/stop] JCC error:`, e.message);
     addRentalPendingCapture(session, amountCents || calcRentalFee(session.startTime, endTime));
-    displayMessage = "Return received. Payment pending — please contact staff.";
+    displayMessage = "Return received. Payment pending â€” please contact staff.";
   }
 
   delete activeRentals[rentalId];
-  console.log(`[RENTAL] Stopped — rentalId=${rentalId} timeUsed=${timeUsedSec}s charged=€${(amountCents/100).toFixed(2)}`);
+  console.log(`[RENTAL] Stopped â€” rentalId=${rentalId} timeUsed=${timeUsedSec}s charged=â‚¬${(amountCents/100).toFixed(2)}`);
   const response = {
     responseCode,
     rentalId,
@@ -3915,7 +3949,7 @@ app.post("/rental/stop", async (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── POST /rental/help ─────────────────────────────────────────────────────────
+// â”€â”€ POST /rental/help â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/rental/help", async (req, res) => {
   const action = req.body.action || "Help Button";
   if (action === "Help Button" || action.startsWith("Help")) {
@@ -3929,19 +3963,19 @@ app.post("/rental/help", async (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// ── GET /rental/rentals ───────────────────────────────────────────────────────
+// â”€â”€ GET /rental/rentals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/rental/rentals", (req, res) => res.json(Object.values(activeRentals)));
 
-// ── GET /rental/logs ──────────────────────────────────────────────────────────
+// â”€â”€ GET /rental/logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/rental/logs", (req, res) => res.json(rentalLogs));
 
-// ── DELETE /rental/logs ───────────────────────────────────────────────────────
+// â”€â”€ DELETE /rental/logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.delete("/rental/logs", (req, res) => { rentalLogs = []; res.json({ ok: true }); });
 
-// ── GET /rental/config ────────────────────────────────────────────────────────
+// â”€â”€ GET /rental/config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/rental/config", (req, res) => res.json(rentalConfig));
 
-// ── POST /admin/rental-config ─────────────────────────────────────────────────
+// â”€â”€ POST /admin/rental-config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/admin/rental-config", (req, res) => {
   const { key, value } = req.body;
   if (!(key in rentalConfig)) return res.json({ ok: false, error: `Unknown key: ${key}` });
@@ -3960,7 +3994,7 @@ app.post("/admin/rental-config", (req, res) => {
   res.json({ ok: true, config: rentalConfig });
 });
 
-// ── POST /admin/rental-add-charge ─────────────────────────────────────────────
+// â”€â”€ POST /admin/rental-add-charge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/admin/rental-add-charge", (req, res) => {
   const { upToMins, fee } = req.body;
   if (!fee) return res.json({ ok: false, error: "fee required" });
@@ -3969,20 +4003,20 @@ app.post("/admin/rental-add-charge", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── POST /admin/rental-remove-charge ─────────────────────────────────────────
+// â”€â”€ POST /admin/rental-remove-charge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/admin/rental-remove-charge", (req, res) => {
   const { index } = req.body;
   if (index >= 0 && index < rentalConfig.charges.length) rentalConfig.charges.splice(index, 1);
   res.json({ ok: true });
 });
 
-// ── POST /admin/rental-clear ──────────────────────────────────────────────────
+// â”€â”€ POST /admin/rental-clear â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/admin/rental-clear", (req, res) => { activeRentals = {}; res.json({ ok: true }); });
 
-// ── GET /admin/rental-pending-captures ───────────────────────────────────────
+// â”€â”€ GET /admin/rental-pending-captures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/admin/rental-pending-captures", (req, res) => res.json(rentalPendingCaptures));
 
-// ── POST /admin/rental-item-avail ────────────────────────────────────────────
+// â”€â”€ POST /admin/rental-item-avail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Toggle item availability in the catalogue (simulate dock state)
 app.post("/admin/rental-item-avail", (req, res) => {
   const { itemId, available } = req.body;
@@ -3995,87 +4029,170 @@ app.post("/admin/rental-item-avail", (req, res) => {
 });
 
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PETROLINA API  (called by S1U2 app)
-// ═══════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════════
 
 const http = require("http");
 
-// POST /pump/init — returns pump label + fuel grades for this terminal
-app.post("/pump/init", (req, res) => {
+// POST /petrolAppInit
+app.post("/petrolAppInit", (req, res) => {
   if (petrolinaConfig.responseCode !== "00") {
     const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "Configuration error" };
-    addPetroLog("POST", "/pump/init", req.body, body);
+    addPetroLog("POST", "/petrolAppInit", req.body, body);
     return res.json(body);
   }
   const body = {
-    pumpLabel:       petrolinaConfig.pumpLabel,
-    fuelGrades:      petrolinaConfig.fuelGrades,
-    maxPreAuthCents: petrolinaConfig.maxPreAuthCents,
-    helpPhone:       petrolinaConfig.helpPhone
+    terminal:    petrolinaConfig.terminal || req.body.terminal || "",
+    pumpNo:      petrolinaConfig.pumpNo,
+    stationName: petrolinaConfig.stationName,
+    isLoyalty:   petrolinaConfig.isLoyalty,
+    helpPhone:   petrolinaConfig.helpPhone,
+    pumpProducts: petrolinaConfig.pumpProducts,
+    pumpSelectedTO:           petrolinaConfig.pumpSelectedTO,
+    fuelSelectionTO:          petrolinaConfig.fuelSelectionTO,
+    selectAmountTO:           petrolinaConfig.selectAmountTO,
+    enterAmountTO:            petrolinaConfig.enterAmountTO,
+    displayStartFuelingTO:    petrolinaConfig.displayStartFuelingTO,
+    displayScreenFuelingSecs: petrolinaConfig.displayScreenFuelingSecs
   };
-  addPetroLog("POST", "/pump/init", req.body, body);
+  addPetroLog("POST", "/petrolAppInit", req.body, body);
   res.json(body);
 });
 
-// POST /pump/authorize — records auth, schedules callback
-app.post("/pump/authorize", (req, res) => {
-  if (petrolinaConfig.authorizeResult !== "ok") {
-    const body = { status: "error", message: "Pump not available — try another pump" };
-    addPetroLog("POST", "/pump/authorize", req.body, body);
+// POST /optTransaction — creates a new OPT transaction record, returns transsegno
+app.post("/optTransaction", (req, res) => {
+  if (petrolinaConfig.responseCode !== "00") {
+    const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "OPT error", uuid: req.body.UUID || "" };
+    addPetroLog("POST", "/optTransaction", req.body, body);
     return res.json(body);
   }
-  pendingPetroAuth = { ...req.body, authorizedAt: Date.now() };
-  const body = { status: "ok", message: "Pump unlocked" };
-  addPetroLog("POST", "/pump/authorize", req.body, body);
+  const transsegno = String(petrolinaTranCounter++);
+  const uuid = req.body.UUID || "";
+  petrolinaTransactions[transsegno] = {
+    transsegno, uuid,
+    terminal: req.body.terminal || petrolinaConfig.terminal,
+    cardType: req.body.cartType || "B",
+    pumpId:   req.body.pumpid || petrolinaConfig.pumpNo,
+    batchNo:  req.body.batchNo || "",
+    callbackBase: req.body.callbackBase || "",
+    createdAt: Date.now(),
+    state: "opt_created"
+  };
+  const body = {
+    terminal:            petrolinaTransactions[transsegno].terminal,
+    transsegno,
+    UUID:                uuid,
+    batchNo:             req.body.batchNo || "",
+    responseCode:        "00",
+    responseDescription: "OK"
+  };
+  addPetroLog("POST", "/optTransaction", req.body, body);
   res.json(body);
-  if (req.body.callbackUrl) {
-    console.log(`[PETRO] Callback to ${req.body.callbackUrl} in ${petrolinaConfig.callbackDelaySec}s`);
-    setTimeout(() => firePetroCallback(req.body), petrolinaConfig.callbackDelaySec * 1000);
+});
+
+// POST /preAuthorization — records ECR pre-auth result, schedules completion callback
+app.post("/preAuthorization", (req, res) => {
+  const transsegno = req.body.transsegno || "";
+  const txn = petrolinaTransactions[transsegno];
+  if (!txn) {
+    const body = { responseCode: "90", responseDescription: "Unknown transsegno", transsegno, UUID: req.body.UUID || "" };
+    addPetroLog("POST", "/preAuthorization", req.body, body);
+    return res.json(body);
+  }
+  if (petrolinaConfig.preAuthResult !== "ok") {
+    const body = { responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT", transsegno, UUID: req.body.UUID || "" };
+    addPetroLog("POST", "/preAuthorization", req.body, body);
+    return res.json(body);
+  }
+  Object.assign(txn, {
+    jccAuthCode:           req.body.jccAuthCode || "",
+    jccRetrievalReference: req.body.jccRetrievalReference || "",
+    jccRequestAmount:      req.body.jccRequestAmount || 0,
+    jccFinalAmount:        req.body.jccFinalAmount || 0,
+    state: "pre_auth_ok"
+  });
+  const body = { responseCode: "00", responseDescription: "Pre-auth accepted", transsegno, UUID: req.body.UUID || "" };
+  addPetroLog("POST", "/preAuthorization", req.body, body);
+  res.json(body);
+
+  // Schedule completion callback
+  const callbackBase = txn.callbackBase || "";
+  if (callbackBase) {
+    console.log(`[PETRO] Completion callback to ${callbackBase} in ${petrolinaConfig.callbackDelaySec}s`);
+    setTimeout(() => firePetroCompletion(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
   }
 });
 
-// POST /pump/help
-app.post("/pump/help", (req, res) => {
-  const body = { message: "Help has been called. Staff will assist you shortly." };
-  addPetroLog("POST", "/pump/help", req.body, body);
+// POST /abortTransaction
+app.post("/abortTransaction", (req, res) => {
+  const transsegno = req.body.transsegno || "";
+  if (transsegno && petrolinaTransactions[transsegno]) {
+    petrolinaTransactions[transsegno].state = "aborted";
+  }
+  const body = { responseCode: "00", responseDescription: "Abort acknowledged" };
+  addPetroLog("POST", "/abortTransaction", req.body, body);
   res.json(body);
 });
 
-// ── Petrolina callback helper ─────────────────────────────────────────────────
-function firePetroCallback(auth) {
-  const maxCents    = auth.maxAmountCents || 5000;
+// POST /help
+app.post("/help", (req, res) => {
+  const body = { message: "Help has been called. Staff will assist you shortly." };
+  addPetroLog("POST", "/help", req.body, body);
+  res.json(body);
+});
+
+// ── Petrolina callback helper ──────────────────────────────────────────────────
+function firePetroCompletion(transsegno, callbackBase) {
+  const txn = petrolinaTransactions[transsegno] || {};
+  const maxCents = Math.round((txn.jccFinalAmount || 0) * 100) || 20000;
   const actualCents = petrolinaConfig.actualAmountCents > 0
     ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
     : Math.floor(Math.random() * (maxCents - 500) + 500);
-  const liters = parseFloat((actualCents / (petrolinaConfig.fuelGrades[0]?.pricePerLiter || 1650)).toFixed(3));
-  const payload = JSON.stringify({ pumpId: auth.pumpId || 1, actualAmountCents: actualCents, liters });
-  console.log(`[PETRO_CB] → ${auth.callbackUrl}  ${payload}`);
+  const pricePerLiter = petrolinaConfig.pumpProducts[0]?.pricePerLiter || 1650;
+  const liters = parseFloat((actualCents / pricePerLiter).toFixed(3));
+
+  const payload = JSON.stringify({
+    uuid:                 txn.uuid || "",
+    transsegno,
+    actualAmountCents:    actualCents,
+    amountAuthorizedCents: maxCents,
+    pumpId:               txn.pumpId || petrolinaConfig.pumpNo,
+    jccAuthCode:          txn.jccAuthCode || "",
+    jccRetrievalReference: txn.jccRetrievalReference || ""
+  });
+
+  const callbackUrl = callbackBase.replace(/\/$/, "") + "/completion";
+  console.log(`[PETRO_CB] → ${callbackUrl}  ${payload}`);
   try {
-    const url = new URL(auth.callbackUrl);
+    const url = new URL(callbackUrl);
     const req = (url.protocol === "https:" ? require("https") : http).request({
-      hostname: url.hostname, port: url.port || (url.protocol==="https:"?443:80),
+      hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname, method: "POST",
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
     }, (r) => {
-      let data=""; r.on("data",c=>data+=c);
-      r.on("end",()=>{
+      let data = ""; r.on("data", c => data += c);
+      r.on("end", () => {
         console.log(`[PETRO_CB] ← HTTP ${r.statusCode} ${data}`);
-        addPetroLog("CALLBACK→APP", auth.callbackUrl, {actualAmountCents:actualCents,liters}, JSON.parse(data||"{}"));
+        if (petrolinaTransactions[transsegno]) petrolinaTransactions[transsegno].state = "completed";
+        addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents, liters }, JSON.parse(data || "{}"));
       });
     });
-    req.on("error", e => { console.error(`[PETRO_CB] FAILED: ${e.message}`); addPetroLog("CALLBACK→APP", auth.callbackUrl, {actualAmountCents:actualCents}, {error:e.message}); });
+    req.on("error", e => {
+      console.error(`[PETRO_CB] FAILED: ${e.message}`);
+      addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents }, { error: e.message });
+    });
     req.write(payload); req.end();
-  } catch(e) {
+  } catch (e) {
     console.error(`[PETRO_CB] URL parse error: ${e.message}`);
-    addPetroLog("CALLBACK→APP", auth.callbackUrl||"?", {actualAmountCents:actualCents}, {error:e.message});
+    addPetroLog("CALLBACK→APP", callbackUrl || "?", { actualAmountCents: actualCents }, { error: e.message });
   }
 }
 
-// ── Petrolina admin endpoints ─────────────────────────────────────────────────
+// ── Petrolina admin endpoints ──────────────────────────────────────────────────
 app.get("/petrolina/logs",    (req, res) => res.json(petrolinaLogs));
 app.post("/petrolina/clear-logs", (req, res) => { petrolinaLogs = []; res.json({ ok: true }); });
-app.get("/petrolina/pending", (req, res) => res.json(pendingPetroAuth));
+app.get("/petrolina/transactions", (req, res) => res.json(petrolinaTransactions));
 
 app.post("/petrolina/config", (req, res) => {
   const { key, value } = req.body;
@@ -4088,22 +4205,50 @@ app.post("/petrolina/config", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/petrolina/fire-callback", (req, res) => {
-  const url     = req.body.callbackUrl || pendingPetroAuth?.callbackUrl;
-  const cents   = parseInt(req.body.actualAmountCents) || petrolinaConfig.actualAmountCents || 3500;
-  if (!url) return res.json({ ok: false, error: "No callbackUrl — app must call /pump/authorize first" });
-  firePetroCallback({ callbackUrl: url, maxAmountCents: cents, pumpId: pendingPetroAuth?.pumpId || 1 });
-  const liters = parseFloat((cents / (petrolinaConfig.fuelGrades[0]?.pricePerLiter || 1650)).toFixed(3));
-  res.json({ ok: true, sentTo: url, actualAmountCents: cents, liters });
+// Manual: fire completion callback to a specific transsegno+callbackBase
+app.post("/petrolina/fire-completion", (req, res) => {
+  const { transsegno, callbackBase } = req.body;
+  const txn = transsegno ? petrolinaTransactions[transsegno] : null;
+  const base = callbackBase || txn?.callbackBase || "";
+  if (!txn) return res.json({ ok: false, error: "transsegno not found" });
+  if (!base) return res.json({ ok: false, error: "No callbackBase — app must send it in optTransaction" });
+  firePetroCompletion(transsegno, base);
+  res.json({ ok: true, transsegno, callbackBase: base });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FAIRWAY API  (RESA / Hermes Airports)
-// POST /connect/token   — OAuth2 client_credentials (identity server)
-// POST /fairway/:method — Fairway API call (Bearer token required)
-// ═══════════════════════════════════════════════════════════════════════════════
+// Manual: fire reversal callback to a specific transsegno+callbackBase
+app.post("/petrolina/fire-reversal", (req, res) => {
+  const { transsegno, callbackBase, reverseReason } = req.body;
+  const txn = transsegno ? petrolinaTransactions[transsegno] : null;
+  const base = callbackBase || txn?.callbackBase || "";
+  if (!txn) return res.json({ ok: false, error: "transsegno not found" });
+  if (!base) return res.json({ ok: false, error: "No callbackBase" });
+  const payload = JSON.stringify({
+    uuid: txn.uuid || "", transsegno,
+    jccAuthCode: txn.jccAuthCode || "", jccRetrievalReference: txn.jccRetrievalReference || "",
+    reverseReason: reverseReason || 1, reverseDescription: "Manual reversal from mock server"
+  });
+  const callbackUrl = base.replace(/\/$/, "") + "/reversePreAuth";
+  try {
+    const url = new URL(callbackUrl);
+    const r = (url.protocol === "https:" ? require("https") : http).request({
+      hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
+      path: url.pathname, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
+    }, resp => { let d=""; resp.on("data",c=>d+=c); resp.on("end",()=>{ addPetroLog("REVERSAL→APP", callbackUrl, JSON.parse(payload), JSON.parse(d||"{}")); }); });
+    r.on("error", e => addPetroLog("REVERSAL→APP", callbackUrl, JSON.parse(payload), { error: e.message }));
+    r.write(payload); r.end();
+  } catch(e) { console.error(`[PETRO_REV] ${e.message}`); }
+  res.json({ ok: true, sentTo: callbackUrl });
+});
 
-// ── POST /connect/token — OAuth2 token endpoint ───────────────────────────────
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// FAIRWAY API  (RESA / Hermes Airports)
+// POST /connect/token   â€” OAuth2 client_credentials (identity server)
+// POST /fairway/:method â€” Fairway API call (Bearer token required)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+// â”€â”€ POST /connect/token â€” OAuth2 token endpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/connect/token", (req, res) => {
   const { grant_type, client_id, client_secret, scope } = req.body;
   if (grant_type !== "client_credentials") {
@@ -4136,7 +4281,7 @@ app.post("/connect/token", (req, res) => {
   res.json(response);
 });
 
-// ── POST /fairway/:apimethod — Fairway API ────────────────────────────────────
+// â”€â”€ POST /fairway/:apimethod â€” Fairway API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/fairway/:apimethod", (req, res) => {
   const method = req.params.apimethod;
 
@@ -4164,7 +4309,7 @@ app.post("/fairway/:apimethod", (req, res) => {
     return res.status(404).json(r);
   }
 
-  // help=1 → parameter discovery
+  // help=1 â†’ parameter discovery
   if (req.body.help !== undefined) {
     const response = { Data: def.params.map(p => ({ name: p.name, type: p.type })) };
     addFairwayLog("POST", `/fairway/${method}?help`, req.body, response);
@@ -4176,7 +4321,7 @@ app.post("/fairway/:apimethod", (req, res) => {
   res.json(response);
 });
 
-// ── Fairway admin endpoints ───────────────────────────────────────────────────
+// â”€â”€ Fairway admin endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.get("/fairway/logs",    (req, res) => res.json(fairwayLogs));
 app.delete("/fairway/logs", (req, res) => { fairwayLogs = []; res.json({ ok: true }); });
 
@@ -4210,10 +4355,10 @@ app.post("/admin/fairway-method", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── START ─────────────────────────────────────────────────────────────────────
+// â”€â”€ START â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RPS Mock running on http://0.0.0.0:${PORT}`);
   startCaptureRetryLoop();
-  console.log(`[PENDING_CAPTURE] Retry loop started — every ${config.captureRetryMins} min, max ${config.captureMaxRetries} retries`);
+  console.log(`[PENDING_CAPTURE] Retry loop started â€” every ${config.captureRetryMins} min, max ${config.captureMaxRetries} retries`);
 })

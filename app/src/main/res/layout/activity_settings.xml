@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <EditText
+            android:id="@+id/edtOutlet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Outlet Number"
+            android:inputType="text"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/edtTerminal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Terminal Number"
+            android:inputType="text"
+            android:layout_marginBottom="8dp"/>
+
+        <EditText
+            android:id="@+id/edtUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Server URL"
+            android:inputType="textUri"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- ── HMAC authentication ────────────────────────────────────────── -->
+        <EditText
+            android:id="@+id/edtHmacClientId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="HMAC Client ID"
+            android:inputType="text"
+            android:layout_marginBottom="4dp"/>
+
+        <EditText
+            android:id="@+id/edtHmacSecret"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="HMAC Secret (Base64)"
+            android:inputType="textPassword"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="HMAC Authentication"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/btnHmac"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+        <!-- ─────────────────────────────────────────────────────────────── -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Show Rates on Screen"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/btnShowRates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+
+        <!-- ── Monthly Card Input Method ────────────────────────────────────── -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Monthly Card Input Method"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgMonthlyMethod"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rbKeyIn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Key-in"
+                android:textColor="#333333"
+                android:textSize="15sp"
+                android:checked="true"/>
+
+            <RadioButton
+                android:id="@+id/rbContactless"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Contactless (Mifare)"
+                android:textColor="#333333"
+                android:textSize="15sp"/>
+
+        </RadioGroup>
+        <!-- ─────────────────────────────────────────────────────────────── -->
+
+        <!-- ── Lost Ticket / Manual Exit Amount ─────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Lost Ticket Amount (€)"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <EditText
+                android:id="@+id/edtDefaultFixAmount"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal"
+                android:hint="0.00"
+                android:padding="8dp"
+                android:textAlignment="center"/>
+
+        </LinearLayout>
+        <!-- ─────────────────────────────────────────────────────────────── -->
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="SAVE"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnInit"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="INIT"
+            android:layout_marginBottom="4dp"/>
+
+        <ProgressBar
+            android:id="@+id/progressInit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/txtInitStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="14sp"
+            android:gravity="center"
+            android:padding="8dp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnContinue"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="CONTINUE"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Voice"
+                android:textColor="#333333"
+                android:textSize="16sp"/>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/btnVoice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Vehicle Check Interval (sec)"
+                android:textColor="#C9D1D9"
+                android:textSize="13sp"/>
+
+            <EditText
+                android:id="@+id/edtTellInterval"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:text="3"
+                android:textColor="#C9D1D9"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:textAlignment="center"/>
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnLogs"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="VIEW LOGS"
+            android:layout_marginBottom="8dp"/>
+
+    </LinearLayout>
+</ScrollView>
