@@ -340,22 +340,30 @@ let petrolinaConfig = {
   pumpNo:           "1",
   stationName:      "Petrolina Station",
   isLoyalty:        "0",
+  loyaltyEndPoint:  "/loyaltyCheck",
+  loyaltyBins:      "",
   helpPhone:        "99123456",
   pumpProducts: [
     { productCode: "unleaded95", product: "Unleaded 95", pricePerLiter: 1720, image: "95petrolina.gif" },
     { productCode: "unleaded98", product: "Unleaded 98", pricePerLiter: 1890, image: "98petrolina.gif" },
     { productCode: "diesel",     product: "Diesel",      pricePerLiter: 1650, image: "diesel.gif"      }
   ],
-  pumpSelectedTO:         8,
-  fuelSelectionTO:        9,
-  selectAmountTO:         8,
-  enterAmountTO:          8,
-  displayStartFuelingTO:  8,
-  displayScreenFuelingSecs: 240,
-  callbackDelaySec:  8,
-  actualAmountCents: 0,
-  preAuthResult:    "ok",
-  responseCode:     "00"
+  pumpSelectedTO:          8,
+  memberOfMyPetrolinaTO:   8,
+  phoneForMyPetrolinaTO:   8,
+  confirmMyPetrolinaTO:    5,
+  fuelSelectionTO:         9,
+  selectAmountTO:          8,
+  enterAmountTO:           8,
+  displayStartFuelingTO:   8,
+  displayAskKM:            40,
+  displayAskRegNo:         40,
+  insertPetrolinaCardTO:   40,
+  displayScreenFuelingTO:  240,
+  callbackDelaySec:        8,
+  actualAmountCents:       0,
+  preAuthResult:           "ok",
+  responseCode:            "00"
 };
 let petrolinaLogs        = [];
 let petrolinaTranCounter = 1000;
@@ -4043,18 +4051,27 @@ app.post("/petrolAppInit", (req, res) => {
     return res.json(body);
   }
   const body = {
-    terminal:    petrolinaConfig.terminal || req.body.terminal || "",
-    pumpNo:      petrolinaConfig.pumpNo,
-    stationName: petrolinaConfig.stationName,
-    isLoyalty:   petrolinaConfig.isLoyalty,
-    helpPhone:   petrolinaConfig.helpPhone,
-    pumpProducts: petrolinaConfig.pumpProducts,
-    pumpSelectedTO:           petrolinaConfig.pumpSelectedTO,
-    fuelSelectionTO:          petrolinaConfig.fuelSelectionTO,
-    selectAmountTO:           petrolinaConfig.selectAmountTO,
-    enterAmountTO:            petrolinaConfig.enterAmountTO,
-    displayStartFuelingTO:    petrolinaConfig.displayStartFuelingTO,
-    displayScreenFuelingSecs: petrolinaConfig.displayScreenFuelingSecs
+    terminal:                petrolinaConfig.terminal || req.body.terminal || "",
+    pumpNo:                  petrolinaConfig.pumpNo,
+    stationName:             petrolinaConfig.stationName,
+    isLoyalty:               petrolinaConfig.isLoyalty,
+    loyaltyEndPoint:         petrolinaConfig.loyaltyEndPoint,
+    loyaltyBins:             petrolinaConfig.loyaltyBins,
+    helpPhone:               petrolinaConfig.helpPhone,
+    pumpProducts:            petrolinaConfig.pumpProducts,
+    pumpSelectedTO:          petrolinaConfig.pumpSelectedTO,
+    memberOfMyPetrolinaTO:   petrolinaConfig.memberOfMyPetrolinaTO,
+    phoneForMyPetrolinaTO:   petrolinaConfig.phoneForMyPetrolinaTO,
+    confirmMyPetrolinaTO:    petrolinaConfig.confirmMyPetrolinaTO,
+    fuelSelectionTO:         petrolinaConfig.fuelSelectionTO,
+    selectAmountTO:          petrolinaConfig.selectAmountTO,
+    enterAmountTO:           petrolinaConfig.enterAmountTO,
+    displayStartFuelingTO:   petrolinaConfig.displayStartFuelingTO,
+    displayAskKM:            petrolinaConfig.displayAskKM,
+    displayAskRegNo:         petrolinaConfig.displayAskRegNo,
+    insertPetrolinaCardTO:   petrolinaConfig.insertPetrolinaCardTO,
+    displayScreenFuelingTO:  petrolinaConfig.displayScreenFuelingTO,
+    serverTime:              new Date().toISOString()
   };
   addPetroLog("POST", "/petrolAppInit", req.body, body);
   res.json(body);
@@ -4081,11 +4098,12 @@ app.post("/optTransaction", (req, res) => {
   };
   const body = {
     terminal:            petrolinaTransactions[transsegno].terminal,
+    timeOfTheServer:     new Date().toISOString(),
     transsegno,
     UUID:                uuid,
     batchNo:             req.body.batchNo || "",
     responseCode:        "00",
-    responseDescription: "OK"
+    responseDescription: "Transaction created successfully"
   };
   addPetroLog("POST", "/optTransaction", req.body, body);
   res.json(body);
@@ -4096,12 +4114,12 @@ app.post("/preAuthorization", (req, res) => {
   const transsegno = req.body.transsegno || "";
   const txn = petrolinaTransactions[transsegno];
   if (!txn) {
-    const body = { responseCode: "90", responseDescription: "Unknown transsegno", transsegno, UUID: req.body.UUID || "" };
+    const body = { terminal: req.body.terminal || "", timeOfTheServer: new Date().toISOString(), transsegno, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: "90", responseDescription: "Unknown transsegno" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
   if (petrolinaConfig.preAuthResult !== "ok") {
-    const body = { responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT", transsegno, UUID: req.body.UUID || "" };
+    const body = { terminal: txn.terminal || "", timeOfTheServer: new Date().toISOString(), transsegno, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
@@ -4112,7 +4130,15 @@ app.post("/preAuthorization", (req, res) => {
     jccFinalAmount:        req.body.jccFinalAmount || 0,
     state: "pre_auth_ok"
   });
-  const body = { responseCode: "00", responseDescription: "Pre-auth accepted", transsegno, UUID: req.body.UUID || "" };
+  const body = {
+    terminal:            txn.terminal || petrolinaConfig.terminal,
+    timeOfTheServer:     new Date().toISOString(),
+    transsegno,
+    UUID:                req.body.UUID || "",
+    batchNo:             req.body.batchNo || "",
+    responseCode:        "00",
+    responseDescription: "Pre-auth accepted"
+  };
   addPetroLog("POST", "/preAuthorization", req.body, body);
   res.json(body);
 
@@ -4130,7 +4156,14 @@ app.post("/abortTransaction", (req, res) => {
   if (transsegno && petrolinaTransactions[transsegno]) {
     petrolinaTransactions[transsegno].state = "aborted";
   }
-  const body = { responseCode: "00", responseDescription: "Abort acknowledged" };
+  const body = {
+    terminal:            req.body.terminal || petrolinaConfig.terminal,
+    timeOfTheServer:     new Date().toISOString(),
+    transsegno:          transsegno,
+    UUID:                req.body.UUID || "",
+    responseCode:        "00",
+    responseDescription: "Abort acknowledged"
+  };
   addPetroLog("POST", "/abortTransaction", req.body, body);
   res.json(body);
 });
