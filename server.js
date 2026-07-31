@@ -4142,45 +4142,106 @@ app.post("/help", (req, res) => {
   res.json(body);
 });
 
-// POST /loyaltyCheck — mock: any UID returns a canned member account
-const mockLoyaltyMembers = {
-  default: { maskedName: "Χαρ**** Πετρ****", points: 1250, cardNumber: "PL00001234" }
+// POST /loyaltyCheck — MyPetrolina loyalty lookup by phone number
+const mockLoyaltyAccounts = {
+  "99123456": { maskedName: "Γιώ*** Αντ****", pointsBalance: 1250 },
+  "99000000": { maskedName: "Μαρ*** Παπ****", pointsBalance:  320 },
+  default:    { maskedName: "Χαρ*** Πετρ****", pointsBalance:  850 }
 };
 app.post("/loyaltyCheck", (req, res) => {
-  const uid = req.body.uid || req.body.UID || "";
-  const member = mockLoyaltyMembers[uid] || mockLoyaltyMembers.default;
+  const phoneNo = req.body.phoneNo || "";
+  const account = mockLoyaltyAccounts[phoneNo] || mockLoyaltyAccounts.default;
   const body = {
+    terminal:            req.body.terminal || "",
+    timeOfTheServer:     new Date().toISOString(),
+    transsegno:          req.body.transsegno || "",
+    UUID:                req.body.UUID || "",
     responseCode:        "00",
     responseDescription: "OK",
-    maskedName:          member.maskedName,
-    points:              member.points,
-    cardNumber:          member.cardNumber
+    maskedName:          account.maskedName,
+    pointsBalance:       account.pointsBalance
   };
   addPetroLog("POST", "/loyaltyCheck", req.body, body);
   res.json(body);
 });
 
-// ── Petrolina callback helper ──────────────────────────────────────────────────
-function firePetroCompletion(transsegno, callbackBase) {
+// POST /petrolinaCard — Petrolina proprietary card auth (PAN + PIN)
+app.post("/petrolinaCard", (req, res) => {
+  const pan = req.body.petrolinaCard || "";
+  const pin = req.body.petrolinaPIN  || "";
+  // Mock: any card/PIN accepted; ask for KM by default
+  const body = {
+    terminal:                   req.body.terminal || "",
+    timeOfTheServer:             new Date().toISOString(),
+    transsegno:                  req.body.transsegno || "",
+    UUID:                        req.body.UUID || "",
+    petrolinacardaskforkm:       "Y",
+    petrolinacardaskforcarregno: "N",
+    responseCode:                "00",
+    responseDescription:         "Card accepted"
+  };
+  addPetroLog("POST", "/petrolinaCard", req.body, body);
+  res.json(body);
+});
+
+// POST /confirmPetrolinaCard — after fuel/KM/reg selection; OPT authorises pump
+app.post("/confirmPetrolinaCard", (req, res) => {
+  const transsegno  = req.body.transsegno || "";
+  const productId   = req.body.productId  || "";
+  const odometer    = req.body.petrolinacardodometer || 0;
+  const carRegNo    = req.body.petrolinacardcarregno || "";
+
+  // Save into active transaction so fire-completion knows the card type
+  if (petrolinaTransactions[transsegno]) {
+    petrolinaTransactions[transsegno].isPetrolinaCard = true;
+  }
+
+  const body = {
+    terminal:            req.body.terminal || "",
+    timeOfTheServer:     new Date().toISOString(),
+    transsegno,
+    UUID:                req.body.UUID || "",
+    responseCode:        "00",
+    responseDescription: "Confirmed — pump authorised"
+  };
+  addPetroLog("POST", "/confirmPetrolinaCard", req.body, body);
+
+  // Auto-fire /completionPetrolina after callbackDelaySec
   const txn = petrolinaTransactions[transsegno] || {};
+  const callbackBase = txn.callbackBase || "";
+  if (callbackBase && petrolinaConfig.callbackDelaySec > 0) {
+    setTimeout(() => firePetroCompletion(transsegno, callbackBase, true), petrolinaConfig.callbackDelaySec * 1000);
+  }
+
+  res.json(body);
+});
+
+// ── Petrolina callback helper ──────────────────────────────────────────────────
+function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) {
+  const txn = petrolinaTransactions[transsegno] || {};
+  const isPetro = isPetrolinaCard || txn.isPetrolinaCard || false;
   const maxCents = Math.round((txn.jccFinalAmount || 0) * 100) || 20000;
   const actualCents = petrolinaConfig.actualAmountCents > 0
     ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
-    : Math.floor(Math.random() * (maxCents - 500) + 500);
+    : Math.floor(Math.random() * (Math.max(maxCents, 5000) - 500) + 500);
   const pricePerLiter = petrolinaConfig.pumpProducts[0]?.pricePerLiter || 1650;
   const liters = parseFloat((actualCents / pricePerLiter).toFixed(3));
 
   const payload = JSON.stringify({
+    terminal:             txn.terminal || petrolinaConfig.terminal,
+    timeOfTheServer:      new Date().toISOString(),
     uuid:                 txn.uuid || "",
     transsegno,
-    actualAmountCents:    actualCents,
-    amountAuthorizedCents: maxCents,
+    amountUsed:           actualCents / 100,
+    amountAuthorized:     maxCents / 100,
     pumpId:               txn.pumpId || petrolinaConfig.pumpNo,
     jccAuthCode:          txn.jccAuthCode || "",
     jccRetrievalReference: txn.jccRetrievalReference || ""
   });
 
-  const callbackUrl = callbackBase.replace(/\/$/, "") + "/completion";
+  // Petrolina card → /completionPetrolina; bank card → /completion
+  const endpoint = isPetro ? "/completionPetrolina" : "/completion";
+  const callbackUrl = callbackBase.replace(/\/$/, "") + endpoint;
   console.log(`[PETRO_CB] → ${callbackUrl}  ${payload}`);
   try {
     const url = new URL(callbackUrl);
