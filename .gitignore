@@ -1,2 +1,36 @@
+﻿# Only server.js, package*.json belong here
 node_modules/
-.env
+
+# Android app — belongs in a separate repo
+app/
+build/
+.gradle/
+.idea/
+gradle/
+gradlew
+gradlew.bat
+build.gradle
+settings.gradle
+gradle.properties
+local.properties
+
+# Binaries & generated
+*.apk
+*.rar
+*.jar
+*.pdf
+*.zip
+*.mp3
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Scratch / comparison files
+2compare/
+extract_docx.py
+extracted_spec.txt
+fin_app_mockup.html
+
+# Claude internals
+.claude/
