@@ -338,6 +338,7 @@ let carWashLogs          = [];
 let petrolinaConfig = {
   terminal:         "",
   pumpNo:           "1",
+  defaultLan:       "el",          // "el" or "en" — app falls back to "el" if absent
   stationName:      "Petrolina Station",
   isLoyalty:        "0",
   loyaltyEndPoint:  "/loyaltyCheck",
@@ -1621,6 +1622,12 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <tr><td>Help Phone</td>
   <td><input class="m" id="ptHelpPhone" value="${petrolinaConfig.helpPhone}"></td>
   <td><button class="btn" onclick="ptSv('helpPhone','ptHelpPhone')">Save</button></td></tr>
+<tr><td>Default Language (defaultLan)</td>
+  <td>${petrolinaConfig.defaultLan === "en" ? "&#x1F1EC;&#x1F1E7; English" : "&#x1F1EC;&#x1F1F7; &#x395;&#x3BB;&#x3BB;&#x3B7;&#x3BD;&#x3B9;&#x3BA;&#x3AC;"}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.defaultLan === "el" ? "green" : ""}" onclick="ptSet2('defaultLan','el')">&#x1F1EC;&#x1F1F7; EL</button>
+    <button class="btn ${petrolinaConfig.defaultLan === "en" ? "green" : ""}" onclick="ptSet2('defaultLan','en')">&#x1F1EC;&#x1F1E7; EN</button>
+  </td></tr>
 <tr><td>Loyalty (isLoyalty)</td>
   <td>${petrolinaConfig.isLoyalty === "1" ? "&#x2705; Enabled" : "Disabled"}</td>
   <td>
@@ -4105,6 +4112,7 @@ app.post("/petrolAppInit", (req, res) => {
   const body = {
     terminal:                petrolinaConfig.terminal || req.body.terminal || "",
     pumpNo:                  petrolinaConfig.pumpNo,
+    defaultLan:              petrolinaConfig.defaultLan,
     stationName:             petrolinaConfig.stationName,
     isLoyalty:               petrolinaConfig.isLoyalty,
     loyaltyEndPoint:         petrolinaConfig.loyaltyEndPoint,
@@ -4254,6 +4262,11 @@ app.post("/loyaltyCheck", (req, res) => {
 app.post("/petrolinaCard", (req, res) => {
   const pan = req.body.petrolinaCard || "";
   const pin = req.body.petrolinaPIN  || "";
+  // Store PAN on transaction so completionPetrolina can include it
+  const txnKey = req.body.transsegno || "";
+  if (txnKey && petrolinaTransactions[txnKey]) {
+    petrolinaTransactions[txnKey].petrolinaCardPan = pan;
+  }
   // Mock: any card/PIN accepted; ask for KM by default
   const body = {
     terminal:                   req.body.terminal || "",
@@ -4313,15 +4326,16 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) 
   const liters = parseFloat((actualCents / pricePerLiter).toFixed(3));
 
   const payload = JSON.stringify({
-    terminal:             txn.terminal || petrolinaConfig.terminal,
-    timeOfTheServer:      new Date().toISOString(),
-    uuid:                 txn.uuid || "",
+    terminal:              txn.terminal || petrolinaConfig.terminal,
+    timeOfTheServer:       new Date().toISOString(),
+    UUID:                  txn.uuid || "",
     transsegno,
-    amountUsed:           actualCents / 100,
-    amountAuthorized:     maxCents / 100,
-    pumpId:               txn.pumpId || petrolinaConfig.pumpNo,
-    jccAuthCode:          txn.jccAuthCode || "",
-    jccRetrievalReference: txn.jccRetrievalReference || ""
+    amountUsed:            actualCents / 100,
+    amountAuthorized:      maxCents / 100,
+    pumpId:                txn.pumpId || petrolinaConfig.pumpNo,
+    jccAuthCode:           txn.jccAuthCode || "",
+    jccRetrievalReference: txn.jccRetrievalReference || "",
+    petrolinaCardNo:       isPetro ? (txn.petrolinaCardPan || "") : undefined
   });
 
   // Petrolina card → /completionPetrolina; bank card → /completion
@@ -4388,9 +4402,12 @@ app.post("/petrolina/fire-reversal", (req, res) => {
   if (!txn) return res.json({ ok: false, error: "transsegno not found" });
   if (!base) return res.json({ ok: false, error: "No callbackBase" });
   const payload = JSON.stringify({
-    uuid: txn.uuid || "", transsegno,
+    application: "petrolinaApp",
+    terminal: txn.terminal || petrolinaConfig.terminal,
+    UUID: txn.uuid || "", transsegno,
     jccAuthCode: txn.jccAuthCode || "", jccRetrievalReference: txn.jccRetrievalReference || "",
-    reverseReason: reverseReason || 1, reverseDescription: "Manual reversal from mock server"
+    reverseReason: reverseReason || 1, reverseDescription: "Manual reversal from mock server",
+    timeOfTheServer: new Date().toISOString()
   });
   const callbackUrl = base.replace(/\/$/, "") + "/reversePreAuth";
   try {
