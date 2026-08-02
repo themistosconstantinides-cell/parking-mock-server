@@ -1749,6 +1749,19 @@ ${petrolinaConfig.pumpProducts.map(g=>`<tr>
   <span id="ptCallbackResult" style="font-size:12px"></span>
 </div>
 
+<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="color:#8b949e;font-size:12px">OPT&#x2192;App control callbacks (uses the callbackBase above, or the last one the app reported):</span>
+  <button class="btn" style="padding:8px 16px;font-size:13px" onclick="ptFireBatchClosure()">&#x1F4E6; Batch Closure</button>
+  <span style="color:#8b949e;font-size:11px">txns</span>
+  <input type="number" id="ptBcTxns" value="11" style="width:70px">
+  <span style="color:#8b949e;font-size:11px">total &#x20AC;</span>
+  <input type="number" id="ptBcTotal" value="931.20" step="0.01" style="width:90px">
+  <button class="btn red" style="padding:8px 16px;font-size:13px" onclick="ptFireServiceChange('out')">&#x26D4; Out of Service</button>
+  <button class="btn green" style="padding:8px 16px;font-size:13px" onclick="ptFireServiceChange('in')">&#x2705; In Service</button>
+  <button class="btn" style="padding:8px 16px;font-size:13px" onclick="ptFireGetStatus()">&#x2753; Get Status</button>
+  <span id="ptCtrlResult" style="font-size:12px"></span>
+</div>
+
 <h2>&#x1F4CB; Petrolina Request Log</h2>
 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
   <button class="btn gray" onclick="ptSetFilter('')">All</button>
@@ -2702,6 +2715,23 @@ async function ptFireCompletion(){
   el.style.color=j.ok?'#3fb950':'#ff6b6b';
   setTimeout(loadPtLogs,1000);
 }
+async function ptCtrl(endpoint, body, label){
+  const cb=document.getElementById('ptManualCallbackBase').value.trim();
+  const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({callbackBase:cb},body))});
+  const j=await r.json();
+  const el=document.getElementById('ptCtrlResult');
+  el.textContent=j.ok?(label+' sent to '+j.sentTo):('ERROR: '+j.error);
+  el.style.color=j.ok?'#3fb950':'#ff6b6b';
+  setTimeout(loadPtLogs,1000);
+}
+async function ptFireBatchClosure(){
+  await ptCtrl('/petrolina/fire-batch-closure',{
+    noOfTransactions:Number(document.getElementById('ptBcTxns').value)||0,
+    totalAmount:Number(document.getElementById('ptBcTotal').value)||0
+  },'Batch closure');
+}
+async function ptFireServiceChange(s){ await ptCtrl('/petrolina/fire-service-change',{service:s},'Service '+s); }
+async function ptFireGetStatus(){ await ptCtrl('/petrolina/fire-get-status',{},'Get status'); }
 async function ptFireReversal(){
   const transsegno=document.getElementById('ptManualTranssegno').value.trim();
   const callbackBase=document.getElementById('ptManualCallbackBase').value.trim();
@@ -4421,6 +4451,71 @@ app.post("/petrolina/fire-reversal", (req, res) => {
     r.write(payload); r.end();
   } catch(e) { console.error(`[PETRO_REV] ${e.message}`); }
   res.json({ ok: true, sentTo: callbackUrl });
+});
+
+// Most recent callbackBase reported by the app on any optTransaction
+function lastPetroCallbackBase() {
+  const txns = Object.values(petrolinaTransactions).filter(t => t.callbackBase);
+  return txns.length ? txns[txns.length - 1].callbackBase : "";
+}
+
+// Generic OPT→App callback sender — used by batchClosure / serviceChange / getStatus
+function firePetroCallback(path, payload, callbackBase, res) {
+  const base = callbackBase || lastPetroCallbackBase();
+  if (!base) return res.json({ ok: false, error: "No callbackBase known — run a transaction first" });
+  const body = JSON.stringify(payload);
+  const callbackUrl = base.replace(/\/$/, "") + path;
+  try {
+    const url = new URL(callbackUrl);
+    const r = (url.protocol === "https:" ? require("https") : http).request({
+      hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
+      path: url.pathname, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+    }, resp => {
+      let d = ""; resp.on("data", c => d += c);
+      resp.on("end", () => addPetroLog(`${path}→APP`, callbackUrl, payload, JSON.parse(d || "{}")));
+    });
+    r.on("error", e => addPetroLog(`${path}→APP`, callbackUrl, payload, { error: e.message }));
+    r.write(body); r.end();
+  } catch (e) { return res.json({ ok: false, error: e.message }); }
+  res.json({ ok: true, sentTo: callbackUrl });
+}
+
+// Manual: batch closure → app
+app.post("/petrolina/fire-batch-closure", (req, res) => {
+  const { callbackBase, batchNo, noOfTransactions, totalAmount } = req.body;
+  firePetroCallback("/batchClosure", {
+    application:      "petrolinaApp",
+    terminal:         petrolinaConfig.terminal,
+    batchNo:          batchNo || "000012",
+    noOfTransactions: Number(noOfTransactions) || 0,
+    totalAmount:      Number(totalAmount) || 0,
+    UUID:             require("crypto").randomUUID(),
+    timeOfTheServer:  new Date().toISOString()
+  }, callbackBase, res);
+});
+
+// Manual: service change (in / out) → app
+app.post("/petrolina/fire-service-change", (req, res) => {
+  const { callbackBase, service } = req.body;
+  firePetroCallback("/serviceChange", {
+    application:     "petrolinaApp",
+    terminal:        petrolinaConfig.terminal,
+    service:         service === "out" ? "out" : "in",
+    UUID:            require("crypto").randomUUID(),
+    timeOfTheServer: new Date().toISOString()
+  }, callbackBase, res);
+});
+
+// Manual: get status → app
+app.post("/petrolina/fire-get-status", (req, res) => {
+  const { callbackBase } = req.body;
+  firePetroCallback("/getStatus", {
+    application:     "petrolinaApp",
+    terminal:        petrolinaConfig.terminal,
+    UUID:            require("crypto").randomUUID(),
+    timeOfTheServer: new Date().toISOString()
+  }, callbackBase, res);
 });
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
