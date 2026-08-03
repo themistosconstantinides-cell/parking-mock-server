@@ -339,6 +339,10 @@ let petrolinaConfig = {
   terminal:         "",
   pumpNo:           "1",
   defaultLan:       "el",          // "el" or "en" — app falls back to "el" if absent
+  terminalMode:     "unattended",  // "unattended" (S1U2, pre-auth) | "attended" (S1F2, post-pay Sale)
+  claimTTL:         180,           // seconds a claim on an unpaid fuelling stays exclusive
+  failSaleAdvice:   "0",           // "1" = reject saleAdvice with HTTP 500, to test the device queue
+  confirmAmountTO:  60,            // attended: seconds on the confirm-amount screen
   stationName:      "Petrolina Station",
   isLoyalty:        "0",
   loyaltyEndPoint:  "/loyaltyCheck",
@@ -1622,6 +1626,12 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <tr><td>Help Phone</td>
   <td><input class="m" id="ptHelpPhone" value="${petrolinaConfig.helpPhone}"></td>
   <td><button class="btn" onclick="ptSv('helpPhone','ptHelpPhone')">Save</button></td></tr>
+<tr><td>Terminal Mode (terminalMode)</td>
+  <td>${petrolinaConfig.terminalMode === "attended" ? "&#x1F6B6; Attended (S1F2, post-pay Sale)" : "&#x26FD; Unattended (S1U2, pre-auth)"}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.terminalMode === "unattended" ? "green" : ""}" onclick="ptSet2('terminalMode','unattended')">Unattended</button>
+    <button class="btn ${petrolinaConfig.terminalMode === "attended" ? "green" : ""}" onclick="ptSet2('terminalMode','attended')">Attended</button>
+  </td></tr>
 <tr><td>Default Language (defaultLan)</td>
   <td>${petrolinaConfig.defaultLan === "en" ? "&#x1F1EC;&#x1F1E7; English" : "&#x1F1EC;&#x1F1F7; &#x395;&#x3BB;&#x3BB;&#x3B7;&#x3BD;&#x3B9;&#x3BA;&#x3AC;"}</td>
   <td>
@@ -1760,6 +1770,25 @@ ${petrolinaConfig.pumpProducts.map(g=>`<tr>
   <button class="btn green" style="padding:8px 16px;font-size:13px" onclick="ptFireServiceChange('in')">&#x2705; In Service</button>
   <button class="btn" style="padding:8px 16px;font-size:13px" onclick="ptFireGetStatus()">&#x2753; Get Status</button>
   <span id="ptCtrlResult" style="font-size:12px"></span>
+</div>
+
+<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;margin-bottom:16px">
+  <div style="color:#8b949e;font-size:12px;margin-bottom:8px">ATTENDED MODE &#x2014; simulate a car that has already fuelled, then pay for it on the portable device</div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="color:#8b949e;font-size:11px">pump</span>
+    <input type="number" id="ptUpPump" value="1" style="width:60px">
+    <span style="color:#8b949e;font-size:11px">litres</span>
+    <input type="number" id="ptUpLitres" value="29.07" step="0.01" style="width:90px">
+    <span style="color:#8b949e;font-size:11px">amount &#x20AC;</span>
+    <input type="number" id="ptUpAmount" value="50.00" step="0.01" style="width:90px">
+    <button class="btn green" style="padding:8px 16px;font-size:13px" onclick="ptAddUnpaid()">&#x2795; Add Unpaid Fuelling</button>
+    <button class="btn" style="padding:8px 16px;font-size:13px" onclick="ptLoadUnpaid()">&#x1F504; Refresh</button>
+    <button class="btn red" style="padding:8px 16px;font-size:13px" onclick="ptClearUnpaid()">Clear All</button>
+    <span style="margin-left:14px;color:#8b949e;font-size:11px">saleAdvice:</span>
+    <button class="btn ${petrolinaConfig.failSaleAdvice === "0" ? "green" : ""}" style="padding:8px 14px;font-size:12px" onclick="ptSet2('failSaleAdvice','0')">Accept</button>
+    <button class="btn ${petrolinaConfig.failSaleAdvice === "1" ? "red" : ""}" style="padding:8px 14px;font-size:12px" onclick="ptSet2('failSaleAdvice','1')">&#x26A0; Fail (test queue)</button>
+  </div>
+  <div id="ptUnpaidList" style="margin-top:10px;font-family:monospace;font-size:11px;color:#8b949e"></div>
 </div>
 
 <h2>&#x1F4CB; Petrolina Request Log</h2>
@@ -2724,6 +2753,26 @@ async function ptCtrl(endpoint, body, label){
   el.style.color=j.ok?'#3fb950':'#ff6b6b';
   setTimeout(loadPtLogs,1000);
 }
+async function ptAddUnpaid(){
+  await fetch('/petrolina/add-unpaid',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    pumpid:document.getElementById('ptUpPump').value,
+    litres:Number(document.getElementById('ptUpLitres').value),
+    amount:Number(document.getElementById('ptUpAmount').value)
+  })});
+  ptLoadUnpaid();
+}
+async function ptClearUnpaid(){ await fetch('/petrolina/clear-unpaid',{method:'POST'}); ptLoadUnpaid(); }
+async function ptLoadUnpaid(){
+  const r=await fetch('/petrolina/unpaid'); const list=await r.json();
+  const el=document.getElementById('ptUnpaidList');
+  if(!list.length){ el.textContent='(no unpaid fuellings)'; return; }
+  el.innerHTML=list.map(f=>{
+    const loy=f.loyaltyPhoneNo?(' &#x2022; <span style="color:#58a6ff">MyPetrolina '+f.loyaltyPhoneNo+'</span>'):'';
+    const state=f.paid?('<span style="color:#3fb950">PAID '+f.receiptNo+' '+(f.cartType==='C'?'cash':'card')+'</span>'+loy)
+      :(f.claimedBy?('<span style="color:#e3b341">CLAIMED by '+f.claimedBy+'</span>'):'<span style="color:#8b949e">unpaid</span>');
+    return 'transsegno '+f.transsegno+' &#x2022; pump '+f.pumpId+' &#x2022; '+f.product+' &#x2022; '+f.litres+'L &#x2022; &#x20AC;'+f.amount+' &#x2022; '+state;
+  }).join('<br>');
+}
 async function ptFireBatchClosure(){
   await ptCtrl('/petrolina/fire-batch-closure',{
     noOfTransactions:Number(document.getElementById('ptBcTxns').value)||0,
@@ -2754,6 +2803,7 @@ if(ptAmtInput) ptAmtInput.addEventListener('input',function(){
   if(el) el.textContent=(parseInt(this.value||0)/100).toFixed(2);
 });
 loadPtLogs(); setInterval(loadPtLogs,4000);
+ptLoadUnpaid(); setInterval(ptLoadUnpaid,4000);
 loadPtTransactions(); setInterval(loadPtTransactions,3000);
 // â”€â”€ Fairway Tab JS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let fwFilter='', fwAllLogs=[];
@@ -4143,6 +4193,9 @@ app.post("/petrolAppInit", (req, res) => {
     terminal:                petrolinaConfig.terminal || req.body.terminal || "",
     pumpNo:                  petrolinaConfig.pumpNo,
     defaultLan:              petrolinaConfig.defaultLan,
+    terminalMode:            petrolinaConfig.terminalMode,
+    claimTTL:                petrolinaConfig.claimTTL,
+    confirmAmountTO:         petrolinaConfig.confirmAmountTO,
     stationName:             petrolinaConfig.stationName,
     isLoyalty:               petrolinaConfig.isLoyalty,
     loyaltyEndPoint:         petrolinaConfig.loyaltyEndPoint,
@@ -4289,13 +4342,26 @@ app.post("/loyaltyCheck", (req, res) => {
 });
 
 // POST /petrolinaCard — Petrolina proprietary card auth (PAN + PIN)
+// UID → card number mapping. In production this lives in the OPT / card host and is populated at
+// card issuance; here it is a stub so the contactless path can be tested end to end.
+const petrolinaUidMap = {
+  "9566709B": "9100001880880805"    // test card
+};
+function petroCardForUid(uid) {
+  return petrolinaUidMap[String(uid).toUpperCase()] || `UID:${uid}`;
+}
+
 app.post("/petrolinaCard", (req, res) => {
-  const pan = req.body.petrolinaCard || "";
+  // A swipe sends petrolinaCard (the card number); a tap sends petrolinaCardUid, because the
+  // terminal cannot read the card's data sector. A real OPT resolves the UID to an account —
+  // this mock accepts either and records which was used.
+  const uid = req.body.petrolinaCardUid || "";
+  const pan = req.body.petrolinaCard || (uid ? petroCardForUid(uid) : "");
   const pin = req.body.petrolinaPIN  || "";
-  // Store PAN on transaction so completionPetrolina can include it
   const txnKey = req.body.transsegno || "";
   if (txnKey && petrolinaTransactions[txnKey]) {
     petrolinaTransactions[txnKey].petrolinaCardPan = pan;
+    petrolinaTransactions[txnKey].petrolinaCardUid = uid;
   }
   // Mock: any card/PIN accepted; ask for KM by default
   const body = {
@@ -4383,7 +4449,7 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) 
       r.on("end", () => {
         console.log(`[PETRO_CB] ← HTTP ${r.statusCode} ${data}`);
         if (petrolinaTransactions[transsegno]) petrolinaTransactions[transsegno].state = "completed";
-        addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents, liters }, JSON.parse(data || "{}"));
+        addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents, liters }, safeJson(data));
       });
     });
     req.on("error", e => {
@@ -4446,12 +4512,21 @@ app.post("/petrolina/fire-reversal", (req, res) => {
       hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname, method: "POST",
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
-    }, resp => { let d=""; resp.on("data",c=>d+=c); resp.on("end",()=>{ addPetroLog("REVERSAL→APP", callbackUrl, JSON.parse(payload), JSON.parse(d||"{}")); }); });
+    }, resp => { let d=""; resp.on("data",c=>d+=c); resp.on("end",()=>{ addPetroLog("REVERSAL→APP", callbackUrl, safeJson(payload), safeJson(d)); }); });
     r.on("error", e => addPetroLog("REVERSAL→APP", callbackUrl, JSON.parse(payload), { error: e.message }));
     r.write(payload); r.end();
   } catch(e) { console.error(`[PETRO_REV] ${e.message}`); }
   res.json({ ok: true, sentTo: callbackUrl });
 });
+
+// The device may answer a callback with a non-JSON body — a NanoHTTPD HTML error page, plain text,
+// or nothing at all. Parsing that unguarded inside a response handler throws asynchronously and
+// takes the whole server down, so every callback response goes through this.
+function safeJson(s) {
+  if (!s) return {};
+  try { return JSON.parse(s); }
+  catch (e) { return { parseError: e.message, raw: String(s).slice(0, 300) }; }
+}
 
 // Most recent callbackBase reported by the app on any optTransaction
 function lastPetroCallbackBase() {
@@ -4473,7 +4548,7 @@ function firePetroCallback(path, payload, callbackBase, res) {
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
     }, resp => {
       let d = ""; resp.on("data", c => d += c);
-      resp.on("end", () => addPetroLog(`${path}→APP`, callbackUrl, payload, JSON.parse(d || "{}")));
+      resp.on("end", () => addPetroLog(`${path}→APP`, callbackUrl, payload, safeJson(d)));
     });
     r.on("error", e => addPetroLog(`${path}→APP`, callbackUrl, payload, { error: e.message }));
     r.write(body); r.end();
@@ -4505,6 +4580,254 @@ app.post("/petrolina/fire-service-change", (req, res) => {
     UUID:            require("crypto").randomUUID(),
     timeOfTheServer: new Date().toISOString()
   }, callbackBase, res);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATTENDED (PORTABLE) MODE — Amendment 1
+// Post-pay: the customer has already fuelled, so there is no pre-auth. The device
+// fetches the unpaid fuelling for a pump, claims it exclusively, takes payment,
+// then advises the OPT.
+// ══════════════════════════════════════════════════════════════════════════════
+
+let petrolinaUnpaid    = {};      // transsegno -> fuelling
+let petrolinaReceiptNo = 100;
+
+function nowIso() { return new Date().toISOString(); }
+
+/** The single unpaid fuelling for a pump — Petrolina cannot serve a second car until settled. */
+function unpaidForPump(pumpid) {
+  return Object.values(petrolinaUnpaid)
+    .find(f => String(f.pumpId) === String(pumpid) && !f.paid) || null;
+}
+
+function claimIsLive(f) {
+  return f.claimedBy && f.claimExpiry && new Date(f.claimExpiry).getTime() > Date.now();
+}
+
+function petroAck(req, extra) {
+  return Object.assign({
+    terminal:        petrolinaConfig.terminal || req.body.terminal || "",
+    timeOfTheServer: nowIso(),
+    transsegno:      req.body.transsegno || "",
+    UUID:            req.body.UUID || ""
+  }, extra);
+}
+
+// ── A3: the unpaid fuelling for a pump ────────────────────────────────────────
+app.post("/pumpTransaction", (req, res) => {
+  const pumpid = String(req.body.pumpid || "");
+  let body;
+  if (!pumpid) {
+    body = petroAck(req, { pumpid, responseCode: "95", responseDescription: "Unknown pump number" });
+  } else {
+    const f = unpaidForPump(pumpid);
+    if (!f) {
+      body = petroAck(req, { pumpid, responseCode: "94", responseDescription: "No unpaid fuelling at this pump" });
+    } else {
+      body = petroAck(req, {
+        pumpid,
+        transsegno:   f.transsegno,
+        productId:    f.productId,
+        product:      f.product,
+        litres:       f.litres,
+        amount:       f.amount,
+        fuellingTime: f.fuellingTime,
+        claimedBy:    claimIsLive(f) ? f.claimedBy : "",
+        claimExpiry:  claimIsLive(f) ? f.claimExpiry : undefined,
+        responseCode: "00",
+        responseDescription: "Unpaid fuelling found"
+      });
+    }
+  }
+  addPetroLog("POST", "/pumpTransaction", req.body, body);
+  res.json(body);
+});
+
+// ── A4: exclusive claim ───────────────────────────────────────────────────────
+app.post("/claimPumpTransaction", (req, res) => {
+  const f = petrolinaUnpaid[req.body.transsegno];
+  const me = req.body.terminal || "";
+  let body;
+  if (!f) {
+    body = petroAck(req, { responseCode: "93", responseDescription: "Unknown transsegno" });
+  } else if (f.paid) {
+    body = petroAck(req, { responseCode: "92", responseDescription: "Already paid" });
+  } else if (claimIsLive(f) && f.claimedBy !== me) {
+    body = petroAck(req, { responseCode: "91", responseDescription: `Claimed by ${f.claimedBy}` });
+  } else {
+    f.claimedBy   = me;
+    f.claimExpiry = new Date(Date.now() + petrolinaConfig.claimTTL * 1000).toISOString();
+    body = petroAck(req, {
+      amount: f.amount, productId: f.productId, litres: f.litres,
+      claimExpiry: f.claimExpiry,
+      responseCode: "00", responseDescription: "Claim granted"
+    });
+  }
+  addPetroLog("POST", "/claimPumpTransaction", req.body, body);
+  res.json(body);
+});
+
+// ── A5: release without payment — still owed, NOT an abort ────────────────────
+app.post("/releasePumpTransaction", (req, res) => {
+  const f = petrolinaUnpaid[req.body.transsegno];
+  if (f && !f.paid) { f.claimedBy = ""; f.claimExpiry = null; }
+  const body = petroAck(req, {
+    responseCode: f ? "00" : "93",
+    responseDescription: f ? `Released (reason ${req.body.releaseReason || "-"})` : "Unknown transsegno"
+  });
+  addPetroLog("POST", "/releasePumpTransaction", req.body, body);
+  res.json(body);
+});
+
+// ── A6/A8: payment advice — idempotent on (transsegno, UUID) ──────────────────
+app.post("/saleAdvice", (req, res) => {
+  // Test switch: fail the advice at transport level so the device cannot tell whether the payment
+  // was recorded. This is the ambiguous case the durable queue exists for — the advice must stay
+  // queued and be retried, NOT discarded.
+  if (petrolinaConfig.failSaleAdvice === "1") {
+    addPetroLog("POST", "/saleAdvice", req.body, { simulatedFailure: true, note: "failSaleAdvice enabled" });
+    return res.status(500).json({ error: "Simulated failure (failSaleAdvice enabled)" });
+  }
+  const f = petrolinaUnpaid[req.body.transsegno];
+  let body;
+  if (!f) {
+    body = petroAck(req, { responseCode: "93", responseDescription: "Unknown transsegno" });
+  } else if (f.paid) {
+    // A repeat of an advice already recorded MUST return 00 and the original receiptNo,
+    // and MUST NOT post the payment twice.
+    body = petroAck(req, {
+      receiptNo: f.receiptNo, responseCode: "00",
+      responseDescription: `Already recorded (duplicate advice, attempt ${req.body.adviceAttempt || "?"})`
+    });
+  } else {
+    f.paid       = true;
+    f.paidBy     = req.body.terminal || "";
+    f.cartType   = req.body.cartType || "";
+    f.amountPaid = req.body.amountPaid;
+    // Attended loyalty: the number is captured on the device with no prior lookup, so the OPT
+    // resolves it and attributes the points here, after the fuelling is already recorded.
+    f.loyaltyPhoneNo = req.body.phoneNo || "";
+    f.petrolinaCardNo = req.body.petrolinaCard || req.body.petrolinaCardUid || "";
+    f.odometer = req.body.petrolinacardodometer || 0;
+    f.carRegNo = req.body.petrolinacardcarregno || "";
+    f.receiptNo  = String(++petrolinaReceiptNo).padStart(6, "0");
+    f.paidAt     = nowIso();
+    body = petroAck(req, {
+      receiptNo: f.receiptNo, responseCode: "00",
+      responseDescription: `Payment recorded (${f.cartType === "C" ? "cash" : "card"})`
+    });
+  }
+  addPetroLog("POST", "/saleAdvice", req.body, body);
+  res.json(body);
+});
+
+// ── A16: receipt ──────────────────────────────────────────────────────────────
+// Returned already formatted for the printer, per ECR field 29:
+//   FJ<line><GS>FJ<line><GS>…   F = font (B double width, N normal, C barcode, P paper)
+//                               J = justification (L left, R right, C centred, S separator)
+// Max 42 chars normal / 21 double-width. The Petrolina logo is NOT included — it is pre-loaded
+// on the terminal and prepended by the payment application.
+const GS = String.fromCharCode(29);
+
+function rline(font, just, text) { return font + just + text; }
+
+function buildPetroReceipt(f) {
+  const paidAt = new Date(f.paidAt || Date.now());
+  const dt = `${String(paidAt.getDate()).padStart(2,"0")}/${String(paidAt.getMonth()+1).padStart(2,"0")}/` +
+             `${paidAt.getFullYear()} ${String(paidAt.getHours()).padStart(2,"0")}:${String(paidAt.getMinutes()).padStart(2,"0")}`;
+  const net = +(f.amountPaid / 1.19).toFixed(2);
+  const vat = +(f.amountPaid - net).toFixed(2);
+  const price = f.litres > 0 ? (f.amountPaid / f.litres) : 0;
+  const method = f.cartType === "C" ? "CASH" : (f.cartType === "P" ? "PETROLINA CARD" : "BANK CARD");
+
+  const lines = [
+    rline("N","C", petrolinaConfig.stationName || "PETROLINA"),
+    rline("N","C", "113, Athalassas Avenue"),
+    rline("N","C", "TEL:22421258"),
+    rline("N","C", "VAT REG. NO.10170964K"),
+    rline("P","S", ""),
+    rline("B","C", method === "PETROLINA CARD" ? "PETROLINA CARD" : method),
+    rline("N","C", "DELIVERY NOTE"),
+    rline("P","S", ""),
+    rline("N","L", padRow("RECEIPT NO:", f.receiptNo || "")),
+    rline("N","L", padRow("PUMP NO:",    f.pumpId || "")),
+    rline("N","L", padRow("TRANS NO:",   f.transsegno || "")),
+  ];
+  if (f.cartType === "P" && f.petrolinaCardNo) lines.push(rline("N","L", padRow("CARD NO:", f.petrolinaCardNo)));
+  if (f.carRegNo)  lines.push(rline("N","L", padRow("CAR REG. NO:", f.carRegNo)));
+  lines.push(
+    rline("P","S", ""),
+    rline("N","C", "PURCHASE DETAILS"),
+    rline("N","L", "PRODUCT      PRICE    QTY     VALUE"),
+    rline("N","L", `${(f.product||"").slice(0,12).padEnd(12)} ${price.toFixed(3).padStart(6)} ${Number(f.litres).toFixed(2).padStart(7)} ${Number(f.amountPaid).toFixed(2).padStart(8)}`),
+    rline("N","L", padRow("TOTAL (EUR):", Number(f.amountPaid).toFixed(2))),
+    rline("P","S", ""),
+    rline("N","L", "RATE  CODE     NET     VAT   TOTAL"),
+    rline("N","L", `19%   A     ${net.toFixed(2).padStart(7)} ${vat.toFixed(2).padStart(7)} ${Number(f.amountPaid).toFixed(2).padStart(7)}`),
+    rline("P","S", ""),
+    rline("N","L", padRow("DATE:", dt)),
+    rline("N","L", padRow("PAID BY:", method))
+  );
+  if (f.odometer)       lines.push(rline("N","L", padRow("KILOMETERS:", String(f.odometer))));
+  if (f.loyaltyPhoneNo) lines.push(rline("N","L", padRow("MYPETROLINA:", f.loyaltyPhoneNo)));
+  lines.push(
+    rline("P","S", ""),
+    rline("N","C", "THIS IS NOT A VALID TAX RECEIPT"),
+    rline("N","C", "PRICES ARE INDICATIVE"),
+    rline("N","C", "HAVE A NICE TRIP")
+  );
+  return lines.join(GS);
+}
+
+/** Left label, right value, padded to the 42-character normal-font line width. */
+function padRow(label, value) {
+  const w = 42;
+  const v = String(value);
+  return label + " ".repeat(Math.max(1, w - label.length - v.length)) + v;
+}
+
+app.post("/receipt", (req, res) => {
+  const f = petrolinaUnpaid[req.body.transsegno];
+  let body;
+  if (!f) {
+    body = petroAck(req, { responseCode: "93", responseDescription: "Unknown transsegno" });
+  } else if (!f.paid) {
+    body = petroAck(req, { responseCode: "96", responseDescription: "Not settled — no receipt available" });
+  } else {
+    body = petroAck(req, {
+      receiptNo:      f.receiptNo,
+      receiptContent: buildPetroReceipt(f),
+      responseCode:   "00",
+      responseDescription: "Receipt"
+    });
+  }
+  addPetroLog("POST", "/receipt", req.body, { ...body, receiptContent: body.receiptContent ? "<" + body.receiptContent.split(GS).length + " lines>" : "" });
+  res.json(body);
+});
+
+// ── Dashboard: simulate a car having fuelled at a pump ────────────────────────
+app.post("/petrolina/add-unpaid", (req, res) => {
+  const transsegno = String(++petrolinaTranCounter);
+  const litres = Number(req.body.litres) || 20;
+  const price  = (petrolinaConfig.pumpProducts[0] || {}).pricePerLiter || 1720;
+  petrolinaUnpaid[transsegno] = {
+    transsegno,
+    pumpId:       String(req.body.pumpid || petrolinaConfig.pumpNo),
+    productId:    req.body.productId || "unleaded95",
+    product:      req.body.product   || "Unleaded 95",
+    litres:       Number(litres.toFixed(2)),
+    amount:       Number(req.body.amount) || Number(((litres * price) / 1000).toFixed(2)),
+    fuellingTime: nowIso(),
+    claimedBy:    "", claimExpiry: null, paid: false
+  };
+  res.json({ ok: true, transsegno, fuelling: petrolinaUnpaid[transsegno] });
+});
+
+app.get("/petrolina/unpaid", (req, res) => res.json(Object.values(petrolinaUnpaid)));
+
+app.post("/petrolina/clear-unpaid", (req, res) => {
+  petrolinaUnpaid = {};
+  res.json({ ok: true });
 });
 
 // Manual: get status → app
@@ -4632,6 +4955,16 @@ app.post("/admin/fairway-method", (req, res) => {
 });
 
 // â”€â”€ START â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// This is a test rig: a stray throw in an async callback handler must not take the server down
+// mid-test. Log it and keep serving — a crashed mock looks exactly like a network fault from the
+// device, which is expensive to diagnose.
+process.on("uncaughtException", (e) => {
+  console.error(`[UNCAUGHT] ${e && e.stack ? e.stack : e}`);
+});
+process.on("unhandledRejection", (e) => {
+  console.error(`[UNHANDLED_REJECTION] ${e && e.stack ? e.stack : e}`);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RPS Mock running on http://0.0.0.0:${PORT}`);
