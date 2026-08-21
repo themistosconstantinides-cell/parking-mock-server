@@ -358,6 +358,9 @@ let petrolinaConfig = {
   petrolinaPin:     "1234",        // the PIN this mock accepts; anything else returns 01
   askForKm:         "Y",           // petrolinacardaskforkm — drives the odometer screen
   askForRegNo:      "N",           // petrolinacardaskforcarregno — drives the registration screen
+  // Response code returned by /petrolinaCard when the PIN is correct. Anything other than 00 lets
+  // the business declines be exercised — each shows a different message on the terminal.
+  petrolinaCardRc:  "00",
   pumpProducts: [
     { productCode: "unleaded95", product: "Unleaded 95", pricePerLiter: 1720, image: "95petrolina.gif" },
     { productCode: "unleaded98", product: "Unleaded 98", pricePerLiter: 1890, image: "98petrolina.gif" },
@@ -1693,6 +1696,16 @@ ${rentalConfig.items.map((item,i)=>`<tr>
   <td>
     <button class="btn ${petrolinaConfig.askForRegNo === "Y" ? "green" : ""}" onclick="ptSet2('askForRegNo','Y')">Yes</button>
     <button class="btn ${petrolinaConfig.askForRegNo === "N" ? "green" : ""}" onclick="ptSet2('askForRegNo','N')">No</button>
+  </td></tr>
+<tr><td>PetrolinaCard result (petrolinaCardRc)<br><span style="color:#8b949e;font-size:11px">Returned by /petrolinaCard once the PIN is correct. A decline ends the transaction with abortReason 23.</span></td>
+  <td style="font-family:monospace">${petrolinaConfig.petrolinaCardRc} ${petroCardRcText(petrolinaConfig.petrolinaCardRc)}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.petrolinaCardRc === "00" ? "green" : ""}" onclick="ptSet2('petrolinaCardRc','00')">00 OK</button>
+    <button class="btn ${petrolinaConfig.petrolinaCardRc === "02" ? "green" : ""}" onclick="ptSet2('petrolinaCardRc','02')">02 Blocked</button>
+    <button class="btn ${petrolinaConfig.petrolinaCardRc === "03" ? "green" : ""}" onclick="ptSet2('petrolinaCardRc','03')">03 Expired</button>
+    <button class="btn ${petrolinaConfig.petrolinaCardRc === "04" ? "green" : ""}" onclick="ptSet2('petrolinaCardRc','04')">04 Unknown</button>
+    <button class="btn ${petrolinaConfig.petrolinaCardRc === "05" ? "green" : ""}" onclick="ptSet2('petrolinaCardRc','05')">05 Declined</button>
+    <button class="btn ${petrolinaConfig.petrolinaCardRc === "06" ? "green" : ""}" onclick="ptSet2('petrolinaCardRc','06')">06 No credit</button>
   </td></tr>
 <tr><td>Terminal Mode (terminalMode)</td>
   <td>${petrolinaConfig.terminalMode === "attended" ? "&#x1F6B6; Attended (S1F2, post-pay Sale)" : "&#x26FD; Unattended (S1U2, pre-auth)"}</td>
@@ -4449,6 +4462,19 @@ function petroCardForUid(uid) {
   return petrolinaUidMap[String(uid).toUpperCase()] || `UID:${uid}`;
 }
 
+/** Description for a /petrolinaCard response code. The device shows its own translated text. */
+function petroCardRcText(rc) {
+  return {
+    [RC.APPROVED]:      "Card accepted",
+    [RC.INVALID_PIN]:   "Incorrect PIN",
+    [RC.CARD_BLOCKED]:  "Card blocked",
+    "03":               "Card expired",
+    "04":               "Card not recognised",
+    [RC.DECLINED]:      "Declined",
+    "06":               "Insufficient credit"
+  }[rc] || `Declined (${rc})`;
+}
+
 app.post("/petrolinaCard", (req, res) => {
   // A swipe sends petrolinaCard (the card number); a tap sends petrolinaCardUid, because the
   // terminal cannot read the card's data sector. A real OPT resolves the UID to an account —
@@ -4466,15 +4492,19 @@ app.post("/petrolinaCard", (req, res) => {
   // customer can recover from unaided. petrolinaPin holds the value this mock treats as correct;
   // anything else returns 01 and the device offers another attempt.
   const pinOk = pin === String(petrolinaConfig.petrolinaPin);
+  // The PIN is checked first: a wrong PIN is recoverable and the device re-prompts, whereas the
+  // declines below end the transaction, so a card set to "blocked" must not mask a typing mistake.
+  const rc   = !pinOk ? RC.INVALID_PIN : String(petrolinaConfig.petrolinaCardRc || RC.APPROVED);
+  const ok   = rc === RC.APPROVED;
   const body = {
     terminal:                   req.body.terminal || "",
     timeOfTheServer:             new Date().toISOString(),
     transsegno:                  req.body.transsegno || "",
     UUID:                        req.body.UUID || "",
-    petrolinacardaskforkm:       pinOk ? petrolinaConfig.askForKm    : undefined,
-    petrolinacardaskforcarregno: pinOk ? petrolinaConfig.askForRegNo : undefined,
-    responseCode:                pinOk ? RC.APPROVED : RC.INVALID_PIN,
-    responseDescription:         pinOk ? "Card accepted" : "Incorrect PIN"
+    petrolinacardaskforkm:       ok ? petrolinaConfig.askForKm    : undefined,
+    petrolinacardaskforcarregno: ok ? petrolinaConfig.askForRegNo : undefined,
+    responseCode:                rc,
+    responseDescription:         petroCardRcText(rc)
   };
   addPetroLog("POST", "/petrolinaCard", req.body, body);
   res.json(body);
