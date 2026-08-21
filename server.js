@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const https   = require("https");
 const app     = express();
 
@@ -341,6 +341,9 @@ let petrolinaConfig = {
   defaultLan:       "el",          // "el" or "en" — app falls back to "el" if absent
   terminalMode:     "unattended",  // "unattended" (S1U2, pre-auth) | "attended" (S1F2, post-pay Sale)
   claimTTL:         180,           // seconds a claim on an unpaid fuelling stays exclusive
+  devicePort:       8080,          // spec Table 2 — port the app binds its callback listener to
+  deviceIP:         "",            // learned from deviceIP on petrolAppInit; used to address callbacks
+  maxAmount:        200.00,        // spec Table 2 — ceiling on a manually entered unattended amount
   failSaleAdvice:   "0",           // "1" = reject saleAdvice with HTTP 500, to test the device queue
   confirmAmountTO:  60,            // attended: seconds on the confirm-amount screen
   stationName:      "Petrolina Station",
@@ -370,6 +373,40 @@ let petrolinaConfig = {
   preAuthResult:           "ok",
   responseCode:            "00"
 };
+// Spec Table 37 serviceStatus values, and Table 40/41 status codes returned by the app.
+const SERVICE_IN     = "IN_SERVICE";
+const SERVICE_OUT    = "OUT_OF_SERVICE";
+const STATUS_RC_IDLE = "00";
+
+/**
+ * OPT response-code catalogue. The range decides the app's behaviour:
+ *   00      success        · continue
+ *   01-19   decline        · definite answer, do not retry
+ *   20-39   state conflict · do not repeat the call, recover per code
+ *   90-99   technical      · retry with back-off (except 90/93/96, which never change)
+ */
+const RC = {
+  APPROVED:            "00",
+  INVALID_PIN:         "01",
+  CARD_BLOCKED:        "02",
+  DECLINED:            "05",
+  LOYALTY_NOT_FOUND:   "07",
+  AMOUNT_TOO_HIGH:     "08",
+  PUMP_UNAVAILABLE:    "10",
+  MODE_MISMATCH:       "11",
+  ALREADY_PROCESSED:   "21",
+  CLAIMED_ELSEWHERE:   "22",
+  CLAIM_EXPIRED:       "23",
+  CLAIM_NOT_HELD:      "24",
+  INVALID_STATE:       "26",
+  FUELLING_IN_PROGRESS:"27",
+  NOTHING_TO_PAY:      "28",
+  MALFORMED:           "90",
+  UNKNOWN_TRANSSEGNO:  "93",
+  NOT_SETTLED:         "96",
+  SYSTEM_MALFUNCTION:  "99"
+};
+
 let petrolinaLogs        = [];
 let petrolinaTranCounter = 1000;
 let petrolinaTransactions = {};
@@ -1626,6 +1663,15 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <tr><td>Help Phone</td>
   <td><input class="m" id="ptHelpPhone" value="${petrolinaConfig.helpPhone}"></td>
   <td><button class="btn" onclick="ptSv('helpPhone','ptHelpPhone')">Save</button></td></tr>
+<tr><td>Device Port (devicePort)<br><span style="color:#8b949e;font-size:11px">Port the app binds its callback listener to. Returned by /petrolAppInit &#x2014; the app re-binds on the next init.</span></td>
+  <td><input class="m" id="ptDevicePort" value="${petrolinaConfig.devicePort}" style="width:90px"></td>
+  <td><button class="btn" onclick="ptSv('devicePort','ptDevicePort')">Save</button></td></tr>
+<tr><td>Device IP (deviceIP)<br><span style="color:#8b949e;font-size:11px">Reported by the app on /petrolAppInit. Callbacks go to this address on the port above.</span></td>
+  <td>${petrolinaConfig.deviceIP ? `<code>${petrolinaConfig.deviceIP}:${petrolinaConfig.devicePort}</code>` : "<span style='color:#8b949e'>not yet initialised</span>"}</td>
+  <td><span style="color:#8b949e;font-size:11px">read&#x2011;only</span></td></tr>
+<tr><td>Max Amount (maxAmount)<br><span style="color:#8b949e;font-size:11px">Ceiling on a manually entered unattended amount, in euro.</span></td>
+  <td><input class="m" id="ptMaxAmount" value="${petrolinaConfig.maxAmount}" style="width:90px"></td>
+  <td><button class="btn" onclick="ptSv('maxAmount','ptMaxAmount')">Save</button></td></tr>
 <tr><td>Terminal Mode (terminalMode)</td>
   <td>${petrolinaConfig.terminalMode === "attended" ? "&#x1F6B6; Attended (S1F2, post-pay Sale)" : "&#x26FD; Unattended (S1U2, pre-auth)"}</td>
   <td>
@@ -4189,12 +4235,18 @@ app.post("/petrolAppInit", (req, res) => {
     addPetroLog("POST", "/petrolAppInit", req.body, body);
     return res.json(body);
   }
+  // Spec Table 1: the app tells us where it lives, we tell it which port to listen on. Remembering
+  // it here is what lets a callback be fired without a transaction having run first.
+  if (req.body && req.body.deviceIP) petrolinaConfig.deviceIP = String(req.body.deviceIP);
+
   const body = {
     terminal:                petrolinaConfig.terminal || req.body.terminal || "",
     pumpNo:                  petrolinaConfig.pumpNo,
     defaultLan:              petrolinaConfig.defaultLan,
     terminalMode:            petrolinaConfig.terminalMode,
     claimTTL:                petrolinaConfig.claimTTL,
+    devicePort:              petrolinaConfig.devicePort,
+    maxAmount:               petrolinaConfig.maxAmount,
     confirmAmountTO:         petrolinaConfig.confirmAmountTO,
     stationName:             petrolinaConfig.stationName,
     isLoyalty:               petrolinaConfig.isLoyalty,
@@ -4257,7 +4309,7 @@ app.post("/preAuthorization", (req, res) => {
   const transsegno = req.body.transsegno || "";
   const txn = petrolinaTransactions[transsegno];
   if (!txn) {
-    const body = { terminal: req.body.terminal || "", timeOfTheServer: new Date().toISOString(), transsegno, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: "90", responseDescription: "Unknown transsegno" };
+    const body = { terminal: req.body.terminal || "", timeOfTheServer: new Date().toISOString(), transsegno, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
@@ -4411,8 +4463,39 @@ app.post("/confirmPetrolinaCard", (req, res) => {
 });
 
 // ── Petrolina callback helper ──────────────────────────────────────────────────
+/**
+ * A completion is valid once, and only while the pre-authorisation still stands. A second one — or
+ * one sent after a reversal — is what produces a double charge on a live terminal.
+ *
+ * The device deliberately keeps no record of past transactions, so it cannot refuse these itself:
+ * it will acknowledge whatever arrives and fire the ECR completion. That makes ordering the OPT's
+ * responsibility, and the mock enforces it so testing reflects how a correct server must behave.
+ */
+function petroCompletionBlockedReason(txn) {
+  switch (txn.state) {
+    case "completed": return "already completed";
+    case "reversed":  return "pre-authorisation already reversed";
+    case "aborted":   return "transaction aborted";
+    default:          return null;
+  }
+}
+
+/** The OPT holds the outcome — whether this call delivered it or an earlier one did. */
+function petroAcknowledged(reply) {
+  return reply && (reply.responseCode === RC.APPROVED || reply.responseCode === RC.ALREADY_PROCESSED);
+}
+
 function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) {
   const txn = petrolinaTransactions[transsegno] || {};
+
+  const blocked = petroCompletionBlockedReason(txn);
+  if (blocked) {
+    const note = { responseCode: RC.INVALID_STATE, responseDescription: `Completion refused — ${blocked}` };
+    console.log(`[PETRO_CB] refused completion for ${transsegno}: ${blocked}`);
+    addPetroLog("CALLBACK REFUSED", `${transsegno} — ${blocked}`, { transsegno, state: txn.state }, note);
+    return { ok: false, error: note.responseDescription };
+  }
+
   const isPetro = isPetrolinaCard || txn.isPetrolinaCard || false;
   const maxCents = Math.round((txn.jccFinalAmount || 0) * 100) || 20000;
   const actualCents = petrolinaConfig.actualAmountCents > 0
@@ -4448,8 +4531,13 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) 
       let data = ""; r.on("data", c => data += c);
       r.on("end", () => {
         console.log(`[PETRO_CB] ← HTTP ${r.statusCode} ${data}`);
-        if (petrolinaTransactions[transsegno]) petrolinaTransactions[transsegno].state = "completed";
-        addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents, liters }, safeJson(data));
+        const reply = safeJson(data);
+        // Only on an acknowledgement. Marking it completed regardless would hide a device that
+        // rejected the completion, and the advice would look settled when it is not.
+        if (petrolinaTransactions[transsegno] && petroAcknowledged(reply)) {
+          petrolinaTransactions[transsegno].state = "completed";
+        }
+        addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents, liters }, reply);
       });
     });
     req.on("error", e => {
@@ -4486,7 +4574,8 @@ app.post("/petrolina/fire-completion", (req, res) => {
   const base = callbackBase || txn?.callbackBase || "";
   if (!txn) return res.json({ ok: false, error: "transsegno not found" });
   if (!base) return res.json({ ok: false, error: "No callbackBase — app must send it in optTransaction" });
-  firePetroCompletion(transsegno, base);
+  const result = firePetroCompletion(transsegno, base);
+  if (result && result.ok === false) return res.json(result);
   res.json({ ok: true, transsegno, callbackBase: base });
 });
 
@@ -4512,7 +4601,14 @@ app.post("/petrolina/fire-reversal", (req, res) => {
       hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname, method: "POST",
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
-    }, resp => { let d=""; resp.on("data",c=>d+=c); resp.on("end",()=>{ addPetroLog("REVERSAL→APP", callbackUrl, safeJson(payload), safeJson(d)); }); });
+    }, resp => { let d=""; resp.on("data",c=>d+=c); resp.on("end",()=>{
+      const reply = safeJson(d);
+      // Record the outcome. Without this the transaction keeps whatever state the completion left
+      // it in, so a reversed pre-authorisation still reads as completed and a second completion
+      // looks legitimate.
+      if (petroAcknowledged(reply)) txn.state = "reversed";
+      addPetroLog("REVERSAL→APP", callbackUrl, safeJson(payload), reply);
+    }); });
     r.on("error", e => addPetroLog("REVERSAL→APP", callbackUrl, JSON.parse(payload), { error: e.message }));
     r.write(payload); r.end();
   } catch(e) { console.error(`[PETRO_REV] ${e.message}`); }
@@ -4529,7 +4625,15 @@ function safeJson(s) {
 }
 
 // Most recent callbackBase reported by the app on any optTransaction
+/**
+ * Where to address a callback. The spec pairing wins: deviceIP from petrolAppInit plus the
+ * devicePort we handed back. Falling back to a callbackBase reported during a transaction keeps
+ * older app builds working, and means a callback can still be fired if init predates this change.
+ */
 function lastPetroCallbackBase() {
+  if (petrolinaConfig.deviceIP && petrolinaConfig.devicePort) {
+    return `http://${petrolinaConfig.deviceIP}:${petrolinaConfig.devicePort}`;
+  }
   const txns = Object.values(petrolinaTransactions).filter(t => t.callbackBase);
   return txns.length ? txns[txns.length - 1].callbackBase : "";
 }
@@ -4548,7 +4652,14 @@ function firePetroCallback(path, payload, callbackBase, res) {
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
     }, resp => {
       let d = ""; resp.on("data", c => d += c);
-      resp.on("end", () => addPetroLog(`${path}→APP`, callbackUrl, payload, safeJson(d)));
+      resp.on("end", () => {
+        const reply = safeJson(d);
+        if (path === "/getStatus") {
+          addPetroLog(`${path}→APP`, `${callbackUrl}  [${describePetroStatus(reply)}]`, payload, reply);
+        } else {
+          addPetroLog(`${path}→APP`, callbackUrl, payload, reply);
+        }
+      });
     });
     r.on("error", e => addPetroLog(`${path}→APP`, callbackUrl, payload, { error: e.message }));
     r.write(body); r.end();
@@ -4573,10 +4684,12 @@ app.post("/petrolina/fire-batch-closure", (req, res) => {
 // Manual: service change (in / out) → app
 app.post("/petrolina/fire-service-change", (req, res) => {
   const { callbackBase, service } = req.body;
+  // Spec Table 37: the field is serviceStatus, carrying IN_SERVICE / OUT_OF_SERVICE.
   firePetroCallback("/serviceChange", {
     application:     "petrolinaApp",
     terminal:        petrolinaConfig.terminal,
-    service:         service === "out" ? "out" : "in",
+    serviceStatus:   service === "out" ? SERVICE_OUT : SERVICE_IN,
+    reason:          req.body.reason || "",
     UUID:            require("crypto").randomUUID(),
     timeOfTheServer: new Date().toISOString()
   }, callbackBase, res);
@@ -4618,11 +4731,11 @@ app.post("/pumpTransaction", (req, res) => {
   const pumpid = String(req.body.pumpid || "");
   let body;
   if (!pumpid) {
-    body = petroAck(req, { pumpid, responseCode: "95", responseDescription: "Unknown pump number" });
+    body = petroAck(req, { pumpid, responseCode: RC.PUMP_UNAVAILABLE, responseDescription: "Unknown pump number" });
   } else {
     const f = unpaidForPump(pumpid);
     if (!f) {
-      body = petroAck(req, { pumpid, responseCode: "94", responseDescription: "No unpaid fuelling at this pump" });
+      body = petroAck(req, { pumpid, responseCode: RC.NOTHING_TO_PAY, responseDescription: "No unpaid fuelling at this pump" });
     } else {
       body = petroAck(req, {
         pumpid,
@@ -4649,11 +4762,11 @@ app.post("/claimPumpTransaction", (req, res) => {
   const me = req.body.terminal || "";
   let body;
   if (!f) {
-    body = petroAck(req, { responseCode: "93", responseDescription: "Unknown transsegno" });
+    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
   } else if (f.paid) {
-    body = petroAck(req, { responseCode: "92", responseDescription: "Already paid" });
+    body = petroAck(req, { responseCode: RC.ALREADY_PROCESSED, responseDescription: "Already paid" });
   } else if (claimIsLive(f) && f.claimedBy !== me) {
-    body = petroAck(req, { responseCode: "91", responseDescription: `Claimed by ${f.claimedBy}` });
+    body = petroAck(req, { responseCode: RC.CLAIMED_ELSEWHERE, responseDescription: `Claimed by ${f.claimedBy}` });
   } else {
     f.claimedBy   = me;
     f.claimExpiry = new Date(Date.now() + petrolinaConfig.claimTTL * 1000).toISOString();
@@ -4691,12 +4804,13 @@ app.post("/saleAdvice", (req, res) => {
   const f = petrolinaUnpaid[req.body.transsegno];
   let body;
   if (!f) {
-    body = petroAck(req, { responseCode: "93", responseDescription: "Unknown transsegno" });
+    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
   } else if (f.paid) {
-    // A repeat of an advice already recorded MUST return 00 and the original receiptNo,
-    // and MUST NOT post the payment twice.
+    // A repeat of an advice already recorded returns 21 with the original receiptNo, and MUST NOT
+    // post the payment twice. 21 tells the device the OPT holds it, so the entry leaves the queue —
+    // which is the difference between a duplicate and a failure worth retrying.
     body = petroAck(req, {
-      receiptNo: f.receiptNo, responseCode: "00",
+      receiptNo: f.receiptNo, responseCode: RC.ALREADY_PROCESSED,
       responseDescription: `Already recorded (duplicate advice, attempt ${req.body.adviceAttempt || "?"})`
     });
   } else {
@@ -4790,9 +4904,9 @@ app.post("/receipt", (req, res) => {
   const f = petrolinaUnpaid[req.body.transsegno];
   let body;
   if (!f) {
-    body = petroAck(req, { responseCode: "93", responseDescription: "Unknown transsegno" });
+    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
   } else if (!f.paid) {
-    body = petroAck(req, { responseCode: "96", responseDescription: "Not settled — no receipt available" });
+    body = petroAck(req, { responseCode: RC.NOT_SETTLED, responseDescription: "Not settled — no receipt available" });
   } else {
     body = petroAck(req, {
       receiptNo:      f.receiptNo,
@@ -4840,6 +4954,19 @@ app.post("/petrolina/fire-get-status", (req, res) => {
     timeOfTheServer: new Date().toISOString()
   }, callbackBase, res);
 });
+
+/**
+ * Spec Table 40: responseCode says whether the terminal is free, stateCode says what it is doing.
+ * Reading both is what lets the OPT decide it may start work rather than merely guessing from a
+ * timeout, so the reply is summarised into the log rather than left as raw JSON.
+ */
+function describePetroStatus(reply) {
+  if (!reply || typeof reply !== "object") return "no reply";
+  const free = reply.responseCode === STATUS_RC_IDLE;
+  const code = reply.stateCode || "--";
+  const desc = reply.stateDescription || reply.responseDescription || "";
+  return `${free ? "IDLE" : "IN USE"} · ${code} ${desc}`.trim();
+}
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // FAIRWAY API  (RESA / Hermes Airports)
