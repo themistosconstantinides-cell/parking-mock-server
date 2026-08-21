@@ -351,6 +351,13 @@ let petrolinaConfig = {
   loyaltyEndPoint:  "/loyaltyCheck",
   loyaltyBins:      "",
   helpPhone:        "99123456",
+  // Spec Table 43: the OPT supplies the text and how long to show it. {phone} is substituted
+  // with helpPhone so the number lives in one place.
+  helpMessage:      "For assistance, please call {phone}",
+  helpMessageSecs:  20,
+  petrolinaPin:     "1234",        // the PIN this mock accepts; anything else returns 01
+  askForKm:         "Y",           // petrolinacardaskforkm — drives the odometer screen
+  askForRegNo:      "N",           // petrolinacardaskforcarregno — drives the registration screen
   pumpProducts: [
     { productCode: "unleaded95", product: "Unleaded 95", pricePerLiter: 1720, image: "95petrolina.gif" },
     { productCode: "unleaded98", product: "Unleaded 98", pricePerLiter: 1890, image: "98petrolina.gif" },
@@ -1672,6 +1679,21 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <tr><td>Max Amount (maxAmount)<br><span style="color:#8b949e;font-size:11px">Ceiling on a manually entered unattended amount, in euro.</span></td>
   <td><input class="m" id="ptMaxAmount" value="${petrolinaConfig.maxAmount}" style="width:90px"></td>
   <td><button class="btn" onclick="ptSv('maxAmount','ptMaxAmount')">Save</button></td></tr>
+<tr><td>PetrolinaCard PIN (petrolinaPin)<br><span style="color:#8b949e;font-size:11px">The PIN accepted by /petrolinaCard. Any other value returns 01 and the device re-prompts, up to 3 attempts.</span></td>
+  <td><input class="m" id="ptPetrolinaPin" value="${petrolinaConfig.petrolinaPin}" style="width:90px"></td>
+  <td><button class="btn" onclick="ptSv('petrolinaPin','ptPetrolinaPin')">Save</button></td></tr>
+<tr><td>Ask for KM (askForKm)<br><span style="color:#8b949e;font-size:11px">Shows the odometer screen after the PIN.</span></td>
+  <td>${petrolinaConfig.askForKm === "Y" ? "&#x2705; Yes" : "No"}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.askForKm === "Y" ? "green" : ""}" onclick="ptSet2('askForKm','Y')">Yes</button>
+    <button class="btn ${petrolinaConfig.askForKm === "N" ? "green" : ""}" onclick="ptSet2('askForKm','N')">No</button>
+  </td></tr>
+<tr><td>Ask for Reg. No (askForRegNo)<br><span style="color:#8b949e;font-size:11px">Shows the vehicle registration screen.</span></td>
+  <td>${petrolinaConfig.askForRegNo === "Y" ? "&#x2705; Yes" : "No"}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.askForRegNo === "Y" ? "green" : ""}" onclick="ptSet2('askForRegNo','Y')">Yes</button>
+    <button class="btn ${petrolinaConfig.askForRegNo === "N" ? "green" : ""}" onclick="ptSet2('askForRegNo','N')">No</button>
+  </td></tr>
 <tr><td>Terminal Mode (terminalMode)</td>
   <td>${petrolinaConfig.terminalMode === "attended" ? "&#x1F6B6; Attended (S1F2, post-pay Sale)" : "&#x26FD; Unattended (S1U2, pre-auth)"}</td>
   <td>
@@ -3448,6 +3470,11 @@ app.post("/vehiclePresent", async (req, res) => {
 app.post("/help", (req, res) => {
   const action      = req.body.action      || "";
   const application = req.body.application || "";
+
+  // Petrolina shares this path per its own specification, so it is answered here rather than by a
+  // second route that Express would never reach.
+  if (application === "petrolinaApp") return petroHelp(req, res);
+
   const isCarWash   = application === "CarWash";
   const isManualHelp  = action === "Help Button";
   const isEcrDecline  = action.toLowerCase().includes("ecr decline") || action.toLowerCase().includes("ecr_decline");
@@ -4364,30 +4391,48 @@ app.post("/abortTransaction", (req, res) => {
 });
 
 // POST /help
-app.post("/help", (req, res) => {
-  const body = { message: "Help has been called. Staff will assist you shortly." };
+/**
+ * Petrolina help, spec Table 43.
+ *
+ * Not registered as its own route: the parking application already owns POST /help, and Express
+ * matches the first route it finds, so a second one here would never be reached. The parking
+ * handler delegates here when the caller identifies itself as petrolinaApp.
+ */
+function petroHelp(req, res) {
+  const body = {
+    terminal:             req.body.terminal || petrolinaConfig.terminal || "",
+    UUID:                 req.body.UUID || "",
+    displayMessage:       petrolinaConfig.helpMessage.replace("{phone}", petrolinaConfig.helpPhone),
+    timeToDisplayMessage: String(petrolinaConfig.helpMessageSecs),
+    responseCode:         RC.APPROVED,
+    responseDescription:  "Help Ok",
+    timeOfTheServer:      new Date().toISOString()
+  };
   addPetroLog("POST", "/help", req.body, body);
   res.json(body);
-});
+}
 
 // POST /loyaltyCheck — MyPetrolina loyalty lookup by phone number
+/**
+ * Only these numbers have an account. Anything else is declined — a lookup that approves whatever
+ * it is given cannot exercise the "no such account" path the device has to handle.
+ */
 const mockLoyaltyAccounts = {
   "99123456": { maskedName: "Γιώ*** Αντ****", pointsBalance: 1250 },
-  "99000000": { maskedName: "Μαρ*** Παπ****", pointsBalance:  320 },
-  default:    { maskedName: "Χαρ*** Πετρ****", pointsBalance:  850 }
+  "99654321": { maskedName: "Μαρ*** Παπ****", pointsBalance:  320 }
 };
 app.post("/loyaltyCheck", (req, res) => {
   const phoneNo = req.body.phoneNo || "";
-  const account = mockLoyaltyAccounts[phoneNo] || mockLoyaltyAccounts.default;
+  const account = mockLoyaltyAccounts[phoneNo];
   const body = {
     terminal:            req.body.terminal || "",
     timeOfTheServer:     new Date().toISOString(),
     transsegno:          req.body.transsegno || "",
     UUID:                req.body.UUID || "",
-    responseCode:        "00",
-    responseDescription: "OK",
-    maskedName:          account.maskedName,
-    pointsBalance:       account.pointsBalance
+    responseCode:        account ? RC.APPROVED : RC.LOYALTY_NOT_FOUND,
+    responseDescription: account ? "OK" : "No MyPetrolina account for this number",
+    maskedName:          account ? account.maskedName    : undefined,
+    pointsBalance:       account ? account.pointsBalance : undefined
   };
   addPetroLog("POST", "/loyaltyCheck", req.body, body);
   res.json(body);
@@ -4397,7 +4442,8 @@ app.post("/loyaltyCheck", (req, res) => {
 // UID → card number mapping. In production this lives in the OPT / card host and is populated at
 // card issuance; here it is a stub so the contactless path can be tested end to end.
 const petrolinaUidMap = {
-  "9566709B": "9100001880880805"    // test card
+  "9566709B":       "9100001880880805",   // MIFARE Classic 1K test card
+  "041534FA035C80": "9100001880880806"    // ISO 14443-4 test card (SAK 0x20)
 };
 function petroCardForUid(uid) {
   return petrolinaUidMap[String(uid).toUpperCase()] || `UID:${uid}`;
@@ -4415,16 +4461,20 @@ app.post("/petrolinaCard", (req, res) => {
     petrolinaTransactions[txnKey].petrolinaCardPan = pan;
     petrolinaTransactions[txnKey].petrolinaCardUid = uid;
   }
-  // Mock: any card/PIN accepted; ask for KM by default
+
+  // A PIN that is always accepted cannot exercise the re-prompt path, which is the one decline a
+  // customer can recover from unaided. petrolinaPin holds the value this mock treats as correct;
+  // anything else returns 01 and the device offers another attempt.
+  const pinOk = pin === String(petrolinaConfig.petrolinaPin);
   const body = {
     terminal:                   req.body.terminal || "",
     timeOfTheServer:             new Date().toISOString(),
     transsegno:                  req.body.transsegno || "",
     UUID:                        req.body.UUID || "",
-    petrolinacardaskforkm:       "Y",
-    petrolinacardaskforcarregno: "N",
-    responseCode:                "00",
-    responseDescription:         "Card accepted"
+    petrolinacardaskforkm:       pinOk ? petrolinaConfig.askForKm    : undefined,
+    petrolinacardaskforcarregno: pinOk ? petrolinaConfig.askForRegNo : undefined,
+    responseCode:                pinOk ? RC.APPROVED : RC.INVALID_PIN,
+    responseDescription:         pinOk ? "Card accepted" : "Incorrect PIN"
   };
   addPetroLog("POST", "/petrolinaCard", req.body, body);
   res.json(body);
@@ -4498,9 +4548,13 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) 
 
   const isPetro = isPetrolinaCard || txn.isPetrolinaCard || false;
   const maxCents = Math.round((txn.jccFinalAmount || 0) * 100) || 20000;
+  // The pump controller stops at the authorised amount, so a completion can never exceed the
+  // pre-authorisation. Randomising above it — as this did via Math.max(maxCents, 5000) — produced
+  // traces the physical system cannot generate, and made the app look wrong for capturing them.
+  const floorCents  = Math.min(500, maxCents);
   const actualCents = petrolinaConfig.actualAmountCents > 0
     ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
-    : Math.floor(Math.random() * (Math.max(maxCents, 5000) - 500) + 500);
+    : Math.floor(Math.random() * (maxCents - floorCents) + floorCents);
   const pricePerLiter = petrolinaConfig.pumpProducts[0]?.pricePerLiter || 1650;
   const liters = parseFloat((actualCents / pricePerLiter).toFixed(3));
 
