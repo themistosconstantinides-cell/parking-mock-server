@@ -1,7 +1,7 @@
 {
   "name": "parking-mock-server",
   "version": "1.0.0",
-  "description": "ParkTec mock RPS server",
+  "description": "Parqio mock RPS server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
