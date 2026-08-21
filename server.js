@@ -379,6 +379,10 @@ let petrolinaConfig = {
   insertPetrolinaCardTO:   40,
   displayScreenFuelingTO:  240,
   callbackDelaySec:        8,
+  // Nozzle simulation: "1" sends /fueling ticks before the completion, as a pump controller would.
+  fuelingEnabled:          "1",
+  fuelingTicks:            4,     // updates sent while the fill climbs
+  fuelingTickSec:          5,     // seconds between them
   actualAmountCents:       0,
   preAuthResult:           "ok",
   responseCode:            "00"
@@ -1696,6 +1700,12 @@ ${rentalConfig.items.map((item,i)=>`<tr>
   <td>
     <button class="btn ${petrolinaConfig.askForRegNo === "Y" ? "green" : ""}" onclick="ptSet2('askForRegNo','Y')">Yes</button>
     <button class="btn ${petrolinaConfig.askForRegNo === "N" ? "green" : ""}" onclick="ptSet2('askForRegNo','N')">No</button>
+  </td></tr>
+<tr><td>Fuelling ticks (fuelingEnabled)<br><span style="color:#8b949e;font-size:11px">Sends /fueling every ${petrolinaConfig.fuelingTickSec}s &times;${petrolinaConfig.fuelingTicks} as the fill climbs, then /completion. Off sends the completion alone.</span></td>
+  <td>${petrolinaConfig.fuelingEnabled === "1" ? "&#x2705; On" : "Off"}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.fuelingEnabled === "1" ? "green" : ""}" onclick="ptSet2('fuelingEnabled','1')">On</button>
+    <button class="btn ${petrolinaConfig.fuelingEnabled === "0" ? "green" : ""}" onclick="ptSet2('fuelingEnabled','0')">Off</button>
   </td></tr>
 <tr><td>PetrolinaCard result (petrolinaCardRc)<br><span style="color:#8b949e;font-size:11px">Returned by /petrolinaCard once the PIN is correct. A decline ends the transaction with abortReason 23.</span></td>
   <td style="font-family:monospace">${petrolinaConfig.petrolinaCardRc} ${petroCardRcText(petrolinaConfig.petrolinaCardRc)}</td>
@@ -4380,8 +4390,14 @@ app.post("/preAuthorization", (req, res) => {
   // Schedule completion callback
   const callbackBase = txn.callbackBase || "";
   if (callbackBase) {
-    console.log(`[PETRO] Completion callback to ${callbackBase} in ${petrolinaConfig.callbackDelaySec}s`);
-    setTimeout(() => firePetroCompletion(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+    if (petrolinaConfig.fuelingEnabled === "1") {
+      // The nozzle is lifted callbackDelaySec after approval, then fuel flows in ticks.
+      console.log(`[PETRO] Fuelling starts in ${petrolinaConfig.callbackDelaySec}s, then ${petrolinaConfig.fuelingTicks} ticks`);
+      setTimeout(() => petroStartFuelling(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+    } else {
+      console.log(`[PETRO] Completion callback to ${callbackBase} in ${petrolinaConfig.callbackDelaySec}s`);
+      setTimeout(() => firePetroCompletion(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+    }
   }
 });
 
@@ -4565,7 +4581,78 @@ function petroAcknowledged(reply) {
   return reply && (reply.responseCode === RC.APPROVED || reply.responseCode === RC.ALREADY_PROCESSED);
 }
 
-function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) {
+/** Fire-and-forget POST to the device. Used for /fueling, where a missed tick simply skips. */
+function postToDevice(callbackBase, path, payload, label) {
+  const body = JSON.stringify(payload);
+  const url  = new URL(callbackBase.replace(/\/$/, "") + path);
+  const r = (url.protocol === "https:" ? require("https") : http).request({
+    hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
+    path: url.pathname, method: "POST",
+    // agent:false forces a fresh socket. Node's global agent keeps sockets alive, but
+    // NanoHTTPD on the terminal closes them between ticks — reusing one gives "socket hang up".
+    agent: false,
+    headers: {
+      "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body),
+      "Connection": "close"
+    }
+  }, resp => {
+    let d = ""; resp.on("data", c => d += c);
+    resp.on("end", () => addPetroLog(label, url.href, payload, safeJson(d)));
+  });
+  r.on("error", e => addPetroLog(label, url.href, payload, { error: e.message }));
+  r.write(body); r.end();
+}
+
+/**
+ * Simulates the pump: the nozzle is lifted, fuel flows, then the nozzle is returned.
+ *
+ * The device is told at each stage — a /fueling tick every fuelingTickSec while the fill climbs,
+ * then /completion once it stops. The ticks are what let the terminal show the fill progressing and
+ * keep its screen alive, so a slow fill is indistinguishable from an abandoned one without them.
+ */
+function petroStartFuelling(transsegno, callbackBase) {
+  const txn = petrolinaTransactions[transsegno];
+  if (!txn || !callbackBase) return;
+
+  const maxCents = Math.round((txn.jccFinalAmount || 0) * 100) || 20000;
+  const target   = petrolinaConfig.actualAmountCents > 0
+    ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
+    : Math.floor(Math.random() * (maxCents - Math.min(500, maxCents)) + Math.min(500, maxCents));
+  const price    = petrolinaConfig.pumpProducts[0]?.pricePerLiter || 1650;
+  const ticks    = Math.max(1, Number(petrolinaConfig.fuelingTicks) || 4);
+  const everyMs  = (Number(petrolinaConfig.fuelingTickSec) || 5) * 1000;
+
+  let tick = 0;
+  const timer = setInterval(() => {
+    tick++;
+    const blocked = petroCompletionBlockedReason(txn);
+    if (blocked) { clearInterval(timer); return; }   // reversed or aborted mid-fill
+
+    const cents = Math.round(target * (tick / ticks));
+    postToDevice(callbackBase, "/fueling", {
+      application:     "petrolinaApp",
+      terminal:        txn.terminal || petrolinaConfig.terminal,
+      transsegno,
+      UUID:            txn.uuid || "",
+      amountUsed:      cents / 100,
+      litresUsed:      parseFloat((cents / price).toFixed(3)),
+      pumpId:          txn.pumpId || petrolinaConfig.pumpNo,
+      productid:       txn.productId || "",
+      timeOfTheServer: new Date().toISOString()
+    }, "FUELING→APP");
+
+    if (tick >= ticks) {
+      clearInterval(timer);
+      // Nozzle returned: the OPT now knows the final amount and completes. Passed explicitly so
+      // the completion matches the fill the device has just watched — writing it back into the
+      // config would pin every later transaction to this one's amount.
+      setTimeout(() => firePetroCompletion(transsegno, callbackBase, false, target), everyMs);
+    }
+  }, everyMs);
+}
+
+/** [forcedCents] is the amount actually dispensed, when a fuelling simulation has just measured it. */
+function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false, forcedCents = 0) {
   const txn = petrolinaTransactions[transsegno] || {};
 
   const blocked = petroCompletionBlockedReason(txn);
@@ -4582,9 +4669,11 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false) 
   // pre-authorisation. Randomising above it — as this did via Math.max(maxCents, 5000) — produced
   // traces the physical system cannot generate, and made the app look wrong for capturing them.
   const floorCents  = Math.min(500, maxCents);
-  const actualCents = petrolinaConfig.actualAmountCents > 0
-    ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
-    : Math.floor(Math.random() * (maxCents - floorCents) + floorCents);
+  const actualCents = forcedCents > 0
+    ? Math.min(forcedCents, maxCents)
+    : petrolinaConfig.actualAmountCents > 0
+      ? Math.min(petrolinaConfig.actualAmountCents, maxCents)
+      : Math.floor(Math.random() * (maxCents - floorCents) + floorCents);
   const pricePerLiter = petrolinaConfig.pumpProducts[0]?.pricePerLiter || 1650;
   const liters = parseFloat((actualCents / pricePerLiter).toFixed(3));
 
