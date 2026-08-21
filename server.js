@@ -4293,6 +4293,9 @@ app.post("/petrolAppInit", (req, res) => {
     terminal:                petrolinaConfig.terminal || req.body.terminal || "",
     pumpNo:                  petrolinaConfig.pumpNo,
     defaultLan:              petrolinaConfig.defaultLan,
+    // Spec Table 2 names this "mode", capitalised. terminalMode is kept alongside it only so
+    // an app build older than the rename keeps working; remove once none are in the field.
+    mode:                    petrolinaConfig.terminalMode === "attended" ? "Attended" : "Unattended",
     terminalMode:            petrolinaConfig.terminalMode,
     claimTTL:                petrolinaConfig.claimTTL,
     devicePort:              petrolinaConfig.devicePort,
