@@ -361,6 +361,9 @@ let petrolinaConfig = {
   // Response code returned by /petrolinaCard when the PIN is correct. Anything other than 00 lets
   // the business declines be exercised â€” each shows a different message on the terminal.
   petrolinaCardRc:  "00",
+  // Attended test switches. "00" means behave normally; anything else forces that outcome so the
+  // failure paths can be reached from the device, which cannot otherwise be driven into them.
+  receiptRc:        "00",           // 96 = not settled, 93 = unknown transsegno
   pumpProducts: [
     { productCode: "unleaded95", product: "Unleaded 95", pricePerLiter: 1720, image: "95petrolina.gif" },
     { productCode: "unleaded98", product: "Unleaded 98", pricePerLiter: 1890, image: "98petrolina.gif" },
@@ -5122,9 +5125,23 @@ app.post("/saleAdvice", (req, res) => {
   let body;
   if (!f) {
     body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
+  } else if (f.paid && f.paidUuid && f.paidUuid !== req.body.UUID) {
+    // Already paid, but by a different transaction - so this is not a retry of the same payment,
+    // it is a second payment for one fuelling. It happens when a claim expires and another terminal
+    // takes payment before the first one advises.
+    //
+    // Answering "already processed" here would be the worst outcome available: the first terminal
+    // would clear its queue believing its payment was recorded, when what is recorded is somebody
+    // else's. Two customers charged, one payment on file, and nothing to reconcile it against.
+    console.error(`[PETRO_ALERT] DOUBLE PAYMENT on ${req.body.transsegno}: recorded for UUID ` +
+      `${f.paidUuid} by ${f.paidBy}, now advised by ${req.body.terminal} for UUID ${req.body.UUID}`);
+    body = petroAck(req, {
+      responseCode: RC.CLAIM_NOT_HELD,
+      responseDescription: `Already paid by ${f.paidBy} under a different transaction - refund required`
+    });
   } else if (f.paid) {
-    // A repeat of an advice already recorded returns 21 with the original receiptNo, and MUST NOT
-    // post the payment twice. 21 tells the device the OPT holds it, so the entry leaves the queue â€”
+    // A true repeat: same fuelling, same UUID. Returns 31 with the original receiptNo and MUST NOT
+    // post the payment twice. 31 tells the device the OPT holds it, so the entry leaves the queue -
     // which is the difference between a duplicate and a failure worth retrying.
     body = petroAck(req, {
       receiptNo: f.receiptNo, responseCode: RC.ALREADY_PROCESSED,
@@ -5133,6 +5150,9 @@ app.post("/saleAdvice", (req, res) => {
   } else {
     f.paid       = true;
     f.paidBy     = req.body.terminal || "";
+    // Recorded so a later advice can be told apart: same UUID is a retry, a different one is a
+    // second payment for the same fuelling.
+    f.paidUuid   = req.body.UUID || "";
     f.cartType   = req.body.cartType || "";
     f.amountPaid = req.body.amountPaid;
     // Attended loyalty: the number is captured on the device with no prior lookup, so the OPT
@@ -5220,6 +5240,19 @@ function padRow(label, value) {
 app.post("/receipt", (req, res) => {
   const f = petrolinaUnpaid[req.body.transsegno];
   let body;
+  // Test switch. The App only asks for a receipt once an advice has succeeded, so the error codes
+  // in Table 37 are otherwise unreachable from the device - and the point of testing them is that a
+  // receipt failure must never look to staff like a payment failure.
+  if (petrolinaConfig.receiptRc && petrolinaConfig.receiptRc !== "00") {
+    body = petroAck(req, {
+      responseCode: petrolinaConfig.receiptRc,
+      responseDescription: petrolinaConfig.receiptRc === RC.NOT_SETTLED
+        ? "Transaction not settled - no receipt available"
+        : "Unknown transsegno"
+    });
+    addPetroLog("POST", "/receipt", req.body, { ...body, forced: true });
+    return res.json(body);
+  }
   if (!f) {
     body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
   } else if (!f.paid) {
@@ -5234,6 +5267,36 @@ app.post("/receipt", (req, res) => {
   }
   addPetroLog("POST", "/receipt", req.body, { ...body, receiptContent: body.receiptContent ? "<" + body.receiptContent.split(GS).length + " lines>" : "" });
   res.json(body);
+});
+
+/**
+ * Expire a live claim, so the terminal holding it finds it gone.
+ *
+ * claimTTL is 180s and a tester cannot usefully wait it out mid-run. This produces the state the
+ * App must survive: it believes it holds the fuelling, and by the time it advises, it does not.
+ */
+app.post("/petrolina/expire-claim", (req, res) => {
+  const f = petrolinaUnpaid[req.body.transsegno];
+  if (!f) return res.json({ ok: false, error: "transsegno not found" });
+  f.claimedBy = "";
+  f.claimExpiry = new Date(Date.now() - 1000).toISOString();
+  console.log(`[PETRO_TEST] claim on ${req.body.transsegno} expired`);
+  res.json({ ok: true, transsegno: req.body.transsegno, claimExpiry: f.claimExpiry });
+});
+
+/**
+ * Hand a fuelling to another terminal, so this one is refused.
+ *
+ * Two terminals taking payment for one fill is the failure the claim exists to prevent, and it
+ * needs a second terminal to test properly - this stands in for one.
+ */
+app.post("/petrolina/steal-claim", (req, res) => {
+  const f = petrolinaUnpaid[req.body.transsegno];
+  if (!f) return res.json({ ok: false, error: "transsegno not found" });
+  f.claimedBy   = req.body.byTerminal || "000025901099";
+  f.claimExpiry = new Date(Date.now() + petrolinaConfig.claimTTL * 1000).toISOString();
+  console.log(`[PETRO_TEST] claim on ${req.body.transsegno} given to ${f.claimedBy}`);
+  res.json({ ok: true, transsegno: req.body.transsegno, claimedBy: f.claimedBy });
 });
 
 // â”€â”€ Dashboard: simulate a car having fuelled at a pump â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
