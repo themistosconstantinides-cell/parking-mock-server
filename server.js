@@ -4571,11 +4571,19 @@ app.post("/confirmPetrolinaCard", (req, res) => {
   };
   addPetroLog("POST", "/confirmPetrolinaCard", req.body, body);
 
-  // Auto-fire /completionPetrolina after callbackDelaySec
+  // The pump is now authorised, so fuel flows exactly as it does for a bank card. Fuelling was
+  // previously started only from /preAuthorization, which the PetrolinaCard flow never calls - so
+  // this path went straight to the completion and the customer watched a static screen while the
+  // tank filled. How the customer pays has no bearing on fuel coming out of the nozzle.
   const txn = petrolinaTransactions[transsegno] || {};
   const callbackBase = txn.callbackBase || "";
   if (callbackBase && petrolinaConfig.callbackDelaySec > 0) {
-    setTimeout(() => firePetroCompletion(transsegno, callbackBase, true), petrolinaConfig.callbackDelaySec * 1000);
+    if (petrolinaConfig.fuelingEnabled === "1") {
+      console.log(`[PETRO] Fuelling starts in ${petrolinaConfig.callbackDelaySec}s, then ${petrolinaConfig.fuelingTicks} ticks (PetrolinaCard)`);
+      setTimeout(() => petroStartFuelling(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+    } else {
+      setTimeout(() => firePetroCompletion(transsegno, callbackBase, true), petrolinaConfig.callbackDelaySec * 1000);
+    }
   }
 
   res.json(body);
@@ -4736,7 +4744,11 @@ function petroStartFuelling(transsegno, callbackBase) {
         petrolinaTransactions[transsegno].fuelledCents = target;
         petrolinaTransactions[transsegno].fuellingInProgress = false;   // nozzle returned
       }
-      setTimeout(() => firePetroCompletion(transsegno, callbackBase, false, target), everyMs);
+      // Route to /completionPetrolina or /completion according to how this fuelling is being paid
+      // for. firePetroCompletion also reads the flag off the transaction, but passing false here
+      // and relying on that is the kind of thing that works until someone changes the other end.
+      const payingByCard = !!(petrolinaTransactions[transsegno] || {}).isPetrolinaCard;
+      setTimeout(() => firePetroCompletion(transsegno, callbackBase, payingByCard, target), everyMs);
     }
   }, everyMs);
 }
