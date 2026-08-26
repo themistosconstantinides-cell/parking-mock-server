@@ -1728,6 +1728,9 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <tr><td>Device IP (deviceIP)<br><span style="color:#8b949e;font-size:11px">Reported by the app on /petrolAppInit. Callbacks go to this address on the port above.</span></td>
   <td>${petrolinaConfig.deviceIP ? `<code>${petrolinaConfig.deviceIP}:${petrolinaConfig.devicePort}</code>` : "<span style='color:#8b949e'>not yet initialised</span>"}</td>
   <td><span style="color:#8b949e;font-size:11px">read&#x2011;only</span></td></tr>
+<tr><td>Device ID (deviceId)<br><span style="color:#8b949e;font-size:11px">The OPT's own identifier for the device, one per pump. Returned by /petrolAppInit and carried as a JWT claim, so a token says which device issued it.</span></td>
+  <td><input class="m" id="ptDeviceId" value="${petrolinaConfig.deviceId}" style="width:90px"></td>
+  <td><button class="btn" onclick="ptSv('deviceId','ptDeviceId')">Save</button></td></tr>
 <tr><td>Max Amount (maxAmount)<br><span style="color:#8b949e;font-size:11px">Ceiling on a manually entered unattended amount, in euro.</span></td>
   <td><input class="m" id="ptMaxAmount" value="${petrolinaConfig.maxAmount}" style="width:90px"></td>
   <td><button class="btn" onclick="ptSv('maxAmount','ptMaxAmount')">Save</button></td></tr>
@@ -1795,6 +1798,35 @@ ${petrolinaConfig.pumpProducts.map(g=>`<tr>
 </tr>`).join('')}
 </table>
 <p style="color:#8b949e;font-size:12px">Products are configured in server.js <code>petrolinaConfig.pumpProducts</code>.</p>
+
+<h2>&#x1F510; Security (JWT)</h2>
+<p style="color:#8b949e;font-size:12px">HS256 over <code>Authorization: Bearer</code>, both directions. The token carries
+<code>bodyhash</code>, <code>path</code> and <code>iat</code>, so the body and the endpoint are covered by the signature on a link with no TLS.
+A call that fails verification is answered with response code <code>91</code>.</p>
+${petrolinaConfig.jwtEnabled === "1" ? `<p style="background:#3d1d00;border:1px solid #e07b00;color:#ffa657;padding:8px;font-size:12px">
+&#x26A0; Verification is ON. A terminal whose build has no JWT, or whose secret differs, will be refused on <b>every</b> call and will look broken.</p>` : ""}
+<table>
+<tr><th style="width:200px">Parameter</th><th>Value</th><th style="width:170px"></th></tr>
+<tr><td>Verify inbound calls (jwtEnabled)<br><span style="color:#8b949e;font-size:11px">Off leaves the mock exactly as it was before JWT: unsigned calls are accepted and callbacks go out unsigned. Turn it on only once the app has been rebuilt with the same secret.</span></td>
+  <td>${petrolinaConfig.jwtEnabled === "1" ? "<span style='color:#3fb950'>&#x2705; On &#x2014; tokens required</span>" : "<span style='color:#8b949e'>Off &#x2014; not checked</span>"}</td>
+  <td>
+    <button class="btn ${petrolinaConfig.jwtEnabled === "1" ? "green" : ""}" onclick="ptSet2('jwtEnabled','1')">On</button>
+    <button class="btn ${petrolinaConfig.jwtEnabled === "0" ? "green" : ""}" onclick="ptSet2('jwtEnabled','0')">Off</button>
+  </td></tr>
+<tr><td>Token validity (tokenValiditySecs)<br><span style="color:#8b949e;font-size:11px">How old an <code>iat</code> may be. Returned by /petrolAppInit so it can be moved without a release on either side. 30s of clock skew is allowed on top. 3s was the early draft and needs both clocks to agree that closely at all times &#x2014; useful for testing the expiry path, not for running.</span></td>
+  <td>${petrolinaConfig.tokenValiditySecs}s</td>
+  <td>
+    <button class="btn ${Number(petrolinaConfig.tokenValiditySecs) === 3  ? "green" : ""}" onclick="ptSet2('tokenValiditySecs','3')">3s</button>
+    <button class="btn ${Number(petrolinaConfig.tokenValiditySecs) === 30 ? "green" : ""}" onclick="ptSet2('tokenValiditySecs','30')">30s</button>
+    <button class="btn ${Number(petrolinaConfig.tokenValiditySecs) === 60 ? "green" : ""}" onclick="ptSet2('tokenValiditySecs','60')">60s</button>
+  </td></tr>
+<tr><td>Shared secret (jwtSecret)<br><span style="color:#8b949e;font-size:11px">Base64 of 32 random bytes. The <b>same</b> value must be typed into the terminal under Settings &#x2192; JWT SECRET &#x2014; it cannot be delivered by /petrolAppInit, because that call is itself signed. Shown in full because this is a test secret.</span></td>
+  <td><input class="t" id="ptJwtSecret" value="${petrolinaConfig.jwtSecret}" style="width:100%"></td>
+  <td><button class="btn" onclick="ptSv('jwtSecret','ptJwtSecret')">Save</button></td></tr>
+<tr><td>Merchant ID (merchantId)<br><span style="color:#8b949e;font-size:11px">Carried as a claim. The outlet &#x2014; the terminal without its last two digits.</span></td>
+  <td><input class="m" id="ptMerchantId" value="${petrolinaConfig.merchantId}" style="width:140px"></td>
+  <td><button class="btn" onclick="ptSv('merchantId','ptMerchantId')">Save</button></td></tr>
+</table>
 
 <h2>&#x1F9EA; Simulation Controls</h2>
 <table>
@@ -4384,7 +4416,7 @@ function petroSignJwt(path, body) {
  * a terminal that has no secret and the feature can be switched on one end at a time.
  */
 function petroAuthHeaders(path, body) {
-  if (petrolinaConfig.jwtEnabled !== "1") return {};
+  if (String(petrolinaConfig.jwtEnabled) !== "1") return {};
   return { "Authorization": "Bearer " + petroSignJwt(path, body) };
 }
 
@@ -4436,7 +4468,7 @@ function petroVerifyJwt(req) {
  * a network fault rather than as the security failure it is.
  */
 function petroRequireJwt(req, res, next) {
-  if (petrolinaConfig.jwtEnabled !== "1") return next();
+  if (String(petrolinaConfig.jwtEnabled) !== "1") return next();
   const reason = petroVerifyJwt(req);
   if (!reason) return next();
   console.log(`[PETRO_JWT] REJECTED ${req.path} - ${reason}`);
