@@ -2,7 +2,10 @@ const express = require("express");
 const https   = require("https");
 const app     = express();
 
-app.use(express.json());
+// The raw bytes are kept because the JWT's bodyhash covers the body exactly as it arrived. Hashing
+// req.body instead would hash a re-serialised object - different key order, different whitespace,
+// different hash - and every signed request would fail.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));  // Fairway /connect/token uses form-urlencoded
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Email alerts via Resend HTTP API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -341,6 +344,32 @@ let petrolinaConfig = {
   defaultLan:       "el",          // "el" or "en" â€” app falls back to "el" if absent
   terminalMode:     "unattended",  // "unattended" (S1U2, pre-auth) | "attended" (S1F2, post-pay Sale)
   claimTTL:         180,           // seconds a claim on an unpaid fuelling stays exclusive
+
+  // V10 section 28. The OPT owns these two and hands them to the App at initialization.
+  //
+  // deviceId is the OPT's own identifier for a device, mapped to a pump - device 1 is pump 1. It is
+  // deliberately not configured on the terminal: a replaced terminal picks up its identity from the
+  // server with no commissioning step. The App presents it in the JWT payload on every later call.
+  deviceId:         "1",
+  // Shared secret for the JWT, Base64 of 32 random bytes. The same secret signs both directions,
+  // and on the terminal it is typed into Settings rather than delivered - petrolAppInit is itself
+  // signed, so the secret cannot arrive over the API it protects.
+  //
+  // A TEST value. It appears in the specification correspondence and in the repository, so it
+  // protects nothing; Petrolina supply the live one.
+  jwtSecret:        "hxzBKQZCmQK5sI7TihI4ljKHFBNenORIJvd4SAuTaY0=",
+  // Off until both sides can sign and verify. Turning it on before the App can sign would simply
+  // reject every request, which is a confusing way to discover the feature is half-built.
+  jwtEnabled:       "0",
+  // merchantId claim - the outlet, which is the terminal without its last two digits.
+  merchantId:       "0000259010",
+  // ipaddress claim. Left blank to mean "work it out from the network interfaces", so the mock
+  // needs no editing when it moves between a laptop and a station PC.
+  serverIp:         "",
+  // Window within which a token's iat is accepted. Delivered rather than fixed so it can be moved
+  // without a release on either side. Was 3s in an early draft, which required both clocks to agree
+  // that closely at all times and would have failed intermittently.
+  tokenValiditySecs: 60,
   devicePort:       8080,          // spec Table 2 â€” port the app binds its callback listener to
   deviceIP:         "",            // learned from deviceIP on petrolAppInit; used to address callbacks
   maxAmount:        200.00,        // spec Table 2 â€” ceiling on a manually entered unattended amount
@@ -4293,9 +4322,130 @@ app.post("/admin/rental-item-avail", (req, res) => {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 const http = require("http");
+// crypto is already required at the top of the CarWash section.
+
+// ── JWT (HS256) ──────────────────────────────────────────────────────────────────────────
+// Petrolina chose JWT without TLS, on the basis that the station network is a segregated VLAN.
+// A plain JWT signs only header.payload, so on a clear link it proves the sender holds the secret
+// but says nothing about the body travelling beside it. Three claims close that, as agreed:
+// bodyhash covers the exact body bytes, path pins the token to one endpoint, iat bounds its life.
+//
+// Mirrors JwtAuth.kt on the terminal. The two were checked against the worked examples issued to
+// Petrolina, so both reproduce those tokens byte for byte.
+
+const b64url = b => Buffer.from(b).toString("base64")
+  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64urlDec = s => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+
+/** Standard Base64 of SHA-256 over the exact bytes - only the JWT envelope is base64url. */
+function petroBodyHash(body) {
+  return crypto.createHash("sha256").update(Buffer.from(body)).digest("base64");
+}
+
+/**
+ * The secret is exchanged as Base64 of 32 random bytes and signs those bytes. A value that is not
+ * Base64 is used as literal text, so a hand-typed secret still works instead of failing in a way
+ * indistinguishable from a signature fault.
+ */
+function petroSecretKey() {
+  const s = petrolinaConfig.jwtSecret || "";
+  const buf = Buffer.from(s, "base64");
+  return buf.toString("base64").replace(/=+$/, "") === s.replace(/=+$/, "")
+    ? buf : Buffer.from(s, "utf8");
+}
+
+/** The first non-internal IPv4 address, unless one is configured explicitly. */
+function petroServerIp() {
+  if (petrolinaConfig.serverIp) return petrolinaConfig.serverIp;
+  const nets = require("os").networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const n of nets[name] || []) {
+      if (n.family === "IPv4" && !n.internal) return n.address;
+    }
+  }
+  return "";
+}
+
+function petroSignJwt(path, body) {
+  const claims = {
+    iat:        Math.floor(Date.now() / 1000),
+    ipaddress:  petroServerIp(),
+    deviceId:   String(petrolinaConfig.deviceId || ""),
+    merchantId: String(petrolinaConfig.merchantId || ""),
+    path,
+    bodyhash:   petroBodyHash(body)
+  };
+  const input = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" })) + "." + b64url(JSON.stringify(claims));
+  return input + "." + b64url(crypto.createHmac("sha256", petroSecretKey()).update(input).digest());
+}
+
+/**
+ * Headers for one outbound callback. Empty when signing is off, so the mock keeps working against
+ * a terminal that has no secret and the feature can be switched on one end at a time.
+ */
+function petroAuthHeaders(path, body) {
+  if (petrolinaConfig.jwtEnabled !== "1") return {};
+  return { "Authorization": "Bearer " + petroSignJwt(path, body) };
+}
+
+/** Returns null when the token is good, otherwise the reason - which is what gets logged. */
+function petroVerifyJwt(req) {
+  const header = req.get("authorization") || "";
+  if (!header) return "no Authorization header";
+  const parts = header.replace(/^Bearer\s+/i, "").trim().split(".");
+  if (parts.length !== 3) return `malformed token - expected 3 parts, got ${parts.length}`;
+  const [h, p, sig] = parts;
+
+  // The algorithm is read only to reject it, never to choose how to verify. alg:none and
+  // HS256/RS256 confusion both work by letting the token pick its own verification path.
+  let alg;
+  try { alg = JSON.parse(b64urlDec(h).toString("utf8")).alg; }
+  catch (e) { return "unreadable header"; }
+  if (alg !== "HS256") return `algorithm '${alg}' rejected - only HS256 is accepted`;
+
+  const expected = b64url(crypto.createHmac("sha256", petroSecretKey()).update(`${h}.${p}`).digest());
+  const a = Buffer.from(expected), b = Buffer.from(sig);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return "bad signature";
+
+  // Past this point the claims are worth reading. Before it they are attacker-supplied text.
+  let claims;
+  try { claims = JSON.parse(b64urlDec(p).toString("utf8")); }
+  catch (e) { return "unreadable payload"; }
+
+  const skew = 30;   // two boxes that never synchronise with each other
+  const age = Math.floor(Date.now() / 1000) - (claims.iat || 0);
+  if (!claims.iat) return "no iat claim";
+  if (age > Number(petrolinaConfig.tokenValiditySecs) + skew)
+    return `token is ${age}s old, limit is ${petrolinaConfig.tokenValiditySecs}s`;
+  if (age < -skew) return `token is ${-age}s in the future - check the clocks`;
+
+  if (claims.path !== req.path)
+    return `token was issued for '${claims.path}', presented at '${req.path}'`;
+
+  const actual = petroBodyHash(req.rawBody || Buffer.alloc(0));
+  if (!claims.bodyhash) return "no bodyhash claim";
+  if (claims.bodyhash !== actual)
+    return `body does not match its hash - carried ${claims.bodyhash}, received ${actual}`;
+
+  return null;
+}
+
+/**
+ * Guards the 13 calls the terminal makes. Response code 91 rather than HTTP 401: the app reads the
+ * body's responseCode on every call, and an HTTP-level rejection would surface to the customer as
+ * a network fault rather than as the security failure it is.
+ */
+function petroRequireJwt(req, res, next) {
+  if (petrolinaConfig.jwtEnabled !== "1") return next();
+  const reason = petroVerifyJwt(req);
+  if (!reason) return next();
+  console.log(`[PETRO_JWT] REJECTED ${req.path} - ${reason}`);
+  addPetroLog("JWT REJECT", req.path, req.body, { responseCode: "91", reason });
+  return res.json({ responseCode: "91", responseDescription: "Authentication failed" });
+}
 
 // POST /petrolAppInit
-app.post("/petrolAppInit", (req, res) => {
+app.post("/petrolAppInit", petroRequireJwt, (req, res) => {
   if (petrolinaConfig.responseCode !== "00") {
     const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "Configuration error" };
     addPetroLog("POST", "/petrolAppInit", req.body, body);
@@ -4316,6 +4466,10 @@ app.post("/petrolAppInit", (req, res) => {
     // V9 Table 2 calls the callback port "listeningPort" and makes it mandatory. devicePort was
     // the name while it was still a proposal; both go out until no old app build remains.
     listeningPort:           petrolinaConfig.devicePort,
+    // V10 section 28 - both mandatory. Sent now so the App can be built against them; the JWT
+    // itself is not implemented on either side yet, so nothing verifies a token today.
+    deviceId:                String(petrolinaConfig.deviceId),
+    tokenValiditySecs:       String(petrolinaConfig.tokenValiditySecs),
     claimTTL:                petrolinaConfig.claimTTL,
     devicePort:              petrolinaConfig.devicePort,
     maxAmount:               petrolinaConfig.maxAmount,
@@ -4377,7 +4531,7 @@ app.post("/optTransaction", (req, res) => {
 });
 
 // POST /preAuthorization â€” records ECR pre-auth result, schedules completion callback
-app.post("/preAuthorization", (req, res) => {
+app.post("/preAuthorization", petroRequireJwt, (req, res) => {
   const transsegno = req.body.transsegno || "";
   const txn = petrolinaTransactions[transsegno];
   if (!txn) {
@@ -4427,7 +4581,7 @@ app.post("/preAuthorization", (req, res) => {
 });
 
 // POST /abortTransaction
-app.post("/abortTransaction", (req, res) => {
+app.post("/abortTransaction", petroRequireJwt, (req, res) => {
   const transsegno = req.body.transsegno || "";
   if (transsegno && petrolinaTransactions[transsegno]) {
     petrolinaTransactions[transsegno].state = "aborted";
@@ -4475,7 +4629,7 @@ const mockLoyaltyAccounts = {
   "99123456": { maskedName: "Î“Î¹ÏŽ*** Î‘Î½Ï„****", pointsBalance: 1250 },
   "99654321": { maskedName: "ÎœÎ±Ï*** Î Î±Ï€****", pointsBalance:  320 }
 };
-app.post("/loyaltyCheck", (req, res) => {
+app.post("/loyaltyCheck", petroRequireJwt, (req, res) => {
   const phoneNo = req.body.phoneNo || "";
   const account = mockLoyaltyAccounts[phoneNo];
   const body = {
@@ -4514,7 +4668,7 @@ function petroCardRcText(rc) {
   }[rc] || `Declined (${rc})`;
 }
 
-app.post("/petrolinaCard", (req, res) => {
+app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
   // A swipe sends petrolinaCard (the card number); a tap sends petrolinaCardUid, because the
   // terminal cannot read the card's data sector. A real OPT resolves the UID to an account â€”
   // this mock accepts either and records which was used.
@@ -4681,7 +4835,8 @@ function postToDevice(callbackBase, path, payload, label) {
     agent: false,
     headers: {
       "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body),
-      "Connection": "close"
+      "Connection": "close",
+      ...petroAuthHeaders(url.pathname, body)
     }
   }, resp => {
     let d = ""; resp.on("data", c => d += c);
@@ -4811,7 +4966,8 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false, 
     const req = (url.protocol === "https:" ? require("https") : http).request({
       hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname, method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload),
+                 ...petroAuthHeaders(url.pathname, payload) }
     }, (r) => {
       let data = ""; r.on("data", c => data += c);
       r.on("end", () => {
@@ -4907,7 +5063,8 @@ function firePetroReversal(transsegno, base, reverseReason = REVERSE_REASON_NOT_
     const r = (url.protocol === "https:" ? require("https") : http).request({
       hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname, method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) }
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload),
+                 ...petroAuthHeaders(url.pathname, payload) }
     }, resp => { let d=""; resp.on("data",c=>d+=c); resp.on("end",()=>{
       const reply = safeJson(d);
       // Record the outcome. Without this the transaction keeps whatever state the completion left
@@ -4956,7 +5113,8 @@ function firePetroCallback(path, payload, callbackBase, res) {
     const r = (url.protocol === "https:" ? require("https") : http).request({
       hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
       path: url.pathname, method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body),
+                 ...petroAuthHeaders(url.pathname, body) }
     }, resp => {
       let d = ""; resp.on("data", c => d += c);
       resp.on("end", () => {
@@ -5069,7 +5227,7 @@ function petroAck(req, extra) {
 }
 
 // â”€â”€ A3: the unpaid fuelling for a pump â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.post("/pumpTransaction", (req, res) => {
+app.post("/pumpTransaction", petroRequireJwt, (req, res) => {
   const pumpid = String(req.body.pumpid || "");
   let body;
   if (!pumpid) {
@@ -5123,7 +5281,7 @@ app.post("/claimPumpTransaction", (req, res) => {
 });
 
 // â”€â”€ A5: release without payment â€” still owed, NOT an abort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.post("/releasePumpTransaction", (req, res) => {
+app.post("/releasePumpTransaction", petroRequireJwt, (req, res) => {
   const f = petrolinaUnpaid[req.body.transsegno];
   if (f && !f.paid) { f.claimedBy = ""; f.claimExpiry = null; }
   const body = petroAck(req, {
@@ -5135,7 +5293,7 @@ app.post("/releasePumpTransaction", (req, res) => {
 });
 
 // â”€â”€ A6/A8: payment advice â€” idempotent on (transsegno, UUID) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.post("/saleAdvice", (req, res) => {
+app.post("/saleAdvice", petroRequireJwt, (req, res) => {
   // Test switch: fail the advice at transport level so the device cannot tell whether the payment
   // was recorded. This is the ambiguous case the durable queue exists for â€” the advice must stay
   // queued and be retried, NOT discarded.
@@ -5259,7 +5417,7 @@ function padRow(label, value) {
   return label + " ".repeat(Math.max(1, w - label.length - v.length)) + v;
 }
 
-app.post("/receipt", (req, res) => {
+app.post("/receipt", petroRequireJwt, (req, res) => {
   const f = petrolinaUnpaid[req.body.transsegno];
   let body;
   // Test switch. The App only asks for a receipt once an advice has succeeded, so the error codes
