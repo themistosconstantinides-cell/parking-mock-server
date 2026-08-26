@@ -4789,6 +4789,16 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false, 
     pumpId:                txn.pumpId || petrolinaConfig.pumpNo,
     jccAuthCode:           txn.jccAuthCode || "",
     jccRetrievalReference: txn.jccRetrievalReference || "",
+    // TODO(V10): remove petrolinaCardNo from this callback.
+    //
+    // Agreed with Petrolina and specified in V10: the OPT must not return the card number. The App
+    // sent it moments earlier on /petrolinaCard and holds it against the transaction, so this tells
+    // it nothing - and the App has never read the field. With TLS not adopted it is the only
+    // cardholder data travelling OPT to terminal, in clear, on a callback with no use for it.
+    //
+    // Left in place for now so this mock keeps matching the OPT as it stands today. Remove once the
+    // real server has dropped it, or sooner if we want the mock to lead. Deleting this one line is
+    // the whole change; nothing reads it on either side.
     petrolinaCardNo:       isPetro ? (txn.petrolinaCardPan || "") : undefined
   });
 
