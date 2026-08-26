@@ -24,17 +24,54 @@ echo ===========================================================
 echo.
 
 rem -- 1. Node present? -------------------------------------------------------
+rem  "not on the PATH" is far more common than "not installed" - a window opened
+rem  before Node was installed keeps the old PATH until it is closed. So look in
+rem  the usual places before giving up, and use what is found for this session.
 where node >nul 2>&1
-if errorlevel 1 (
-    echo [X] Node.js is not installed, or is not on the PATH.
-    echo.
-    echo     Install the LTS version from https://nodejs.org
-    echo     then close this window and run this file again.
-    echo.
-    pause
-    exit /b 1
+if not errorlevel 1 goto :node_ok
+
+echo  [..] Node is not on the PATH - looking in the usual places
+for %%D in (
+    "%ProgramFiles%\nodejs"
+    "%ProgramFiles(x86)%\nodejs"
+    "%LOCALAPPDATA%\Programs\nodejs"
+    "%APPDATA%\npm"
+    "%ProgramFiles%\nodejs\node_modules\npm\bin"
+    "%USERPROFILE%\scoop\apps\nodejs\current"
+    "C:\nodejs"
+) do (
+    if exist "%%~D\node.exe" (
+        set "PATH=%%~D;!PATH!"
+        echo  [OK] Found Node at %%~D
+        goto :node_ok
+    )
 )
-for /f "delims=" %%v in ('node --version') do set NODEVER=%%v
+
+rem  nvm-windows keeps versions in subfolders and switches by symlink.
+if exist "%APPDATA%\nvm" (
+    for /d %%N in ("%APPDATA%\nvm\v*") do (
+        if exist "%%~N\node.exe" (
+            set "PATH=%%~N;!PATH!"
+            echo  [OK] Found Node at %%~N
+            goto :node_ok
+        )
+    )
+)
+
+echo.
+echo  [X] Node.js is not installed, or is not on the PATH.
+echo.
+echo      Install the LTS version from https://nodejs.org
+echo      Accept the defaults - nothing needs configuring.
+echo.
+echo      If you have JUST installed it, close this window and open a new
+echo      one: an open window keeps the PATH it started with.
+echo.
+pause
+exit /b 1
+
+:node_ok
+for /f "delims=" %%v in ('node --version 2^>nul') do set NODEVER=%%v
 echo  [OK] Node.js !NODEVER!
 
 rem -- 2. The server itself ---------------------------------------------------
