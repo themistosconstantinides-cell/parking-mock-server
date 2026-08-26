@@ -339,7 +339,14 @@ let carWashLogs          = [];
 
 // -- Petrolina State ----------------------------------------------------------
 let petrolinaConfig = {
-  terminal:         "",
+  // The terminal this OPT is configured for. petrolAppInit refuses any other with code 92, the way
+  // a real OPT holds configuration per registered terminal.
+  //
+  // Blank means accept whatever calls - deliberately kept as an option, because a good deal of
+  // testing involves pointing several devices at one mock and not caring which is which. It is not
+  // the default, so that the everyday case of a mistyped digit in Settings is caught rather than
+  // producing a terminal that appears to work on someone else's configuration.
+  terminal:         "000025901090",
   pumpNo:           "1",
   defaultLan:       "el",          // "el" or "en" â€” app falls back to "el" if absent
   terminalMode:     "unattended",  // "unattended" (S1U2, pre-auth) | "attended" (S1F2, post-pay Sale)
@@ -4483,6 +4490,27 @@ app.post("/petrolAppInit", petroRequireJwt, (req, res) => {
     addPetroLog("POST", "/petrolAppInit", req.body, body);
     return res.json(body);
   }
+  // The terminal must be one this OPT knows. Everything the response carries - pump number, station,
+  // products, prices, mode - is configuration held per terminal, so answering a terminal number that
+  // is not registered means handing a device someone else's configuration and then attributing its
+  // transactions to whatever it claimed to be. A mistyped digit in Settings is the everyday case,
+  // and without this it produces a terminal that appears to work.
+  //
+  // Note this is a separate question from the JWT. The token proves the caller holds the shared
+  // secret; it does not say which terminal is calling, because the claims that name one are written
+  // by the caller. Authentication and identity have to be checked separately.
+  const claimed = String((req.body && req.body.terminal) || "");
+  if (petrolinaConfig.terminal && claimed !== petrolinaConfig.terminal) {
+    const body = {
+      responseCode: "92",
+      responseDescription: "Unknown terminal",
+      timeOfTheServer: nowIso()
+    };
+    console.log(`[PETRO] petrolAppInit refused - terminal '${claimed}' is not '${petrolinaConfig.terminal}'`);
+    addPetroLog("POST", "/petrolAppInit", req.body, body);
+    return res.json(body);
+  }
+
   // Spec Table 1: the app tells us where it lives, we tell it which port to listen on. Remembering
   // it here is what lets a callback be fired without a transaction having run first.
   if (req.body && req.body.deviceIP) petrolinaConfig.deviceIP = String(req.body.deviceIP);
