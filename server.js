@@ -3573,7 +3573,7 @@ app.post("/help", (req, res) => {
 
   // Petrolina shares this path per its own specification, so it is answered here rather than by a
   // second route that Express would never reach.
-  if (application === "petrolinaApp") return petroHelp(req, res);
+  if (application === "petrolinaApp") return petroRequireJwt(req, res, () => petroHelp(req, res));
 
   const isCarWash   = application === "CarWash";
   const isManualHelp  = action === "Help Button";
@@ -4531,7 +4531,7 @@ app.post("/petrolAppInit", petroRequireJwt, (req, res) => {
 });
 
 // POST /optTransaction â€” creates a new OPT transaction record, returns transsegno
-app.post("/optTransaction", (req, res) => {
+app.post("/optTransaction", petroRequireJwt, (req, res) => {
   if (petrolinaConfig.responseCode !== "00") {
     const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "OPT error", uuid: req.body.UUID || "" };
     addPetroLog("POST", "/optTransaction", req.body, body);
@@ -4736,7 +4736,7 @@ app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
 });
 
 // POST /confirmPetrolinaCard â€” after fuel/KM/reg selection; OPT authorises pump
-app.post("/confirmPetrolinaCard", (req, res) => {
+app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
   const transsegno  = req.body.transsegno || "";
   const productId   = req.body.productId  || "";
   const odometer    = req.body.petrolinacardodometer || 0;
@@ -5289,7 +5289,7 @@ app.post("/pumpTransaction", petroRequireJwt, (req, res) => {
 });
 
 // â”€â”€ A4: exclusive claim â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.post("/claimPumpTransaction", (req, res) => {
+app.post("/claimPumpTransaction", petroRequireJwt, (req, res) => {
   const f = petrolinaUnpaid[req.body.transsegno];
   const me = req.body.terminal || "";
   let body;
