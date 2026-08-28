@@ -399,7 +399,7 @@ let petrolinaConfig = {
   petrolinaCardRc:  "00",
   // Attended test switches. "00" means behave normally; anything else forces that outcome so the
   // failure paths can be reached from the device, which cannot otherwise be driven into them.
-  receiptRc:        "00",           // 96 = not settled, 93 = unknown transsegno
+  receiptRc:        "00",           // 96 = not settled, 93 = unknown transactionId
   pumpProducts: [
     { productCode: "unleaded95", product: "Unleaded 95", pricePerLiter: 1720, image: "95petrolina.gif" },
     { productCode: "unleaded98", product: "Unleaded 98", pricePerLiter: 1890, image: "98petrolina.gif" },
@@ -466,7 +466,7 @@ const RC = {
   NOTHING_TO_PAY:      "38",
   // â”€â”€ technical â”€â”€
   MALFORMED:           "90",
-  UNKNOWN_TRANSSEGNO:  "93",
+  UNKNOWN_TRANSACTION_ID:  "93",
   NOT_SETTLED:         "96",
   SYSTEM_MALFUNCTION:  "99"
 };
@@ -1918,10 +1918,10 @@ ${petrolinaConfig.jwtEnabled === "1" ? `<p style="background:#3d1d00;border:1px 
 </div>
 
 <h2>&#x26A1; Manual OPT&#x2192;App Callbacks</h2>
-<p style="color:#8b949e;font-size:12px">Enter a transsegno and callbackBase (e.g. <code>http://192.168.x.x:8080</code>) then fire.</p>
+<p style="color:#8b949e;font-size:12px">Enter a transactionId and callbackBase (e.g. <code>http://192.168.x.x:8080</code>) then fire.</p>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-  <span style="color:#8b949e">transsegno:</span>
-  <input type="text" id="ptManualTranssegno" placeholder="e.g. 1001" style="width:120px">
+  <span style="color:#8b949e">transactionId:</span>
+  <input type="text" id="ptManualTransactionId" placeholder="e.g. 1001" style="width:120px">
   <span style="color:#8b949e">callbackBase:</span>
   <input type="text" id="ptManualCallbackBase" placeholder="http://192.168.x.x:8080" style="width:220px">
 </div>
@@ -2885,9 +2885,9 @@ async function loadPtTransactions(){
     const el=document.getElementById('ptTransDiv');if(!el)return;
     const keys=Object.keys(txns);
     if(!keys.length){el.innerHTML='<span style="color:#8b949e">No active transactions.</span>';return;}
-    el.innerHTML='<table><tr><th>transsegno</th><th>UUID</th><th>terminal</th><th>pumpId</th><th>state</th><th>callbackBase</th></tr>'+
+    el.innerHTML='<table><tr><th>transactionId</th><th>UUID</th><th>terminal</th><th>pumpId</th><th>state</th><th>callbackBase</th></tr>'+
       keys.map(k=>{const t=txns[k];return '<tr>'+
-        '<td style="color:#58a6ff;font-family:monospace">'+t.transsegno+'</td>'+
+        '<td style="color:#58a6ff;font-family:monospace">'+t.transactionId+'</td>'+
         '<td style="font-size:10px;color:#8b949e">'+t.uuid+'</td>'+
         '<td>'+t.terminal+'</td>'+
         '<td>'+t.pumpId+'</td>'+
@@ -2908,11 +2908,11 @@ async function ptSv(key,id){
   location.reload();
 }
 async function ptFireCompletion(){
-  const transsegno=document.getElementById('ptManualTranssegno').value.trim();
+  const transactionId=document.getElementById('ptManualTransactionId').value.trim();
   const callbackBase=document.getElementById('ptManualCallbackBase').value.trim();
   const cents=parseInt(document.getElementById('ptManualAmount').value)||3500;
-  if(!transsegno){alert('Enter a transsegno');return;}
-  const r=await fetch('/petrolina/fire-completion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transsegno,callbackBase,actualAmountCents:cents})});
+  if(!transactionId){alert('Enter a transactionId');return;}
+  const r=await fetch('/petrolina/fire-completion',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transactionId,callbackBase,actualAmountCents:cents})});
   const j=await r.json();
   const el=document.getElementById('ptCallbackResult');
   el.textContent=j.ok?'Completion sent to '+j.callbackBase:'ERROR: '+j.error;
@@ -2945,7 +2945,7 @@ async function ptLoadUnpaid(){
     const loy=f.loyaltyPhoneNo?(' &#x2022; <span style="color:#58a6ff">MyPetrolina '+f.loyaltyPhoneNo+'</span>'):'';
     const state=f.paid?('<span style="color:#3fb950">PAID '+f.receiptNo+' '+(f.cartType==='C'?'cash':'card')+'</span>'+loy)
       :(f.claimedBy?('<span style="color:#e3b341">CLAIMED by '+f.claimedBy+'</span>'):'<span style="color:#8b949e">unpaid</span>');
-    return 'transsegno '+f.transsegno+' &#x2022; pump '+f.pumpId+' &#x2022; '+f.product+' &#x2022; '+f.litres+'L &#x2022; &#x20AC;'+f.amount+' &#x2022; '+state;
+    return 'transactionId '+f.transactionId+' &#x2022; pump '+f.pumpId+' &#x2022; '+f.product+' &#x2022; '+f.litres+'L &#x2022; &#x20AC;'+f.amount+' &#x2022; '+state;
   }).join('<br>');
 }
 async function ptFireBatchClosure(){
@@ -2957,10 +2957,10 @@ async function ptFireBatchClosure(){
 async function ptFireServiceChange(s){ await ptCtrl('/petrolina/fire-service-change',{service:s},'Service '+s); }
 async function ptFireGetStatus(){ await ptCtrl('/petrolina/fire-get-status',{},'Get status'); }
 async function ptFireReversal(){
-  const transsegno=document.getElementById('ptManualTranssegno').value.trim();
+  const transactionId=document.getElementById('ptManualTransactionId').value.trim();
   const callbackBase=document.getElementById('ptManualCallbackBase').value.trim();
-  if(!transsegno){alert('Enter a transsegno');return;}
-  const r=await fetch('/petrolina/fire-reversal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transsegno,callbackBase,reverseReason:1})});
+  if(!transactionId){alert('Enter a transactionId');return;}
+  const r=await fetch('/petrolina/fire-reversal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transactionId,callbackBase,reverseReason:1})});
   const j=await r.json();
   const el=document.getElementById('ptCallbackResult');
   el.textContent=j.ok?'Reversal sent to '+j.sentTo:'ERROR: '+j.error;
@@ -4558,17 +4558,17 @@ app.post("/petrolAppInit", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// POST /optTransaction â€” creates a new OPT transaction record, returns transsegno
+// POST /optTransaction â€” creates a new OPT transaction record, returns transactionId
 app.post("/optTransaction", petroRequireJwt, (req, res) => {
   if (petrolinaConfig.responseCode !== "00") {
     const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "OPT error", uuid: req.body.UUID || "" };
     addPetroLog("POST", "/optTransaction", req.body, body);
     return res.json(body);
   }
-  const transsegno = String(petrolinaTranCounter++);
+  const transactionId = String(petrolinaTranCounter++);
   const uuid = req.body.UUID || "";
-  petrolinaTransactions[transsegno] = {
-    transsegno, uuid,
+  petrolinaTransactions[transactionId] = {
+    transactionId, uuid,
     terminal: req.body.terminal || petrolinaConfig.terminal,
     cardType: req.body.cartType || "B",
     pumpId:   req.body.pumpid || petrolinaConfig.pumpNo,
@@ -4578,9 +4578,9 @@ app.post("/optTransaction", petroRequireJwt, (req, res) => {
     state: "opt_created"
   };
   const body = {
-    terminal:            petrolinaTransactions[transsegno].terminal,
+    terminal:            petrolinaTransactions[transactionId].terminal,
     timeOfTheServer:     new Date().toISOString(),
-    transsegno,
+    transactionId,
     UUID:                uuid,
     batchNo:             req.body.batchNo || "",
     responseCode:        "00",
@@ -4592,15 +4592,15 @@ app.post("/optTransaction", petroRequireJwt, (req, res) => {
 
 // POST /preAuthorization â€” records ECR pre-auth result, schedules completion callback
 app.post("/preAuthorization", petroRequireJwt, (req, res) => {
-  const transsegno = req.body.transsegno || "";
-  const txn = petrolinaTransactions[transsegno];
+  const transactionId = req.body.transactionId || "";
+  const txn = petrolinaTransactions[transactionId];
   if (!txn) {
-    const body = { terminal: req.body.terminal || "", timeOfTheServer: new Date().toISOString(), transsegno, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" };
+    const body = { terminal: req.body.terminal || "", timeOfTheServer: new Date().toISOString(), transactionId, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
   if (petrolinaConfig.preAuthResult !== "ok") {
-    const body = { terminal: txn.terminal || "", timeOfTheServer: new Date().toISOString(), transsegno, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT" };
+    const body = { terminal: txn.terminal || "", timeOfTheServer: new Date().toISOString(), transactionId, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
@@ -4617,7 +4617,7 @@ app.post("/preAuthorization", petroRequireJwt, (req, res) => {
   const body = {
     terminal:            txn.terminal || petrolinaConfig.terminal,
     timeOfTheServer:     new Date().toISOString(),
-    transsegno,
+    transactionId,
     UUID:                req.body.UUID || "",
     batchNo:             req.body.batchNo || "",
     responseCode:        "00",
@@ -4632,24 +4632,24 @@ app.post("/preAuthorization", petroRequireJwt, (req, res) => {
     if (petrolinaConfig.fuelingEnabled === "1") {
       // The nozzle is lifted callbackDelaySec after approval, then fuel flows in ticks.
       console.log(`[PETRO] Fuelling starts in ${petrolinaConfig.callbackDelaySec}s, then ${petrolinaConfig.fuelingTicks} ticks`);
-      setTimeout(() => petroStartFuelling(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+      setTimeout(() => petroStartFuelling(transactionId, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
     } else {
       console.log(`[PETRO] Completion callback to ${callbackBase} in ${petrolinaConfig.callbackDelaySec}s`);
-      setTimeout(() => firePetroCompletion(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+      setTimeout(() => firePetroCompletion(transactionId, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
     }
   }
 });
 
 // POST /abortTransaction
 app.post("/abortTransaction", petroRequireJwt, (req, res) => {
-  const transsegno = req.body.transsegno || "";
-  if (transsegno && petrolinaTransactions[transsegno]) {
-    petrolinaTransactions[transsegno].state = "aborted";
+  const transactionId = req.body.transactionId || "";
+  if (transactionId && petrolinaTransactions[transactionId]) {
+    petrolinaTransactions[transactionId].state = "aborted";
   }
   const body = {
     terminal:            req.body.terminal || petrolinaConfig.terminal,
     timeOfTheServer:     new Date().toISOString(),
-    transsegno:          transsegno,
+    transactionId:          transactionId,
     UUID:                req.body.UUID || "",
     responseCode:        "00",
     responseDescription: "Abort acknowledged"
@@ -4695,7 +4695,7 @@ app.post("/loyaltyCheck", petroRequireJwt, (req, res) => {
   const body = {
     terminal:            req.body.terminal || "",
     timeOfTheServer:     new Date().toISOString(),
-    transsegno:          req.body.transsegno || "",
+    transactionId:          req.body.transactionId || "",
     UUID:                req.body.UUID || "",
     responseCode:        account ? RC.APPROVED : RC.LOYALTY_DECLINED,
     responseDescription: account ? "OK" : "No MyPetrolina account for this number",
@@ -4735,7 +4735,7 @@ app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
   const uid = req.body.petrolinaCardUid || "";
   const pan = req.body.petrolinaCard || (uid ? petroCardForUid(uid) : "");
   const pin = req.body.petrolinaPIN  || "";
-  const txnKey = req.body.transsegno || "";
+  const txnKey = req.body.transactionId || "";
   if (txnKey && petrolinaTransactions[txnKey]) {
     petrolinaTransactions[txnKey].petrolinaCardPan = pan;
     petrolinaTransactions[txnKey].petrolinaCardUid = uid;
@@ -4752,7 +4752,7 @@ app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
   const body = {
     terminal:                   req.body.terminal || "",
     timeOfTheServer:             new Date().toISOString(),
-    transsegno:                  req.body.transsegno || "",
+    transactionId:                  req.body.transactionId || "",
     UUID:                        req.body.UUID || "",
     petrolinacardaskforkm:       ok ? petrolinaConfig.askForKm    : undefined,
     petrolinacardaskforcarregno: ok ? petrolinaConfig.askForRegNo : undefined,
@@ -4765,20 +4765,20 @@ app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
 
 // POST /confirmPetrolinaCard â€” after fuel/KM/reg selection; OPT authorises pump
 app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
-  const transsegno  = req.body.transsegno || "";
+  const transactionId  = req.body.transactionId || "";
   const productId   = req.body.productId  || "";
   const odometer    = req.body.petrolinacardodometer || 0;
   const carRegNo    = req.body.petrolinacardcarregno || "";
 
   // Save into active transaction so fire-completion knows the card type
-  if (petrolinaTransactions[transsegno]) {
-    petrolinaTransactions[transsegno].isPetrolinaCard = true;
+  if (petrolinaTransactions[transactionId]) {
+    petrolinaTransactions[transactionId].isPetrolinaCard = true;
   }
 
   const body = {
     terminal:            req.body.terminal || "",
     timeOfTheServer:     new Date().toISOString(),
-    transsegno,
+    transactionId,
     UUID:                req.body.UUID || "",
     responseCode:        "00",
     responseDescription: "Confirmed â€” pump authorised"
@@ -4789,14 +4789,14 @@ app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
   // previously started only from /preAuthorization, which the PetrolinaCard flow never calls - so
   // this path went straight to the completion and the customer watched a static screen while the
   // tank filled. How the customer pays has no bearing on fuel coming out of the nozzle.
-  const txn = petrolinaTransactions[transsegno] || {};
+  const txn = petrolinaTransactions[transactionId] || {};
   const callbackBase = txn.callbackBase || "";
   if (callbackBase && petrolinaConfig.callbackDelaySec > 0) {
     if (petrolinaConfig.fuelingEnabled === "1") {
       console.log(`[PETRO] Fuelling starts in ${petrolinaConfig.callbackDelaySec}s, then ${petrolinaConfig.fuelingTicks} ticks (PetrolinaCard)`);
-      setTimeout(() => petroStartFuelling(transsegno, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
+      setTimeout(() => petroStartFuelling(transactionId, callbackBase), petrolinaConfig.callbackDelaySec * 1000);
     } else {
-      setTimeout(() => firePetroCompletion(transsegno, callbackBase, true), petrolinaConfig.callbackDelaySec * 1000);
+      setTimeout(() => firePetroCompletion(transactionId, callbackBase, true), petrolinaConfig.callbackDelaySec * 1000);
     }
   }
 
@@ -4839,7 +4839,7 @@ function petroOutstanding() {
   return Object.values(petrolinaTransactions)
     .filter(t => t.state === "pre_auth_ok")
     .map(t => ({
-      transsegno: t.transsegno,
+      transactionId: t.transactionId,
       pumpId:     t.pumpId,
       amount:     t.jccFinalAmount || 0,
       ageSec:     Math.round((Date.now() - (t.preAuthAt || Date.now())) / 1000),
@@ -4856,7 +4856,7 @@ function petroOutstanding() {
  * nothing; a reversal of one that did gives the fuel away.
  */
 function petroSettleOne(item, callbackBase) {
-  const txn = petrolinaTransactions[item.transsegno];
+  const txn = petrolinaTransactions[item.transactionId];
   if (!txn) return;
   if (item.fuelling) {
     // The nozzle is still up. Neither outcome is known yet, so leave it alone - reversing now
@@ -4864,11 +4864,11 @@ function petroSettleOne(item, callbackBase) {
     return;
   }
   if (item.fuelledCents > 0) {
-    console.log(`[PETRO_SETTLE] retry completion transsegno=${item.transsegno} (age ${item.ageSec}s)`);
-    firePetroCompletion(item.transsegno, callbackBase, txn.isPetrolinaCard, item.fuelledCents);
+    console.log(`[PETRO_SETTLE] retry completion transactionId=${item.transactionId} (age ${item.ageSec}s)`);
+    firePetroCompletion(item.transactionId, callbackBase, txn.isPetrolinaCard, item.fuelledCents);
   } else if (item.ageSec >= petrolinaConfig.abandonedAfterSec) {
-    console.log(`[PETRO_SETTLE] reversing abandoned pre-auth transsegno=${item.transsegno} (age ${item.ageSec}s)`);
-    firePetroReversal(item.transsegno, callbackBase);
+    console.log(`[PETRO_SETTLE] reversing abandoned pre-auth transactionId=${item.transactionId} (age ${item.ageSec}s)`);
+    firePetroReversal(item.transactionId, callbackBase);
   }
 }
 
@@ -4913,8 +4913,8 @@ function postToDevice(callbackBase, path, payload, label) {
  * then /completion once it stops. The ticks are what let the terminal show the fill progressing and
  * keep its screen alive, so a slow fill is indistinguishable from an abandoned one without them.
  */
-function petroStartFuelling(transsegno, callbackBase) {
-  const txn = petrolinaTransactions[transsegno];
+function petroStartFuelling(transactionId, callbackBase) {
+  const txn = petrolinaTransactions[transactionId];
   if (!txn || !callbackBase) return;
 
   // The nozzle is up. The settlement sweep leaves it alone until this clears - the outcome is not
@@ -4939,7 +4939,7 @@ function petroStartFuelling(transsegno, callbackBase) {
     postToDevice(callbackBase, "/fueling", {
       application:     "petrolinaApp",
       terminal:        txn.terminal || petrolinaConfig.terminal,
-      transsegno,
+      transactionId,
       UUID:            txn.uuid || "",
       amountUsed:      cents / 100,
       litresUsed:      parseFloat((cents / price).toFixed(3)),
@@ -4955,28 +4955,28 @@ function petroStartFuelling(transsegno, callbackBase) {
       // config would pin every later transaction to this one's amount.
       // Remembered so the settlement sweep knows fuel was actually dispensed. Without it an
       // unacknowledged completion would later be settled as a reversal and the fuel given away.
-      if (petrolinaTransactions[transsegno]) {
-        petrolinaTransactions[transsegno].fuelledCents = target;
-        petrolinaTransactions[transsegno].fuellingInProgress = false;   // nozzle returned
+      if (petrolinaTransactions[transactionId]) {
+        petrolinaTransactions[transactionId].fuelledCents = target;
+        petrolinaTransactions[transactionId].fuellingInProgress = false;   // nozzle returned
       }
       // Route to /completionPetrolina or /completion according to how this fuelling is being paid
       // for. firePetroCompletion also reads the flag off the transaction, but passing false here
       // and relying on that is the kind of thing that works until someone changes the other end.
-      const payingByCard = !!(petrolinaTransactions[transsegno] || {}).isPetrolinaCard;
-      setTimeout(() => firePetroCompletion(transsegno, callbackBase, payingByCard, target), everyMs);
+      const payingByCard = !!(petrolinaTransactions[transactionId] || {}).isPetrolinaCard;
+      setTimeout(() => firePetroCompletion(transactionId, callbackBase, payingByCard, target), everyMs);
     }
   }, everyMs);
 }
 
 /** [forcedCents] is the amount actually dispensed, when a fuelling simulation has just measured it. */
-function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false, forcedCents = 0) {
-  const txn = petrolinaTransactions[transsegno] || {};
+function firePetroCompletion(transactionId, callbackBase, isPetrolinaCard = false, forcedCents = 0) {
+  const txn = petrolinaTransactions[transactionId] || {};
 
   const blocked = petroCompletionBlockedReason(txn);
   if (blocked) {
     const note = { responseCode: RC.INVALID_STATE, responseDescription: `Completion refused â€” ${blocked}` };
-    console.log(`[PETRO_CB] refused completion for ${transsegno}: ${blocked}`);
-    addPetroLog("CALLBACK REFUSED", `${transsegno} â€” ${blocked}`, { transsegno, state: txn.state }, note);
+    console.log(`[PETRO_CB] refused completion for ${transactionId}: ${blocked}`);
+    addPetroLog("CALLBACK REFUSED", `${transactionId} â€” ${blocked}`, { transactionId, state: txn.state }, note);
     return { ok: false, error: note.responseDescription };
   }
 
@@ -4998,7 +4998,7 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false, 
     terminal:              txn.terminal || petrolinaConfig.terminal,
     timeOfTheServer:       new Date().toISOString(),
     UUID:                  txn.uuid || "",
-    transsegno,
+    transactionId,
     amountUsed:            actualCents / 100,
     amountAuthorized:      maxCents / 100,
     pumpId:                txn.pumpId || petrolinaConfig.pumpNo,
@@ -5035,8 +5035,8 @@ function firePetroCompletion(transsegno, callbackBase, isPetrolinaCard = false, 
         const reply = safeJson(data);
         // Only on an acknowledgement. Marking it completed regardless would hide a device that
         // rejected the completion, and the advice would look settled when it is not.
-        if (petrolinaTransactions[transsegno] && petroAcknowledged(reply)) {
-          petrolinaTransactions[transsegno].state = "completed";
+        if (petrolinaTransactions[transactionId] && petroAcknowledged(reply)) {
+          petrolinaTransactions[transactionId].state = "completed";
         }
         addPetroLog("CALLBACKâ†’APP", callbackUrl, { actualAmountCents: actualCents, liters }, reply);
       });
@@ -5076,26 +5076,26 @@ app.post("/petrolina/config", (req, res) => {
   res.json({ ok: true });
 });
 
-// Manual: fire completion callback to a specific transsegno+callbackBase
+// Manual: fire completion callback to a specific transactionId+callbackBase
 app.post("/petrolina/fire-completion", (req, res) => {
-  const { transsegno, callbackBase } = req.body;
-  const txn = transsegno ? petrolinaTransactions[transsegno] : null;
+  const { transactionId, callbackBase } = req.body;
+  const txn = transactionId ? petrolinaTransactions[transactionId] : null;
   const base = callbackBase || txn?.callbackBase || "";
-  if (!txn) return res.json({ ok: false, error: "transsegno not found" });
+  if (!txn) return res.json({ ok: false, error: "transactionId not found" });
   if (!base) return res.json({ ok: false, error: "No callbackBase â€” app must send it in optTransaction" });
-  const result = firePetroCompletion(transsegno, base);
+  const result = firePetroCompletion(transactionId, base);
   if (result && result.ok === false) return res.json(result);
-  res.json({ ok: true, transsegno, callbackBase: base });
+  res.json({ ok: true, transactionId, callbackBase: base });
 });
 
-// Manual: fire reversal callback to a specific transsegno+callbackBase
+// Manual: fire reversal callback to a specific transactionId+callbackBase
 app.post("/petrolina/fire-reversal", (req, res) => {
-  const { transsegno, callbackBase, reverseReason } = req.body;
-  const txn = transsegno ? petrolinaTransactions[transsegno] : null;
+  const { transactionId, callbackBase, reverseReason } = req.body;
+  const txn = transactionId ? petrolinaTransactions[transactionId] : null;
   const base = callbackBase || txn?.callbackBase || "";
-  if (!txn) return res.json({ ok: false, error: "transsegno not found" });
+  if (!txn) return res.json({ ok: false, error: "transactionId not found" });
   if (!base) return res.json({ ok: false, error: "No callbackBase" });
-  const sentTo = firePetroReversal(transsegno, base, reverseReason || 1, "Manual reversal from mock server");
+  const sentTo = firePetroReversal(transactionId, base, reverseReason || 1, "Manual reversal from mock server");
   res.json({ ok: true, sentTo });
 });
 
@@ -5106,13 +5106,13 @@ app.post("/petrolina/fire-reversal", (req, res) => {
  *
  * Returns the URL it posted to.
  */
-function firePetroReversal(transsegno, base, reverseReason = REVERSE_REASON_NOT_FUELLED, description = "No fuelling took place") {
-  const txn = petrolinaTransactions[transsegno];
+function firePetroReversal(transactionId, base, reverseReason = REVERSE_REASON_NOT_FUELLED, description = "No fuelling took place") {
+  const txn = petrolinaTransactions[transactionId];
   if (!txn) return "";
   const payload = JSON.stringify({
     application: "petrolinaApp",
     terminal: txn.terminal || petrolinaConfig.terminal,
-    UUID: txn.uuid || "", transsegno,
+    UUID: txn.uuid || "", transactionId,
     jccAuthCode: txn.jccAuthCode || "", jccRetrievalReference: txn.jccRetrievalReference || "",
     reverseReason, reverseDescription: description,
     timeOfTheServer: nowIso()
@@ -5209,7 +5209,7 @@ app.post("/petrolina/fire-batch-closure", (req, res) => {
       outstanding
     };
     console.error(`[PETRO_ALERT] BATCH CLOSURE DEFERRED - ${outstanding.length} unsettled: ` +
-      outstanding.map(o => `${o.transsegno} (pump ${o.pumpId}, EUR ${o.amount}, ${o.ageSec}s)`).join(", "));
+      outstanding.map(o => `${o.transactionId} (pump ${o.pumpId}, EUR ${o.amount}, ${o.ageSec}s)`).join(", "));
     addPetroLog("BATCH DEFERRED", "/batchClosure", { batchNo }, alert);
     petroLastAlert = { at: nowIso(), ...alert };
     // Nudge them along now rather than waiting for the next sweep.
@@ -5249,7 +5249,7 @@ app.post("/petrolina/fire-service-change", (req, res) => {
 // then advises the OPT.
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-let petrolinaUnpaid    = {};      // transsegno -> fuelling
+let petrolinaUnpaid    = {};      // transactionId -> fuelling
 let petrolinaReceiptNo = 100;
 
 /**
@@ -5281,7 +5281,7 @@ function petroAck(req, extra) {
   return Object.assign({
     terminal:        petrolinaConfig.terminal || req.body.terminal || "",
     timeOfTheServer: nowIso(),
-    transsegno:      req.body.transsegno || "",
+    transactionId:      req.body.transactionId || "",
     UUID:            req.body.UUID || ""
   }, extra);
 }
@@ -5299,7 +5299,7 @@ app.post("/pumpTransaction", petroRequireJwt, (req, res) => {
     } else {
       body = petroAck(req, {
         pumpid,
-        transsegno:   f.transsegno,
+        transactionId:   f.transactionId,
         productId:    f.productId,
         product:      f.product,
         litres:       f.litres,
@@ -5318,11 +5318,11 @@ app.post("/pumpTransaction", petroRequireJwt, (req, res) => {
 
 // â”€â”€ A4: exclusive claim â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/claimPumpTransaction", petroRequireJwt, (req, res) => {
-  const f = petrolinaUnpaid[req.body.transsegno];
+  const f = petrolinaUnpaid[req.body.transactionId];
   const me = req.body.terminal || "";
   let body;
   if (!f) {
-    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
+    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" });
   } else if (f.paid) {
     body = petroAck(req, { responseCode: RC.ALREADY_PROCESSED, responseDescription: "Already paid" });
   } else if (claimIsLive(f) && f.claimedBy !== me) {
@@ -5342,17 +5342,17 @@ app.post("/claimPumpTransaction", petroRequireJwt, (req, res) => {
 
 // â”€â”€ A5: release without payment â€” still owed, NOT an abort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/releasePumpTransaction", petroRequireJwt, (req, res) => {
-  const f = petrolinaUnpaid[req.body.transsegno];
+  const f = petrolinaUnpaid[req.body.transactionId];
   if (f && !f.paid) { f.claimedBy = ""; f.claimExpiry = null; }
   const body = petroAck(req, {
     responseCode: f ? "00" : "93",
-    responseDescription: f ? `Released (reason ${req.body.releaseReason || "-"})` : "Unknown transsegno"
+    responseDescription: f ? `Released (reason ${req.body.releaseReason || "-"})` : "Unknown transactionId"
   });
   addPetroLog("POST", "/releasePumpTransaction", req.body, body);
   res.json(body);
 });
 
-// â”€â”€ A6/A8: payment advice â€” idempotent on (transsegno, UUID) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ A6/A8: payment advice â€” idempotent on (transactionId, UUID) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/saleAdvice", petroRequireJwt, (req, res) => {
   // Test switch: fail the advice at transport level so the device cannot tell whether the payment
   // was recorded. This is the ambiguous case the durable queue exists for â€” the advice must stay
@@ -5361,10 +5361,10 @@ app.post("/saleAdvice", petroRequireJwt, (req, res) => {
     addPetroLog("POST", "/saleAdvice", req.body, { simulatedFailure: true, note: "failSaleAdvice enabled" });
     return res.status(500).json({ error: "Simulated failure (failSaleAdvice enabled)" });
   }
-  const f = petrolinaUnpaid[req.body.transsegno];
+  const f = petrolinaUnpaid[req.body.transactionId];
   let body;
   if (!f) {
-    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
+    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" });
   } else if (f.paid && f.paidUuid && f.paidUuid !== req.body.UUID) {
     // Already paid, but by a different transaction - so this is not a retry of the same payment,
     // it is a second payment for one fuelling. It happens when a claim expires and another terminal
@@ -5373,7 +5373,7 @@ app.post("/saleAdvice", petroRequireJwt, (req, res) => {
     // Answering "already processed" here would be the worst outcome available: the first terminal
     // would clear its queue believing its payment was recorded, when what is recorded is somebody
     // else's. Two customers charged, one payment on file, and nothing to reconcile it against.
-    console.error(`[PETRO_ALERT] DOUBLE PAYMENT on ${req.body.transsegno}: recorded for UUID ` +
+    console.error(`[PETRO_ALERT] DOUBLE PAYMENT on ${req.body.transactionId}: recorded for UUID ` +
       `${f.paidUuid} by ${f.paidBy}, now advised by ${req.body.terminal} for UUID ${req.body.UUID}`);
     body = petroAck(req, {
       responseCode: RC.CLAIM_NOT_HELD,
@@ -5442,7 +5442,7 @@ function buildPetroReceipt(f) {
     rline("P","S", ""),
     rline("N","L", padRow("RECEIPT NO:", f.receiptNo || "")),
     rline("N","L", padRow("PUMP NO:",    f.pumpId || "")),
-    rline("N","L", padRow("TRANS NO:",   f.transsegno || "")),
+    rline("N","L", padRow("TRANS NO:",   f.transactionId || "")),
   ];
   if (f.cartType === "P" && f.petrolinaCardNo) lines.push(rline("N","L", padRow("CARD NO:", f.petrolinaCardNo)));
   if (f.carRegNo)  lines.push(rline("N","L", padRow("CAR REG. NO:", f.carRegNo)));
@@ -5478,7 +5478,7 @@ function padRow(label, value) {
 }
 
 app.post("/receipt", petroRequireJwt, (req, res) => {
-  const f = petrolinaUnpaid[req.body.transsegno];
+  const f = petrolinaUnpaid[req.body.transactionId];
   let body;
   // Test switch. The App only asks for a receipt once an advice has succeeded, so the error codes
   // in Table 37 are otherwise unreachable from the device - and the point of testing them is that a
@@ -5488,13 +5488,13 @@ app.post("/receipt", petroRequireJwt, (req, res) => {
       responseCode: petrolinaConfig.receiptRc,
       responseDescription: petrolinaConfig.receiptRc === RC.NOT_SETTLED
         ? "Transaction not settled - no receipt available"
-        : "Unknown transsegno"
+        : "Unknown transactionId"
     });
     addPetroLog("POST", "/receipt", req.body, { ...body, forced: true });
     return res.json(body);
   }
   if (!f) {
-    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSSEGNO, responseDescription: "Unknown transsegno" });
+    body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" });
   } else if (!f.paid) {
     body = petroAck(req, { responseCode: RC.NOT_SETTLED, responseDescription: "Not settled â€” no receipt available" });
   } else {
@@ -5516,12 +5516,12 @@ app.post("/receipt", petroRequireJwt, (req, res) => {
  * App must survive: it believes it holds the fuelling, and by the time it advises, it does not.
  */
 app.post("/petrolina/expire-claim", (req, res) => {
-  const f = petrolinaUnpaid[req.body.transsegno];
-  if (!f) return res.json({ ok: false, error: "transsegno not found" });
+  const f = petrolinaUnpaid[req.body.transactionId];
+  if (!f) return res.json({ ok: false, error: "transactionId not found" });
   f.claimedBy = "";
   f.claimExpiry = new Date(Date.now() - 1000).toISOString();
-  console.log(`[PETRO_TEST] claim on ${req.body.transsegno} expired`);
-  res.json({ ok: true, transsegno: req.body.transsegno, claimExpiry: f.claimExpiry });
+  console.log(`[PETRO_TEST] claim on ${req.body.transactionId} expired`);
+  res.json({ ok: true, transactionId: req.body.transactionId, claimExpiry: f.claimExpiry });
 });
 
 /**
@@ -5531,21 +5531,21 @@ app.post("/petrolina/expire-claim", (req, res) => {
  * needs a second terminal to test properly - this stands in for one.
  */
 app.post("/petrolina/steal-claim", (req, res) => {
-  const f = petrolinaUnpaid[req.body.transsegno];
-  if (!f) return res.json({ ok: false, error: "transsegno not found" });
+  const f = petrolinaUnpaid[req.body.transactionId];
+  if (!f) return res.json({ ok: false, error: "transactionId not found" });
   f.claimedBy   = req.body.byTerminal || "000025901099";
   f.claimExpiry = new Date(Date.now() + petrolinaConfig.claimTTL * 1000).toISOString();
-  console.log(`[PETRO_TEST] claim on ${req.body.transsegno} given to ${f.claimedBy}`);
-  res.json({ ok: true, transsegno: req.body.transsegno, claimedBy: f.claimedBy });
+  console.log(`[PETRO_TEST] claim on ${req.body.transactionId} given to ${f.claimedBy}`);
+  res.json({ ok: true, transactionId: req.body.transactionId, claimedBy: f.claimedBy });
 });
 
 // â”€â”€ Dashboard: simulate a car having fuelled at a pump â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post("/petrolina/add-unpaid", (req, res) => {
-  const transsegno = String(++petrolinaTranCounter);
+  const transactionId = String(++petrolinaTranCounter);
   const litres = Number(req.body.litres) || 20;
   const price  = (petrolinaConfig.pumpProducts[0] || {}).pricePerLiter || 1720;
-  petrolinaUnpaid[transsegno] = {
-    transsegno,
+  petrolinaUnpaid[transactionId] = {
+    transactionId,
     pumpId:       String(req.body.pumpid || petrolinaConfig.pumpNo),
     productId:    req.body.productId || "unleaded95",
     product:      req.body.product   || "Unleaded 95",
@@ -5554,7 +5554,7 @@ app.post("/petrolina/add-unpaid", (req, res) => {
     fuellingTime: nowIso(),
     claimedBy:    "", claimExpiry: null, paid: false
   };
-  res.json({ ok: true, transsegno, fuelling: petrolinaUnpaid[transsegno] });
+  res.json({ ok: true, transactionId, fuelling: petrolinaUnpaid[transactionId] });
 });
 
 app.get("/petrolina/unpaid", (req, res) => res.json(Object.values(petrolinaUnpaid)));
