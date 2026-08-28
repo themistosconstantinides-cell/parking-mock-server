@@ -145,7 +145,20 @@ echo   Pick the address on the same network as the terminal.
 echo   Dashboard: open any of the above in a browser.
 echo.
 
-rem -- 6. Run -----------------------------------------------------------------
+rem -- 6. Log file ------------------------------------------------------------
+rem  The server prints the reason it refused a call - a bad JWT signature, an
+rem  unregistered terminal, a settlement still outstanding. Those lines are the
+rem  most useful thing it produces and they used to go nowhere: the dashboard
+rem  log holds only the structured request/response pairs, and it is in memory,
+rem  so a restart loses it. One file per day, appended, so a restart mid-session
+rem  does not discard the earlier run.
+rem  The server writes its own console output to logs\server-YYYY-MM-DD.log,
+rem  appended, one file per day. Nothing to set up here - this only says where
+rem  to look, because the first thing anyone needs after a failed test is the
+rem  reason the server gave, and it is no use if nobody knows it was kept.
+echo  [OK] Log file: %~dp0logs\server-^<today^>.log
+
+rem -- 7. Run -----------------------------------------------------------------
 echo  Starting. Leave this window open - closing it stops the server.
 echo  Press Ctrl+C to stop.
 echo.
@@ -153,6 +166,10 @@ echo ===========================================================
 echo.
 
 set PORT=!PORT!
+rem  Run directly, not through a pipe. Piping to PowerShell to capture the log
+rem  cost more than it gave: Tee-Object on PowerShell 5.1 writes UTF-16, and a
+rem  pipeline swallows Ctrl+C so the window could not be stopped cleanly. The
+rem  server writes its own log file instead.
 node server.js
 
 rem  Reached when the server exits or is stopped.

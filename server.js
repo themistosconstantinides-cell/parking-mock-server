@@ -1,3 +1,40 @@
+// ── Console output to a dated file ──────────────────────────────────────────
+// The most useful thing this server prints is the reason it refused something -
+// a bad JWT signature, an unregistered terminal, a settlement still outstanding.
+// None of it survived: the dashboard log holds only request/response pairs and
+// lives in memory, and stdout went nowhere whenever the process was started
+// without a console.
+//
+// Done here rather than by redirecting in the launcher because a shell pipe
+// brought its own problems: PowerShell 5.1's Tee-Object writes UTF-16, which
+// makes the file awkward to read and to grep, and piping breaks Ctrl+C.
+// Appending from Node keeps one encoding, one date format, and works the same
+// however the server is started.
+//
+// appendFileSync is deliberate. It is slower than buffering, which does not
+// matter for a mock, and it means the last line before a crash is on disk -
+// which is exactly the line worth having.
+const fsLog = require("fs");
+const pathLog = require("path");
+const LOG_DIR = pathLog.join(__dirname, "logs");
+try { fsLog.mkdirSync(LOG_DIR, { recursive: true }); } catch (e) { /* logging must never stop the server */ }
+
+function logFileForToday() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return pathLog.join(LOG_DIR, `server-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.log`);
+}
+
+["log", "warn", "error"].forEach(level => {
+  const passThrough = console[level].bind(console);
+  console[level] = (...args) => {
+    passThrough(...args);
+    try {
+      const text = args.map(a => typeof a === "string" ? a : require("util").inspect(a, { depth: 4 })).join(" ");
+      fsLog.appendFileSync(logFileForToday(), `${nowIso()} ${text}\n`, "utf8");
+    } catch (e) { /* never let logging break the thing being logged */ }
+  };
+});
+
 const express = require("express");
 const https   = require("https");
 const app     = express();
