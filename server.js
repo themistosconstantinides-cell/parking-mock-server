@@ -17,23 +17,49 @@
 const fsLog = require("fs");
 const pathLog = require("path");
 const LOG_DIR = pathLog.join(__dirname, "logs");
-try { fsLog.mkdirSync(LOG_DIR, { recursive: true }); } catch (e) { /* logging must never stop the server */ }
+
+// Whether the log is actually working is itself worth reporting. Silently
+// swallowing a failure here means the first sign of trouble is an empty folder
+// on someone else's PC, with nothing to say whether the directory could not be
+// created, the disk is read-only, or the copy of this file is simply too old to
+// have logging at all. One line at startup settles it.
+let LOG_OK = false, LOG_WHY = "";
+try {
+  fsLog.mkdirSync(LOG_DIR, { recursive: true });
+  fsLog.accessSync(LOG_DIR, fsLog.constants.W_OK);
+  LOG_OK = true;
+} catch (e) {
+  LOG_WHY = e.message;
+}
 
 function logFileForToday() {
   const d = new Date(), p = n => String(n).padStart(2, "0");
   return pathLog.join(LOG_DIR, `server-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.log`);
 }
 
+// A write that fails is reported once and then given up on, rather than either
+// being hidden or printing on every line until the console is unreadable.
+let logWriteFailed = false;
+
 ["log", "warn", "error"].forEach(level => {
   const passThrough = console[level].bind(console);
   console[level] = (...args) => {
     passThrough(...args);
+    if (!LOG_OK || logWriteFailed) return;
     try {
       const text = args.map(a => typeof a === "string" ? a : require("util").inspect(a, { depth: 4 })).join(" ");
       fsLog.appendFileSync(logFileForToday(), `${nowIso()} ${text}\n`, "utf8");
-    } catch (e) { /* never let logging break the thing being logged */ }
+    } catch (e) {
+      logWriteFailed = true;
+      passThrough(`[LOG] writing to ${LOG_DIR} failed, no more will be written: ${e.message}`);
+    }
   };
 });
+
+// Printed through the wrapper above, so a working log records its own first line
+// and the banner says where to look.
+if (LOG_OK) console.log(`[LOG] Console output is being written to ${logFileForToday()}`);
+else        console.error(`[LOG] NOT LOGGING TO FILE - could not use ${LOG_DIR}: ${LOG_WHY}`);
 
 const express = require("express");
 const https   = require("https");
