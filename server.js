@@ -95,17 +95,17 @@ const app     = express();
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));  // Fairway /connect/token uses form-urlencoded
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Email alerts via Resend HTTP API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Email alerts via Resend HTTP API ─────────────────────────────────────────
 // Set RESEND_KEY and ALERT_EMAIL in Render environment variables
-// No npm packages needed Ã¢â‚¬â€ uses built-in https module
+// No npm packages needed — uses built-in https module
 async function sendHelpAlert(req, isCarWash = false) {
   const apiKey = process.env.RESEND_KEY;
   const to     = (isCarWash ? carWashConfig.alertEmail : null)
               || req.body._overrideEmail
               || config.alertEmail
               || process.env.ALERT_EMAIL;
-  if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set Ã¢â‚¬â€ skipping"); return; }
-  if (!to)     { console.log("[EMAIL] No alert email configured Ã¢â‚¬â€ skipping"); return; }
+  if (!apiKey) { console.log("[EMAIL] RESEND_KEY not set — skipping"); return; }
+  if (!to)     { console.log("[EMAIL] No alert email configured — skipping"); return; }
 
   const outlet   = req.body.outlet           || "?";
   const terminal = req.body.terminal         || "?";
@@ -155,7 +155,7 @@ async function sendHelpAlert(req, isCarWash = false) {
           if (isCarWash) carWashConfig.lastAlertSent = time;
           else config.lastAlertSent = time;
         } else {
-          console.error(`[EMAIL] Failed: HTTP ${res.statusCode} Ã¢â‚¬â€ ${data}`);
+          console.error(`[EMAIL] Failed: HTTP ${res.statusCode} — ${data}`);
         }
         resolve();
       });
@@ -170,7 +170,7 @@ async function sendHelpAlert(req, isCarWash = false) {
 }
 app.use(express.static("public"));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ State Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── State ─────────────────────────────────────────────────────────────────────
 let logs          = [];
 let activeEntries = {};
 let rejectionLog  = [];  // track rejected entrance attempts
@@ -194,15 +194,15 @@ function addEcrDecline(outlet, terminal, point, action) {
 }
 
 let config = {
-  // Ã¢â€â‚¬Ã¢â€â‚¬ POS Devices Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-  // Entrance POS Ã¢â‚¬â€ configured in Android Settings on the entrance device
+  // ── POS Devices ──────────────────────────────────────────────────────────────
+  // Entrance POS — configured in Android Settings on the entrance device
   entranceOutlet:   "0000259010",
   entranceTerminal: "000025901090",
-  // Exit POS Ã¢â‚¬â€ configured in Android Settings on the exit device
+  // Exit POS — configured in Android Settings on the exit device
   exitOutlet:       "0000259010",
   exitTerminal:     "000025901091",
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ parkingInit fields Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── parkingInit fields ────────────────────────────────────────────────────────
   keepAliveFreq:          10,
   minimumAmountPreAuth:   300,
   defaultAmount:          800,
@@ -233,10 +233,10 @@ let config = {
   defaultLanguage:       "EN",    // EN, EL, RU, IW
   companyCode:           "MarinaParking",
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ TELL Gate Control PRO Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── TELL Gate Control PRO ─────────────────────────────────────────────────────
   tellEnabled:       false,
   tellApiKey:        "f2nIrJ8DBf4Gc8ar99IQeCVVm3pnWrVP",
-  tellPassword:      "1234",  // device admin password Ã¢â‚¬â€ used by app for addappid
+  tellPassword:      "1234",  // device admin password — used by app for addappid
   tellHwId:          "",
   tellHwName:        "ParkingBarrier",
   tellAppId:         "",
@@ -244,7 +244,7 @@ let config = {
   tellVehicleInputExit:     "in2",  // input pin for exit vehicle detection
   tellBarrierOutput: 1,
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ JCC IPPI Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── JCC IPPI ──────────────────────────────────────────────────────────────────
   jccBaseUrl:   "https://test-apis.jccsecure.com",
   jccUseMock:          true,   // true = call own mock endpoints, false = call real JCC
   parkingName:         "Parqio",
@@ -253,7 +253,7 @@ let config = {
   captureMaxRetries:   5,      // max retry attempts before marking as FAILED
 };
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Pending Captures (capture declined at exit Ã¢â‚¬â€ retry in background) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Pending Captures (capture declined at exit — retry in background) ─────────
 let pendingCaptures = [];  // { id, entry, amountCents, createdAt, retries, status, lastAttempt, lastError }
 
 function addPendingCapture(entry, amountCents) {
@@ -266,7 +266,7 @@ function addPendingCapture(entry, amountCents) {
     lastAttempt: null,
     lastError:   null
   });
-  console.log(`[PENDING_CAPTURE] Added ${id} Ã¢â‚¬â€ Ã¢â€šÂ¬${(amountCents/100).toFixed(2)} last4=${entry.lastDigits}`);
+  console.log(`[PENDING_CAPTURE] Added ${id} — €${(amountCents/100).toFixed(2)} last4=${entry.lastDigits}`);
 }
 
 async function retrySingleCapture(pc) {
@@ -281,7 +281,7 @@ async function retrySingleCapture(pc) {
       pc.lastError = r ? `${r.responseCode} ${r.responseText}` : "No response";
       if (pc.retries >= config.captureMaxRetries) {
         pc.status = "FAILED";
-        console.log(`[PENDING_CAPTURE] ${pc.id} FAILED after ${pc.retries} retries Ã¢â‚¬â€ manual action required`);
+        console.log(`[PENDING_CAPTURE] ${pc.id} FAILED after ${pc.retries} retries — manual action required`);
       } else {
         console.log(`[PENDING_CAPTURE] ${pc.id} retry ${pc.retries}/${config.captureMaxRetries} failed: ${pc.lastError}`);
       }
@@ -292,7 +292,7 @@ async function retrySingleCapture(pc) {
   }
 }
 
-// Background retry loop Ã¢â‚¬â€ checks every 60s, fires when interval elapsed
+// Background retry loop — checks every 60s, fires when interval elapsed
 function startCaptureRetryLoop() {
   let lastRun = Date.now();
   setInterval(async () => {
@@ -301,27 +301,27 @@ function startCaptureRetryLoop() {
     lastRun = Date.now();
     const pending = pendingCaptures.filter(pc => pc.status === "PENDING");
     if (pending.length === 0) return;
-    console.log(`[PENDING_CAPTURE] Background retry Ã¢â‚¬â€ ${pending.length} pending`);
+    console.log(`[PENDING_CAPTURE] Background retry — ${pending.length} pending`);
     for (const pc of pending) await retrySingleCapture(pc);
   }, 60 * 1000); // checks every 60s
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Rental State Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Rental State ─────────────────────────────────────────────────────────────
 let rentalConfig = {
   rentalOutlet:          "",
   rentalTerminal:        "",
   rentalStationId:       "LIM-012",
-  rentalStationName:     "Limassol Marina Ã¢â‚¬â€ Station 12",
+  rentalStationName:     "Limassol Marina — Station 12",
   preAuthAmountCents:    1500,      // legacy field (used by /rental/start)
-  preAuthStandardCents:  1500,      // Standard pre-auth Ã¢â€šÂ¬15
-  preAuthPremiumCents:   3000,      // Premium pre-auth Ã¢â€šÂ¬30
+  preAuthStandardCents:  1500,      // Standard pre-auth €15
+  preAuthPremiumCents:   3000,      // Premium pre-auth €30
   maxRentalTimeMins:     120,
   rentalScenario:        1,         // 1=time-based, 2=fixed, 3=free+release
   fixedAmountCents:      300,
   unlockDisplaySecs:     15,
   returnDisplaySecs:     8,
   phoneForHelp:          "77002020",
-  displayMessage:        "Welcome to Limassol Marina Ã¢â‚¬â€ Station 12",
+  displayMessage:        "Welcome to Limassol Marina — Station 12",
   helpMessage:           "Help has been called. Staff will assist you shortly.",
   helpDisplayTime:       "10",
   alertEmail:            process.env.ALERT_EMAIL || "",
@@ -377,7 +377,7 @@ function addRentalLog(req, response) {
     request: req.body || {}, response
   });
   if (rentalLogs.length > 200) rentalLogs.pop();
-  console.log(`[RENTAL] ${req.method} ${req.originalUrl} Ã¢â€ â€™ ${JSON.stringify(response).substring(0,80)}`);
+  console.log(`[RENTAL] ${req.method} ${req.originalUrl} → ${JSON.stringify(response).substring(0,80)}`);
 }
 
 function addRentalPendingCapture(session, amountCents) {
@@ -387,7 +387,7 @@ function addRentalPendingCapture(session, amountCents) {
     createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
     retries: 0, status: "PENDING", lastAttempt: null, lastError: null
   });
-  console.log(`[RENTAL_PENDING] Added ${id} Ã¢â‚¬â€ Ã¢â€šÂ¬${(amountCents/100).toFixed(2)} rentalId=${session.rentalId}`);
+  console.log(`[RENTAL_PENDING] Added ${id} — €${(amountCents/100).toFixed(2)} rentalId=${session.rentalId}`);
 }
 
 function calcRentalFee(startTimeMs, endTimeMs) {
@@ -399,7 +399,7 @@ function calcRentalFee(startTimeMs, endTimeMs) {
   return sorted[sorted.length - 1].fee;
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ CarWash State Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── CarWash State ─────────────────────────────────────────────────────────────
 let carWashConfig = {
   outlet:                   "0000259010",
   terminal:                 "000025901025",
@@ -435,7 +435,7 @@ let petrolinaConfig = {
   // producing a terminal that appears to work on someone else's configuration.
   terminal:         "000025901090",
   pumpNo:           "1",
-  defaultLan:       "el",          // "el" or "en" â€” app falls back to "el" if absent
+  defaultLan:       "el",          // "el" or "en" — app falls back to "el" if absent
   terminalMode:     "unattended",  // "unattended" (S1U2, pre-auth) | "attended" (S1F2, post-pay Sale)
   claimTTL:         180,           // seconds a claim on an unpaid fuelling stays exclusive
 
@@ -464,9 +464,9 @@ let petrolinaConfig = {
   // without a release on either side. Was 3s in an early draft, which required both clocks to agree
   // that closely at all times and would have failed intermittently.
   tokenValiditySecs: 60,
-  devicePort:       8080,          // spec Table 2 â€” port the app binds its callback listener to
+  devicePort:       8080,          // spec Table 2 — port the app binds its callback listener to
   deviceIP:         "",            // learned from deviceIP on petrolAppInit; used to address callbacks
-  maxAmount:        200.00,        // spec Table 2 â€” ceiling on a manually entered unattended amount
+  maxAmount:        200.00,        // spec Table 2 — ceiling on a manually entered unattended amount
   failSaleAdvice:   "0",           // "1" = reject saleAdvice with HTTP 500, to test the device queue
   confirmAmountTO:  60,            // attended: seconds on the confirm-amount screen
   stationName:      "Petrolina Station",
@@ -479,10 +479,10 @@ let petrolinaConfig = {
   helpMessage:      "For assistance, please call {phone}",
   helpMessageSecs:  20,
   petrolinaPin:     "1234",        // the PIN this mock accepts; anything else returns 01
-  askForKm:         "Y",           // petrolinacardaskforkm â€” drives the odometer screen
-  askForRegNo:      "N",           // petrolinacardaskforcarregno â€” drives the registration screen
+  askForKm:         "Y",           // petrolinacardaskforkm — drives the odometer screen
+  askForRegNo:      "N",           // petrolinacardaskforcarregno — drives the registration screen
   // Response code returned by /petrolinaCard when the PIN is correct. Anything other than 00 lets
-  // the business declines be exercised â€” each shows a different message on the terminal.
+  // the business declines be exercised — each shows a different message on the terminal.
   petrolinaCardRc:  "00",
   // Attended test switches. "00" means behave normally; anything else forces that outcome so the
   // failure paths can be reached from the device, which cannot otherwise be driven into them.
@@ -526,13 +526,13 @@ const STATUS_RC_IDLE = "00";
 
 /**
  * OPT response-code catalogue. The range decides the app's behaviour:
- *   00      success        Â· continue
- *   01-19   decline        Â· definite answer, do not retry
- *   20-39   state conflict Â· do not repeat the call, recover per code
- *   90-99   technical      Â· retry with back-off (except 90/93/96, which never change)
+ *   00      success        · continue
+ *   01-19   decline        · definite answer, do not retry
+ *   20-39   state conflict · do not repeat the call, recover per code
+ *   90-99   technical      · retry with back-off (except 90/93/96, which never change)
  */
 // Spec V9 Table 46. Codes 01-23 are as published; from 06 up they mirror the abortReason
-// meanings of Table 8. The 3x band below it is not in V9 at all â€” the attended flow has to be
+// meanings of Table 8. The 3x band below it is not in V9 at all — the attended flow has to be
 // able to say "claimed at another terminal" and "nothing owed here", and Table 46 offers nothing
 // for either. Those values are ours and are expected to move once Petrolina rules on them.
 const RC = {
@@ -543,7 +543,7 @@ const RC = {
   PREAUTH_NOT_APPROVED:"12",
   PIN_EXHAUSTED:       "18",
   PETROLINA_REFUSED:   "23",
-  // â”€â”€ not in V9 â”€â”€
+  // ── not in V9 ──
   ALREADY_PROCESSED:   "31",
   CLAIMED_ELSEWHERE:   "32",
   CLAIM_EXPIRED:       "33",
@@ -551,7 +551,7 @@ const RC = {
   INVALID_STATE:       "36",
   FUELLING_IN_PROGRESS:"37",
   NOTHING_TO_PAY:      "38",
-  // â”€â”€ technical â”€â”€
+  // ── technical ──
   MALFORMED:           "90",
   UNKNOWN_TRANSACTION_ID:  "93",
   NOT_SETTLED:         "96",
@@ -564,7 +564,7 @@ let petroLastAlert       = null;
 let petrolinaTranCounter = 1000;
 let petrolinaTransactions = {};
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Fairway State Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Fairway State ─────────────────────────────────────────────────────────────
 let fairwayConfig = {
   clientId:       "hermes-parking",
   clientSecret:   "secret123",
@@ -576,7 +576,7 @@ let fairwayConfig = {
 let fairwayLogs        = [];
 let fairwayCurrentToken = null;
 let fairwayTokenExpiry  = 0;
-// Per-method mock data Ã¢â‚¬â€ params describe inputs, data is what the API returns
+// Per-method mock data — params describe inputs, data is what the API returns
 let fairwayMethods = {
   "OpenGate": {
     params: [
@@ -629,7 +629,7 @@ function addFairwayLog(method, path, reqBody, resBody) {
     request: reqBody, response: resBody
   });
   if (fairwayLogs.length > 200) fairwayLogs.pop();
-  console.log(`[FAIRWAY] ${method} ${path} Ã¢â€ â€™ ${JSON.stringify(resBody).substring(0,80)}`);
+  console.log(`[FAIRWAY] ${method} ${path} → ${JSON.stringify(resBody).substring(0,80)}`);
 }
 
 function addPetroLog(method, path, req, res) {
@@ -656,7 +656,7 @@ function addCarWashLog(req, response) {
     request: req.body || {}, response
   });
   if (carWashLogs.length > 200) carWashLogs.pop();
-  console.log(`[CW] ${req.method} ${req.originalUrl} Ã¢â€ â€™ ${JSON.stringify(response).substring(0,80)}`);
+  console.log(`[CW] ${req.method} ${req.originalUrl} → ${JSON.stringify(response).substring(0,80)}`);
 }
 
 function addWashPendingCapture(session, amountCents) {
@@ -666,10 +666,10 @@ function addWashPendingCapture(session, amountCents) {
     createdAt:   new Date().toLocaleString("en-GB", { timeZone: "Europe/Nicosia" }),
     retries: 0, status: "PENDING", lastAttempt: null, lastError: null
   });
-  console.log(`[CW_PENDING] Added ${id} Ã¢â‚¬â€ Ã¢â€šÂ¬${(amountCents/100).toFixed(2)} washId=${session.washId}`);
+  console.log(`[CW_PENDING] Added ${id} — €${(amountCents/100).toFixed(2)} washId=${session.washId}`);
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Helpers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function addLog(req, response) {
   logs.unshift({
     id:       Date.now(),
@@ -702,7 +702,7 @@ function ts() {
   return new Date().toISOString().replace(/[-:T.Z]/g,"").slice(0,14);
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ HMAC Header Builder (JCC spec) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── HMAC Header Builder (JCC spec) ───────────────────────────────────────────
 function buildHmacHeader(method, fullUrl, body, endpointType) {
   const creds     = jccConfig[endpointType] || jccConfig.topup;
   const appId     = creds.appId;
@@ -721,7 +721,7 @@ function buildHmacHeader(method, fullUrl, body, endpointType) {
   return `hmacauth ${appId}:${signature}:${nonce}:${timestamp}`;
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ JCC HTTP POST helper Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── JCC HTTP POST helper ──────────────────────────────────────────────────────
 function jccPost(path, body, endpointType) {
   return new Promise((resolve, reject) => {
     const baseUrl = config.jccUseMock
@@ -750,7 +750,7 @@ function jccPost(path, body, endpointType) {
       let data = "";
       r.on("data", c => data += c);
       r.on("end", () => {
-        console.log(`[JCC] ${fullUrl} Ã¢â€ â€™ HTTP ${r.statusCode} | body: ${data.substring(0,200)}`);
+        console.log(`[JCC] ${fullUrl} → HTTP ${r.statusCode} | body: ${data.substring(0,200)}`);
         if (!data || data.trim() === "" || data.trim() === "{}") {
           // JCC returns empty body on success for topup/capture/release
           if (r.statusCode === 200) {
@@ -770,7 +770,7 @@ function jccPost(path, body, endpointType) {
   });
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ JCC DateTime format Ã¢â‚¬â€ Cyprus timezone +03:00 Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── JCC DateTime format — Cyprus timezone +03:00 ─────────────────────────────
 function jccDateTime() {
   const now    = new Date();
   const offset = '+03:00';
@@ -785,7 +785,7 @@ function jccDateTime() {
     pad(cy.getUTCSeconds()) + offset;
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ JCC API Calls Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── JCC API Calls ─────────────────────────────────────────────────────────────
 async function jccTopup(entry, topupAmountCents) {
   const body = {
     amount:       topupAmountCents,
@@ -889,7 +889,7 @@ function detectMode(reqBody) {
   return "Unknown";
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ TELL API client Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── TELL API client ───────────────────────────────────────────────────────────
 function tellRequest(method, path, body) {
   return new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
@@ -939,18 +939,18 @@ async function tellOpenBarrier() {
   return result.data && result.data.status === 0;
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Admin endpoints Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Admin endpoints ───────────────────────────────────────────────────────────
 app.get("/logs", (req, res) => res.json(logs));
 app.get("/admin/config", (req, res) => res.json(config));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/entries Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /admin/entries ────────────────────────────────────────────────────────
 app.get("/admin/entries", (req, res) => res.json(Object.values(activeEntries)));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/rejections Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /admin/rejections ─────────────────────────────────────────────────────
 app.get("/admin/rejections", (req, res) => res.json(rejectionLog));
 app.get("/admin/ecr-declines", (req, res) => res.json(ecrDeclineLog));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Pending Captures endpoints Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Pending Captures endpoints ────────────────────────────────────────────────
 app.get("/admin/pending-captures", (req, res) => res.json(pendingCaptures));
 
 app.post("/admin/retry-capture/:id", async (req, res) => {
@@ -969,7 +969,7 @@ app.delete("/admin/pending-captures/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/tell-status Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /admin/tell-status ────────────────────────────────────────────────────
 app.get("/admin/tell-status", async (req, res) => {
   if (!config.tellEnabled || !config.tellHwId || !config.tellAppId) {
     return res.json({ available: false, reason: "TELL not configured" });
@@ -1057,8 +1057,8 @@ app.post("/admin/tell-open", async (req, res) => {
   }
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/tell-register Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// Calls TELL /gc/addappid using hwId + hwName + password Ã¢â€ â€™ saves appId to config
+// ── POST /admin/tell-register ─────────────────────────────────────────────────
+// Calls TELL /gc/addappid using hwId + hwName + password → saves appId to config
 app.post("/admin/tell-register", async (req, res) => {
   if (!config.tellHwId)
     return res.json({ok:false, error:"hwId must be configured first"});
@@ -1076,7 +1076,7 @@ app.post("/admin/tell-register", async (req, res) => {
   }
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Dashboard Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const sn = scenarioName(config.exitScenario);
   res.send(`<!DOCTYPE html><html><head><title>Parking RPS Mock</title>
@@ -1132,7 +1132,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 </p>
 
 <div class="pos-box entrance-box">
-<h3>Ã°Å¸â€Âµ Entrance POS</h3>
+<h3>🔵 Entrance POS</h3>
 <table>
 <tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
 <tr>
@@ -1149,7 +1149,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 </div>
 
 <div class="pos-box exit-box">
-<h3>Ã°Å¸Å¸Â  Exit POS</h3>
+<h3>🟠 Exit POS</h3>
 <table>
 <tr><th style="width:160px">Parameter</th><th>Value</th><th style="width:80px"></th></tr>
 <tr>
@@ -1207,14 +1207,14 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <button class="btn orange" onclick="set('flagsForAction','1000')">1000 Restart App</button>
 <button class="btn" onclick="set('flagsForAction','0100')">0100 Force Init</button>
 <button class="btn red" onclick="set('flagsForAction','1100')">1100 Init + Restart</button></td></tr>
-<tr><td>Voice Assistant</td><td>${config.voiceAssistant ? 'Ã°Å¸â€Å  ON' : 'Ã°Å¸â€â€¡ OFF'}</td>
-<td><button class="btn green" onclick="set('voiceAssistant',true)">Ã°Å¸â€Å  ON</button>
-<button class="btn red" onclick="set('voiceAssistant',false)">Ã°Å¸â€â€¡ OFF</button></td></tr>
+<tr><td>Voice Assistant</td><td>${config.voiceAssistant ? '🔊 ON' : '🔇 OFF'}</td>
+<td><button class="btn green" onclick="set('voiceAssistant',true)">🔊 ON</button>
+<button class="btn red" onclick="set('voiceAssistant',false)">🔇 OFF</button></td></tr>
 <tr><td>Default Language</td><td>${config.defaultLanguage}</td>
-<td><button class="btn green" onclick="set('defaultLanguage','EN')">Ã°Å¸â€¡Â¬Ã°Å¸â€¡Â§ EN</button>
-<button class="btn" onclick="set('defaultLanguage','EL')">Ã°Å¸â€¡Â¬Ã°Å¸â€¡Â· EL</button>
-<button class="btn" onclick="set('defaultLanguage','RU')">Ã°Å¸â€¡Â·Ã°Å¸â€¡Âº RU</button>
-<button class="btn" onclick="set('defaultLanguage','IW')">Ã°Å¸â€¡Â®Ã°Å¸â€¡Â± IW</button></td></tr>
+<td><button class="btn green" onclick="set('defaultLanguage','EN')">🇬🇧 EN</button>
+<button class="btn" onclick="set('defaultLanguage','EL')">🇬🇷 EL</button>
+<button class="btn" onclick="set('defaultLanguage','RU')">🇷🇺 RU</button>
+<button class="btn" onclick="set('defaultLanguage','IW')">🇮🇱 IW</button></td></tr>
 </table>
 
 <h2>&#x1F4E1; parkingInit Response Fields</h2>
@@ -1223,14 +1223,14 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <tr><td>Keep Alive (min)</td><td>${config.keepAliveFreq}</td>
 <td><input class="n" type="number" id="inKA" value="${config.keepAliveFreq}">
 <button class="btn" onclick="set('keepAliveFreq',Number(document.getElementById('inKA').value))">Set</button></td></tr>
-<tr><td>Min Pre-Auth (cents)</td><td>${config.minimumAmountPreAuth} = Ã¢â€šÂ¬${(config.minimumAmountPreAuth/100).toFixed(2)}</td>
+<tr><td>Min Pre-Auth (cents)</td><td>${config.minimumAmountPreAuth} = €${(config.minimumAmountPreAuth/100).toFixed(2)}</td>
 <td><input class="n" type="number" id="inPA" value="${config.minimumAmountPreAuth}">
 <button class="btn" onclick="set('minimumAmountPreAuth',Number(document.getElementById('inPA').value))">Set</button></td></tr>
-<tr><td>Fix Amount Solution (cents)</td><td>${config.fixAmountSolution} ${config.fixAmountSolution > 0 ? '= Ã¢â€šÂ¬'+(config.fixAmountSolution/100).toFixed(2)+' SALE mode' : '= OFF (pre-auth mode)'}</td>
+<tr><td>Fix Amount Solution (cents)</td><td>${config.fixAmountSolution} ${config.fixAmountSolution > 0 ? '= €'+(config.fixAmountSolution/100).toFixed(2)+' SALE mode' : '= OFF (pre-auth mode)'}</td>
 <td><input class="n" type="number" id="inFA" value="${config.fixAmountSolution}">
 <button class="btn" onclick="set('fixAmountSolution',Number(document.getElementById('inFA').value))">Set</button>
-<span style="color:#8b949e;font-size:11px;margin-left:6px">-1 = off, e.g. 500 = Ã¢â€šÂ¬5.00 fixed SALE</span></td></tr>
-<tr><td>Default Amount (cents)</td><td>${config.defaultAmount} = Ã¢â€šÂ¬${(config.defaultAmount/100).toFixed(2)}</td>
+<span style="color:#8b949e;font-size:11px;margin-left:6px">-1 = off, e.g. 500 = €5.00 fixed SALE</span></td></tr>
+<tr><td>Default Amount (cents)</td><td>${config.defaultAmount} = €${(config.defaultAmount/100).toFixed(2)}</td>
 <td><input class="n" type="number" id="inDA" value="${config.defaultAmount}">
 <button class="btn" onclick="set('defaultAmount',Number(document.getElementById('inDA').value))">Set</button></td></tr>
 <tr><td>Phone For Help</td><td>${config.phoneForHelp}</td>
@@ -1243,7 +1243,7 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <td><input class="m" id="inHDT" value="${config.helpDisplayTime}" style="width:60px">
 <button class="btn" onclick="sv('helpDisplayTime','inHDT')">Save</button></td></tr>
 <tr><td>Email Alerts</td>
-<td>${process.env.RESEND_KEY ? 'Ã¢Å“â€¦ Resend active' : 'Ã¢Å¡Â Ã¯Â¸Â Not configured (set RESEND_KEY in Render)'}</td>
+<td>${process.env.RESEND_KEY ? '✅ Resend active' : '⚠️ Not configured (set RESEND_KEY in Render)'}</td>
 <td style="font-size:11px;color:#8b949e">${config.lastAlertSent ? 'Last sent: '+config.lastAlertSent : 'No alerts sent yet'}</td></tr>
 <tr><td>Alert Email (recipient)</td>
 <td><input class="w" id="inAlertEmail" placeholder="recipient@email.com" value="${config.alertEmail}"></td>
@@ -1260,22 +1260,22 @@ input.n{width:60px} input.m{width:160px} input.w{width:260px} input.t{width:140p
 <table>
 <tr><th>From (min)</th><th>To (min)</th><th>Fee (cents)</th><th>= Euro</th><th></th></tr>
 ${config.charges.map((c,i)=>`<tr>
-<td>${c.from}</td><td>${c.to||'Ã¢Ë†Å¾'}</td><td>${c.fee}</td><td>Ã¢â€šÂ¬${(parseInt(c.fee)/100).toFixed(2)}</td>
+<td>${c.from}</td><td>${c.to||'∞'}</td><td>${c.fee}</td><td>€${(parseInt(c.fee)/100).toFixed(2)}</td>
 <td><button class="btn red" onclick="removeCharge(${i})">Remove</button></td>
 </tr>`).join('')}
 </table>
 <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
   <input class="n" type="number" id="chFrom" placeholder="from">
-  <input class="n" type="number" id="chTo" placeholder="to (blank=Ã¢Ë†Å¾)">
+  <input class="n" type="number" id="chTo" placeholder="to (blank=∞)">
   <input class="n" type="number" id="chFee" placeholder="fee">
   <button class="btn green" onclick="addCharge()">+ Add Charge</button>
 </div>
 
 <h2>&#x1F6A7; TELL Gate Control PRO</h2>
 <div class="tell-box">
-<h3>Mode - currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'Ã°Å¸Å¸Â¢ REAL TELL API ACTIVE':'Ã¢Å¡Â« MOCK (TELL disabled)'}</span></h3>
+<h3>Mode - currently: <span class="${config.tellEnabled?'active':'inactive'}">${config.tellEnabled?'🟢 REAL TELL API ACTIVE':'⚫ MOCK (TELL disabled)'}</span></h3>
 <button class="btn green" onclick="set('tellEnabled',true)">&#x1F7E2; Enable Real TELL API</button>
-<button class="btn gray" onclick="set('tellEnabled',false)">Ã¢Å¡Â« Use Mock</button>
+<button class="btn gray" onclick="set('tellEnabled',false)">⚫ Use Mock</button>
 <p style="color:#8b949e;font-size:11px;margin:6px 0 0">When enabled: vehiclePresent reads real IN1/IN2; barrier opens on entranceCall/exitCall(free,capture)/exitPayment.</p>
 
 <h3>Device Settings</h3>
@@ -1305,12 +1305,12 @@ ${config.charges.map((c,i)=>`<tr>
 <h3>I/O Mapping</h3>
 <table>
 <tr><th>Function</th><th>Setting</th></tr>
-<tr><td>Ã°Å¸â€Âµ Entrance vehicle input</td>
+<tr><td>🔵 Entrance vehicle input</td>
 <td><select onchange="set('tellVehicleInputEntrance',this.value)">
 <option value="in1" ${config.tellVehicleInputEntrance==='in1'?'selected':''}>IN1 - dry contact</option>
 <option value="in2" ${config.tellVehicleInputEntrance==='in2'?'selected':''}>IN2 - dry contact</option>
 </select></td></tr>
-<tr><td>Ã°Å¸Å¸Â  Exit vehicle input</td>
+<tr><td>🟠 Exit vehicle input</td>
 <td><select onchange="set('tellVehicleInputExit',this.value)">
 <option value="in1" ${config.tellVehicleInputExit==='in1'?'selected':''}>IN1 - dry contact</option>
 <option value="in2" ${config.tellVehicleInputExit==='in2'?'selected':''}>IN2 - dry contact</option>
@@ -1395,15 +1395,15 @@ ${config.charges.map((c,i)=>`<tr>
     <tr><td>Validate HMAC</td><td colspan="2"><input id="jccValidate" type="checkbox" ${jccConfig.validateHmac?'checked':''} style="width:18px;height:18px"> <span style="color:#8b949e;font-size:12px">When OFF - all requests pass through</span></td></tr>
     <tr><td>JCC Target</td><td colspan="2">
       <select onchange="set('jccUseMock',this.value==='true')">
-        <option value="true"  ${config.jccUseMock?'selected':''}>Ã°Å¸Å¸Â¡ MOCK (this server)</option>
-        <option value="false" ${!config.jccUseMock?'selected':''}>Ã°Å¸Å¸Â¢ REAL JCC (${config.jccBaseUrl})</option>
+        <option value="true"  ${config.jccUseMock?'selected':''}>🟡 MOCK (this server)</option>
+        <option value="false" ${!config.jccUseMock?'selected':''}>🟢 REAL JCC (${config.jccBaseUrl})</option>
       </select>
     </td></tr>
     <tr><td>Parking Name</td><td><input id="parkingNameInput" value="${config.parkingName}" style="width:200px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('parkingName','parkingNameInput')">Save</button></td><td></td></tr>
     <tr><td>TopUp total amount (cents)</td><td><input id="topupAmountInput" value="${config.topupAmount}" style="width:100px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('topupAmount','topupAmountInput')">Save</button>
-      <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = Ã¢â€šÂ¬5.00</span></td><td></td></tr>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">e.g. 500 = €5.00</span></td><td></td></tr>
     <tr><td>Capture Retry Interval (min)</td><td><input id="captureRetryMinsInput" value="${config.captureRetryMins}" style="width:80px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:4px">
       <button class="btn" style="margin-left:6px" onclick="sv('captureRetryMins','captureRetryMinsInput')">Save</button>
       <span style="color:#8b949e;font-size:11px;margin-left:8px">background retry every X minutes</span></td><td></td></tr>
@@ -1411,13 +1411,13 @@ ${config.charges.map((c,i)=>`<tr>
       <button class="btn" style="margin-left:6px" onclick="sv('captureMaxRetries','captureMaxRetriesInput')">Save</button>
       <span style="color:#8b949e;font-size:11px;margin-left:8px">mark as FAILED after N retries</span></td><td></td></tr>
   </table>
-  <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">Ã°Å¸â€™Â¾ Save JCC HMAC Config</button>
+  <button class="btn" onclick="saveJccConfig()" style="margin-top:8px">💾 Save JCC HMAC Config</button>
 </div>
 
 <div class="card" style="margin-top:12px">
   <h3>Active Transaction</h3>
   <div id="jccActiveTx"><span style="color:#888">Loading...</span></div>
-  <button class="btn red" onclick="clearJccTransaction()" style="margin-top:8px">Ã°Å¸â€”â€˜ Clear Transaction</button>
+  <button class="btn red" onclick="clearJccTransaction()" style="margin-top:8px">🗑 Clear Transaction</button>
 </div>
 
 <div class="card" style="margin-top:12px">
@@ -1446,7 +1446,7 @@ ${config.charges.map((c,i)=>`<tr>
 
 </div>
 
-<!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â RENTAL TAB Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+<!-- ═══ RENTAL TAB ═══ -->
 <div id="tab-rental" class="tab-content">
 <h1>&#x1F512; Rental RPS Mock</h1>
 <p style="color:#8b949e">All changes take effect immediately. Uses same JCC IPPI endpoints as Parking.</p>
@@ -1596,12 +1596,12 @@ ${config.charges.map((c,i)=>`<tr>
 <table>
 <tr><th>Up to (min)</th><th>Fee (cents)</th><th>= Euro</th><th></th></tr>
 ${rentalConfig.charges.map((c,i)=>`<tr>
-<td>${c.upToMins===-1?'Ã¢Ë†Å¾':c.upToMins}</td><td>${c.fee}</td><td>&#x20AC;${(c.fee/100).toFixed(2)}</td>
+<td>${c.upToMins===-1?'∞':c.upToMins}</td><td>${c.fee}</td><td>&#x20AC;${(c.fee/100).toFixed(2)}</td>
 <td><button class="btn red" onclick="removeRentalCharge(${i})">Remove</button></td>
 </tr>`).join('')}
 </table>
 <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
-  <input class="n" type="number" id="rnChTo" placeholder="up to min (-1=Ã¢Ë†Å¾)">
+  <input class="n" type="number" id="rnChTo" placeholder="up to min (-1=∞)">
   <input class="n" type="number" id="rnChFee" placeholder="fee cents">
   <button class="btn green" onclick="addRentalCharge()">+ Add Tier</button>
 </div>
@@ -1643,7 +1643,7 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <div id="rentalLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
-<!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â CARWASH TAB Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+<!-- ═══ CARWASH TAB ═══ -->
 <div id="tab-carwash" class="tab-content">
 <h1>&#x1F6BF; Car Wash RPS Mock</h1>
 <p style="color:#8b949e">All changes take effect immediately. Uses same JCC IPPI endpoints as Parking.</p>
@@ -1805,7 +1805,7 @@ ${rentalConfig.items.map((item,i)=>`<tr>
 <div id="cwLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
-<!-- â•â•â• PETROLINA TAB â•â•â• -->
+<!-- ═══ PETROLINA TAB ═══ -->
 <div id="tab-petrolina" class="tab-content">
 <h1>&#x26FD; Petrolina Mock OPT Server</h1>
 <p style="color:#8b949e">Simulates the Petrolina OPT server. The S1U2 app calls <code>/petrolAppInit</code>, <code>/optTransaction</code>, <code>/preAuthorization</code>, <code>/abortTransaction</code>, <code>/help</code>. The OPT fires <code>POST /completion</code> back to the app.</p>
@@ -1937,7 +1937,7 @@ ${petrolinaConfig.jwtEnabled === "1" ? `<p style="background:#3d1d00;border:1px 
 <table>
 <tr><th style="width:260px">Setting</th><th style="width:80px">Current</th><th>Edit</th></tr>
 
-<tr><td colspan="3" style="background:#161b22;color:#58a6ff;font-size:11px;letter-spacing:.08em;padding:6px 8px">TIMEOUTS (seconds) â€” returned to app via /petrolAppInit</td></tr>
+<tr><td colspan="3" style="background:#161b22;color:#58a6ff;font-size:11px;letter-spacing:.08em;padding:6px 8px">TIMEOUTS (seconds) — returned to app via /petrolAppInit</td></tr>
 <tr><td>pumpSelectedTO<br><span style="color:#8b949e;font-size:11px">Wait for pump selection</span></td>
   <td>${petrolinaConfig.pumpSelectedTO}s</td>
   <td><input type="number" id="pt_pumpSelectedTO" value="${petrolinaConfig.pumpSelectedTO}" style="width:70px">
@@ -2081,7 +2081,7 @@ ${petrolinaConfig.jwtEnabled === "1" ? `<p style="background:#3d1d00;border:1px 
 <div id="ptLogDiv"><p style="color:#8b949e">Loading...</p></div>
 </div>
 
-<!-- Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â FAIRWAY TAB Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â -->
+<!-- ═══ FAIRWAY TAB ═══ -->
 <div id="tab-fairway" class="tab-content">
 <h1>&#x2708;&#xFE0F; Fairway API Mock</h1>
 <p style="color:#8b949e">Simulates <code>http://identity.hermesairports.com</code> (OAuth2 token) and <code>https://fairway-api.hermesairports.com</code> (API methods).</p>
@@ -2137,8 +2137,8 @@ ${petrolinaConfig.jwtEnabled === "1" ? `<p style="background:#3d1d00;border:1px 
 <h2>&#x1F9EE; Current Token</h2>
 <div id="fwTokenDiv" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px;font-size:12px;font-family:monospace">
 ${fairwayCurrentToken
-  ? `<span style="color:#3fb950">Active Ã¢â‚¬â€ expires in ${Math.max(0,Math.floor((fairwayTokenExpiry-Date.now())/1000))}s</span><br><span style="color:#8b949e">${fairwayCurrentToken}</span>`
-  : '<span style="color:#8b949e">No token issued yet Ã¢â‚¬â€ app must call POST /connect/token first</span>'}
+  ? `<span style="color:#3fb950">Active — expires in ${Math.max(0,Math.floor((fairwayTokenExpiry-Date.now())/1000))}s</span><br><span style="color:#8b949e">${fairwayCurrentToken}</span>`
+  : '<span style="color:#8b949e">No token issued yet — app must call POST /connect/token first</span>'}
 </div>
 <button class="btn red" onclick="fwClearToken()" style="margin-top:8px">&#x1F5D1; Invalidate Token</button>
 
@@ -2251,7 +2251,7 @@ function renderLogs(){
     return '<div style="background:'+bg+';border:1px solid '+col+';border-radius:6px;padding:10px;margin-bottom:10px">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'+
         '<span style="color:#8b949e;font-size:11px;min-width:130px">'+l.time+'</span>'+
-        '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'Ã°Å¸â€Å’ ':'')+l.method+' '+l.endpoint+'</span>'+
+        '<span style="color:'+col+';font-weight:bold;font-size:12px">'+(isTell?'🔌 ':'')+l.method+' '+l.endpoint+'</span>'+
         (l.request&&l.request.outlet?modeTag(l.request.outlet):'')+
         (l.request&&l.request.versionName?'<span style="color:#8b949e;font-size:11px;margin-left:4px">v'+l.request.versionName+'</span>':'')+
         (rc?'<span style="margin-left:auto;color:'+rcColor(rc)+';font-size:12px;font-weight:bold">RC: '+rc+'</span>':'')+
@@ -2310,7 +2310,7 @@ async function sv(key,id){
   const r=await fetch('/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:v})});
   const d=await r.json();
   if(d.ok) location.reload();
-  else showS('Ã¢Å“â€” Error: '+d.error,true);
+  else showS('✗ Error: '+d.error,true);
 }
 async function clearE(){await fetch('/admin/clear-entries',{method:'POST'});location.reload();}
 function showS(msg,err){
@@ -2323,8 +2323,8 @@ async function testConn(){
     const r=await fetch('/admin/tell-test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
     if(d.ok) showS('OK OK  Model:'+d.model+'  FW:'+d.fw+'  IN1='+d.in1+'  IN2='+d.in2+'  OUT1='+d.out1+'  OUT2='+d.out2,false);
-    else showS('Ã¢Å“â€” '+d.error,true);
-  }catch(e){showS('Ã¢Å“â€” '+e.message,true);}
+    else showS('✗ '+d.error,true);
+  }catch(e){showS('✗ '+e.message,true);}
 }
 async function openNow(){
   showS('Sending open command...',false);
@@ -2332,8 +2332,8 @@ async function openNow(){
     const r=await fetch('/admin/tell-open',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
     if(d.ok) showS('OK Barrier open command sent OK',false);
-    else showS('Ã¢Å“â€” '+d.error,true);
-  }catch(e){showS('Ã¢Å“â€” '+e.message,true);}
+    else showS('✗ '+d.error,true);
+  }catch(e){showS('✗ '+e.message,true);}
 }
 async function registerAppId(){
   const el=document.getElementById('regResult');
@@ -2347,11 +2347,11 @@ async function registerAppId(){
       el.textContent='OK App ID registered and saved: '+d.appId;
     } else {
       el.style.color='#f85149';
-      el.textContent='Ã¢Å“â€” '+d.error;
+      el.textContent='✗ '+d.error;
     }
   }catch(e){
     el.style.color='#f85149';
-    el.textContent='Ã¢Å“â€” '+e.message;
+    el.textContent='✗ '+e.message;
   }
 }
 
@@ -2516,11 +2516,11 @@ async function loadTellStatus(){
     }
     const s=d.status||{};
     const in1Color=s.in1===1?'#E65100':'#238636';
-    const in1Text=s.in1===1?'Ã°Å¸Å¸Â  Car Present':'Ã°Å¸Å¸Â¢ No Car';
+    const in1Text=s.in1===1?'🟠 Car Present':'🟢 No Car';
     const in2Color=s.in2===1?'#E65100':'#238636';
-    const in2Text=s.in2===1?'Ã°Å¸Å¸Â  Car Present':'Ã°Å¸Å¸Â¢ No Car';
+    const in2Text=s.in2===1?'🟠 Car Present':'🟢 No Car';
     const barrierColor=s.in4!==0?'#C62828':'#238636';
-    const barrierText=s.in4!==0?'Ã°Å¸â€Â´ Barrier OPEN':'Ã°Å¸Å¸Â¢ Barrier Closed';
+    const barrierText=s.in4!==0?'🔴 Barrier OPEN':'🟢 Barrier Closed';
     const out1Color=s.out1===1?'#1F6FEB':'#30363d';
     el.innerHTML=
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+in1Color+'">'+
@@ -2537,7 +2537,7 @@ async function loadTellStatus(){
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid '+out1Color+'">'+
         '<div style="font-size:11px;color:#8b949e">OUT1 - Relay</div>'+
-        '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'Ã°Å¸â€Âµ Active':'Ã¢Å¡Âª Idle')+'</div>'+
+        '<div style="font-size:14px;font-weight:500;color:'+out1Color+'">'+(s.out1===1?'🔵 Active':'⚪ Idle')+'</div>'+
       '</div>'+
       '<div style="background:#161b22;border-radius:8px;padding:10px 14px;border:1px solid #30363d">'+
         '<div style="font-size:11px;color:#8b949e">Ping / IP</div>'+
@@ -2674,7 +2674,7 @@ async function runEndOfDayCapture(){
     const r=await fetch('/admin/eod-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d=await r.json();
     el.textContent='OK EOD Capture done - '+d.processed+' entries processed. '+d.results;
-  }catch(e){el.textContent='Ã¢Å“â€” Error: '+e.message;}
+  }catch(e){el.textContent='✗ Error: '+e.message;}
 }
 
 async function saveJccConfig(){
@@ -2692,7 +2692,7 @@ async function saveJccConfig(){
   if(d.ok) alert('JCC config saved');
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Rental tab JS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Rental tab JS ────────────────────────────────────────────────────────────
 let rentalFilter='', rentalLogs=[];
 function setRentalFilter(f){rentalFilter=f;renderRentalLogs();}
 function renderRentalLogs(){
@@ -2811,7 +2811,7 @@ async function loadRentalPending(){
 }
 
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Car Wash Tab JS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Car Wash Tab JS ──────────────────────────────────────────────────────────
 let cwFilter='', cwAllLogs=[];
 
 function cwSetFilter(f){cwFilter=f;cwRenderLogs();}
@@ -2909,7 +2909,7 @@ function cwRenderLogs(){
     ?cwAllLogs.filter(l=>l.endpoint.toLowerCase().includes(cwFilter.toLowerCase()))
     :cwAllLogs;
   const countEl=document.getElementById('cwLogCount');
-  if(countEl) countEl.textContent=filtered.length+' of '+cwAllLogs.length+' entries'+(cwFilter?' Ã¢â‚¬â€ filter: '+cwFilter:'');
+  if(countEl) countEl.textContent=filtered.length+' of '+cwAllLogs.length+' entries'+(cwFilter?' — filter: '+cwFilter:'');
   const el=document.getElementById('cwLogDiv');
   if(!el) return;
   if(!filtered.length){el.innerHTML='<p style="color:#8b949e">No entries match filter</p>';return;}
@@ -2950,7 +2950,7 @@ loadRentalLogs();setInterval(loadRentalLogs,3000);
 loadRentals();setInterval(loadRentals,5000);
 loadRentalPending();setInterval(loadRentalPending,8000);
 
-// â”€â”€ Petrolina JS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Petrolina JS ──────────────────────────────────────────────────────────────
 let ptAllLogs=[]; let ptFilter='';
 
 function ptSetFilter(f){ptFilter=f;ptRenderLogs();}
@@ -3078,7 +3078,7 @@ if(ptAmtInput) ptAmtInput.addEventListener('input',function(){
 loadPtLogs(); setInterval(loadPtLogs,4000);
 ptLoadUnpaid(); setInterval(ptLoadUnpaid,4000);
 loadPtTransactions(); setInterval(loadPtTransactions,3000);
-// Ã¢â€â‚¬Ã¢â€â‚¬ Fairway Tab JS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Fairway Tab JS ───────────────────────────────────────────────────────────
 let fwFilter='', fwAllLogs=[];
 function fwSetFilter(f){fwFilter=f;fwRenderLogs();}
 function fwRenderLogs(){
@@ -3144,7 +3144,7 @@ loadFwLogs(); setInterval(loadFwLogs,4000);
 </script></body></html>`);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /parkingInit Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /parkingInit ─────────────────────────────────────────────────────────
 app.post("/parkingInit", (req, res) => {
   // Track app version for dashboard display
   const versionName = req.body.versionName || "";
@@ -3155,7 +3155,7 @@ app.post("/parkingInit", (req, res) => {
     console.log(`[parkingInit] App version: ${versionName} (${versionNumber})`);
   }
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ CarWash init Ã¢â‚¬â€ clean response, no parking fields Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── CarWash init — clean response, no parking fields ─────────────────────────
   if (req.body.application === "CarWash") {
     if (carWashConfig.responseCode !== "00") {
       const errMap = {"91":"Invalid Outlet Number","92":"Invalid Company Code","93":"Invalid Application","08":"Technical issue. Please wait for assistance."};
@@ -3178,7 +3178,7 @@ app.post("/parkingInit", (req, res) => {
       timeOfServer:             ts()
     };
     if (carWashConfig.flagsForAction !== "0000") {
-      console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent Ã¢â€ â€™ auto-reset to 0000`);
+      console.log(`[parkingInit/CarWash] flagsForAction=${carWashConfig.flagsForAction} sent → auto-reset to 0000`);
       carWashConfig.flagsForAction = "0000";
     }
     addCarWashLog(req, response); return res.json(response);
@@ -3190,10 +3190,10 @@ app.post("/parkingInit", (req, res) => {
     addLog(req, response); return res.json(response);
   }
 
-  // Identify which POS is calling Ã¢â‚¬â€ determines mode returned
+  // Identify which POS is calling — determines mode returned
   const mode = detectMode(req.body);
 
-  // Validate outlet Ã¢â‚¬â€ return 91 if unrecognised (both POS configured and neither matches)
+  // Validate outlet — return 91 if unrecognised (both POS configured and neither matches)
   if (mode === "Unknown" && config.entranceOutlet && config.exitOutlet) {
     const response = {responseCode:"91", responseDescription:"Invalid Outlet Number"};
     addLog(req, response); return res.json(response);
@@ -3219,7 +3219,7 @@ app.post("/parkingInit", (req, res) => {
     controller:                      config.tellEnabled ? "A" : "0",
     fixAmountSolution:               String(config.fixAmountSolution),
     charges,
-    // TELL credentials Ã¢â‚¬â€ only included when TELL is enabled
+    // TELL credentials — only included when TELL is enabled
     // App uses these to poll getStatus directly for vehicle detection
     ...(config.tellEnabled && config.tellHwId ? {
       tellApiUrl:        "https://api.tell.hu/gc",
@@ -3231,7 +3231,7 @@ app.post("/parkingInit", (req, res) => {
     } : {}),
     stationId:                       rentalConfig.rentalStationId   || "LIM-001",
     stationName:                     rentalConfig.rentalStationName || "Rental Station",
-    // Rental-specific fields Ã¢â‚¬â€ only included when app identifies as Rental
+    // Rental-specific fields — only included when app identifies as Rental
     ...(req.body.application === "Rental" ? {
       preAuthAmountCents: String(rentalConfig.preAuthAmountCents),
       maxRentalTimeMins:  String(rentalConfig.maxRentalTimeMins),
@@ -3247,19 +3247,19 @@ app.post("/parkingInit", (req, res) => {
     voiceAssistant:                  config.voiceAssistant ? "1" : "0",  // "1"=enabled, "0"=silent
     defaultLanguage:                 config.defaultLanguage               // "EN","EL","RU","IW"
   };
-  // Auto-reset flagsForAction to "0000" after sending Ã¢â‚¬â€ prevents loop on next keep-alive
+  // Auto-reset flagsForAction to "0000" after sending — prevents loop on next keep-alive
   if (config.flagsForAction !== "0000") {
-    console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent Ã¢â€ â€™ auto-reset to 0000`);
+    console.log(`[parkingInit] flagsForAction=${config.flagsForAction} sent → auto-reset to 0000`);
     config.flagsForAction = "0000";
   }
   if (req.body.application === "Rental" && rentalConfig.flagsForAction !== "0000") {
-    console.log(`[parkingInit/Rental] flagsForAction=${rentalConfig.flagsForAction} sent Ã¢â€ â€™ auto-reset to 0000`);
+    console.log(`[parkingInit/Rental] flagsForAction=${rentalConfig.flagsForAction} sent → auto-reset to 0000`);
     rentalConfig.flagsForAction = "0000";
   }
   addLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /entranceCall Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /entranceCall ────────────────────────────────────────────────────────
 app.post("/entranceCall", async (req, res) => {
   const { token, lastDigits, authCode, timeOfInput, tokenCode,
           receiptNumber, referenceNo, preAuthAmount, expiryDate,
@@ -3277,7 +3277,7 @@ app.post("/entranceCall", async (req, res) => {
         timeToDisplayMessage: "8", responseCode: "56",
         responseDescription: "Monthly card not in allowed list"
       };
-      console.log(`[entranceCall] BLOCKED Ã¢â‚¬â€ Monthly card ${cardNumber} not in list`);
+      console.log(`[entranceCall] BLOCKED — Monthly card ${cardNumber} not in list`);
       addRejection("Not in allowed list", "Monthly Card", cardNumber, "56");
       addLog(req, response); return res.json(response);
     }
@@ -3287,15 +3287,15 @@ app.post("/entranceCall", async (req, res) => {
   if (token && activeEntries[token] && inputType === "Monthly Card") {
     const existing = activeEntries[token];
     const entryTime = new Date(existing.entryTime).toISOString().substring(11,19);
-    // No jccRelease needed Ã¢â‚¬â€ monthly cards have no pre-auth
+    // No jccRelease needed — monthly cards have no pre-auth
     const response = {
       outlet: outlet || config.entranceOutlet, terminal: terminal || config.entranceTerminal,
       installationPoint: "Entrance",
       displayMessage: `This card is already inside since ${entryTime}. Please exit first.`,
       timeToDisplayMessage: "8", responseCode: "41",
-      responseDescription: "Card already inside Ã¢â‚¬â€ exit required"
+      responseDescription: "Card already inside — exit required"
     };
-    console.log(`[entranceCall] BLOCKED monthly Ã¢â‚¬â€ already inside since ${entryTime}`);
+    console.log(`[entranceCall] BLOCKED monthly — already inside since ${entryTime}`);
     addRejection("Already inside since "+entryTime, "Monthly Card", existing.lastDigits, "41");
     addLog(req, response); return res.json(response);
   }
@@ -3318,16 +3318,16 @@ app.post("/entranceCall", async (req, res) => {
           expiryDate:         exp
         };
         await jccRelease(releaseEntry);
-        console.log(`[entranceCall] jccRelease called Ã¢â‚¬â€ duplicate bank card *${ld}`);
+        console.log(`[entranceCall] jccRelease called — duplicate bank card *${ld}`);
       } catch(e) { console.error("[entranceCall] jccRelease failed:", e.message); }
       const response = {
         outlet: outlet || config.entranceOutlet, terminal: terminal || config.entranceTerminal,
         installationPoint: "Entrance",
         displayMessage: `This card is already inside since ${entryTime}. Please exit first.`,
         timeToDisplayMessage: "8", responseCode: "41",
-        responseDescription: "Card already inside Ã¢â‚¬â€ exit required"
+        responseDescription: "Card already inside — exit required"
       };
-      console.log(`[entranceCall] BLOCKED bank card *${ld} Ã¢â‚¬â€ already inside since ${entryTime}`);
+      console.log(`[entranceCall] BLOCKED bank card *${ld} — already inside since ${entryTime}`);
       addRejection("Already inside since "+entryTime, "Bank Card", "*"+ld, "41");
       addLog(req, response); return res.json(response);
     }
@@ -3358,9 +3358,9 @@ app.post("/entranceCall", async (req, res) => {
     catch(e) { barrier = "tell-error: " + e.message; console.error("TELL entrance:", e.message); }
   }
 
-  // If barrier failed Ã¢â‚¬â€ release pre-auth (bank card only) and remove entry
+  // If barrier failed — release pre-auth (bank card only) and remove entry
   if (barrier !== "tell-ok" && barrier !== "mock-ok") {
-    console.log(`[entranceCall] Barrier failed (${barrier}) Ã¢â‚¬â€ removing entry${inputType === "Bank Card" ? " + releasing pre-auth" : ""}`);
+    console.log(`[entranceCall] Barrier failed (${barrier}) — removing entry${inputType === "Bank Card" ? " + releasing pre-auth" : ""}`);
     if (token && activeEntries[token]) {
       if (inputType === "Bank Card") {
         // Only bank cards have a pre-auth to release
@@ -3374,7 +3374,7 @@ app.post("/entranceCall", async (req, res) => {
             expiryDate:         expiryDate || "0000"
           };
           await jccRelease(releaseEntry);
-          console.log(`[entranceCall] jccRelease called Ã¢â‚¬â€ barrier failure`);
+          console.log(`[entranceCall] jccRelease called — barrier failure`);
         } catch(e) { console.error("[entranceCall] jccRelease failed:", e.message); }
       }
       releaseSpace(activeEntries[token]);
@@ -3418,7 +3418,7 @@ function releaseSpace(entry) {
   }
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Barrier open with 3 retries Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Barrier open with 3 retries ───────────────────────────────────────────────
 async function openBarrierWithRetry(maxRetries = 3, delayMs = 2000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -3434,11 +3434,11 @@ async function openBarrierWithRetry(maxRetries = 3, delayMs = 2000) {
     }
     if (attempt < maxRetries) await new Promise(r => setTimeout(r, delayMs));
   }
-  console.error("[BARRIER] All retries failed Ã¢â‚¬â€ calling staff");
+  console.error("[BARRIER] All retries failed — calling staff");
   return "failed";
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Fee calculation from entry time and charges table Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Fee calculation from entry time and charges table ─────────────────────────
 function calculateFee(entryTime) {
   if (!entryTime) return config.minimumAmountPreAuth || 300;
   const mins = Math.floor((Date.now() - entryTime) / 60000);
@@ -3448,21 +3448,21 @@ function calculateFee(entryTime) {
     const to   = c.to ? parseInt(c.to) : Infinity;
     if (mins >= from && mins < to) return parseInt(c.fee);
   }
-  // Below first threshold Ã¢â‚¬â€ free
+  // Below first threshold — free
   return 0;
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /exitCall Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /exitCall ────────────────────────────────────────────────────────────
 app.post("/exitCall", async (req, res) => {
   const { token } = req.body;
   const entry = token ? activeEntries[token] : null;
   const inputType = req.body.inputType || (entry && entry.inputType) || "Bank Card";
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Monthly Card exit Ã¢â‚¬â€ always free, no JCC calls Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Monthly Card exit — always free, no JCC calls ────────────────────────
   if (inputType === "Monthly Card") {
     if (!token || !activeEntries[token]) {
-      // Card not registered at entrance Ã¢â‚¬â€ reject
-      console.log(`[exitCall] Monthly Card exit Ã¢â‚¬â€ no entry found for token`);
+      // Card not registered at entrance — reject
+      console.log(`[exitCall] Monthly Card exit — no entry found for token`);
       const response = {
         barrierOpen:         "0",
         moneyToPay:          "0",
@@ -3473,7 +3473,7 @@ app.post("/exitCall", async (req, res) => {
       };
       addLog(req, response); return res.json(response);
     }
-    console.log(`[exitCall] Monthly Card exit Ã¢â‚¬â€ entry found, opening barrier`);
+    console.log(`[exitCall] Monthly Card exit — entry found, opening barrier`);
     releaseSpace(activeEntries[token]);
     delete activeEntries[token];
     const bm = await openBarrierWithRetry();
@@ -3481,7 +3481,7 @@ app.post("/exitCall", async (req, res) => {
       ? { barrierOpen:"0", moneyToPay:"0",
           displayMessage:"Technical issue. Please contact staff.",
           timeToDisplayMessage:"10", responseCode:"08",
-          responseDescription:"Barrier failed Ã¢â‚¬â€ staff called" }
+          responseDescription:"Barrier failed — staff called" }
       : { barrierOpen:"1", moneyToPay:"0",
           displayMessage:"Thank you! Have a nice day.",
           timeToDisplayMessage:"5", responseCode:"00",
@@ -3496,13 +3496,13 @@ app.post("/exitCall", async (req, res) => {
     return { barrierOpen:"0", moneyToPay:"0",
       displayMessage: msg || "Technical issue. Please contact staff.",
       timeToDisplayMessage:"10", responseCode:"08",
-      responseDescription:"Barrier failed Ã¢â‚¬â€ staff called" };
+      responseDescription:"Barrier failed — staff called" };
   }
 
   let response;
   switch(config.exitScenario) {
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Scenario 1: FREE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ── Scenario 1: FREE ──────────────────────────────────────────────────────
     // Release pre-auth, open barrier, no charge
     case 1: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
@@ -3518,7 +3518,7 @@ app.post("/exitCall", async (req, res) => {
       break;
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Scenario 2: CAPTURE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ── Scenario 2: CAPTURE ───────────────────────────────────────────────────
     // Capture the calculated fee (must be <= preAuth), open barrier
     case 2: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
@@ -3527,8 +3527,8 @@ app.post("/exitCall", async (req, res) => {
       try { captureResult2 = await jccCapture(entry, captureAmt); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
       const captureOk2 = captureResult2 && captureResult2.responseCode === "00";
       if (!captureOk2) {
-        // Capture declined Ã¢â‚¬â€ open barrier anyway, store for retry
-        console.log(`[JCC] Capture declined (${captureResult2?.responseCode}) Ã¢â‚¬â€ storing for retry`);
+        // Capture declined — open barrier anyway, store for retry
+        console.log(`[JCC] Capture declined (${captureResult2?.responseCode}) — storing for retry`);
         addPendingCapture(entry, captureAmt);
       }
       delete activeEntries[token];
@@ -3538,16 +3538,16 @@ app.post("/exitCall", async (req, res) => {
         ? staffResponse("Technical issue. Please contact staff.")
         : { barrierOpen:"1", moneyToPay:String(captureAmt),
             displayMessage: captureOk2
-              ? `Thank you! Charged Ã¢â€šÂ¬${(captureAmt/100).toFixed(2)}.`
-              : `Thank you! Charged Ã¢â€šÂ¬${(captureAmt/100).toFixed(2)}. (Payment pending)`,
+              ? `Thank you! Charged €${(captureAmt/100).toFixed(2)}.`
+              : `Thank you! Charged €${(captureAmt/100).toFixed(2)}. (Payment pending)`,
             timeToDisplayMessage:"5", responseCode:"00",
             responseDescription:"Successful Response" };
       break;
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Scenario 3: TOPUP APPROVED Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    // TopUp succeeds Ã¢â€ â€™ Capture full fee Ã¢â€ â€™ open barrier
-    // If TopUp is declined by JCC Ã¢â€ â€™ fall back to Scenario 4 behaviour (release + barrierOpen:"-2")
+    // ── Scenario 3: TOPUP APPROVED ────────────────────────────────────────────
+    // TopUp succeeds → Capture full fee → open barrier
+    // If TopUp is declined by JCC → fall back to Scenario 4 behaviour (release + barrierOpen:"-2")
     case 3: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
       const totalFee3 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
@@ -3556,61 +3556,61 @@ app.post("/exitCall", async (req, res) => {
       try { topupResult3 = await jccTopup(entry, topupAmt3); } catch(e) { console.error("[JCC TOPUP]", e.message); }
 
       const topupApproved = topupResult3 && topupResult3.responseCode === "00";
-      console.log(`[JCC] topup result: ${topupResult3?.responseCode} ${topupResult3?.responseText} Ã¢â€ â€™ ${topupApproved ? "APPROVED" : "DECLINED"}`);
+      console.log(`[JCC] topup result: ${topupResult3?.responseCode} ${topupResult3?.responseText} → ${topupApproved ? "APPROVED" : "DECLINED"}`);
 
       if (topupApproved) {
-        // TopUp approved Ã¢â€ â€™ Capture full fee Ã¢â€ â€™ open barrier
+        // TopUp approved → Capture full fee → open barrier
         let captureResult3 = null;
         try { captureResult3 = await jccCapture(entry, totalFee3); } catch(e) { console.error("[JCC CAPTURE]", e.message); }
         const captureOk3 = captureResult3 && captureResult3.responseCode === "00";
         if (!captureOk3) {
-          console.log(`[JCC] Capture declined after TopUp (${captureResult3?.responseCode}) Ã¢â‚¬â€ storing for retry`);
+          console.log(`[JCC] Capture declined after TopUp (${captureResult3?.responseCode}) — storing for retry`);
           addPendingCapture(entry, totalFee3);
         }
         delete activeEntries[token];
         releaseSpace(entry);
         const b3 = await openBarrierWithRetry();
         response = b3 === "failed"
-          ? staffResponse(`Payment Ã¢â€šÂ¬${(totalFee3/100).toFixed(2)} processed. Barrier failed Ã¢â‚¬â€ staff called.`)
+          ? staffResponse(`Payment €${(totalFee3/100).toFixed(2)} processed. Barrier failed — staff called.`)
           : { barrierOpen:"1", moneyToPay:String(totalFee3),
               displayMessage: captureOk3
-                ? `Thank you! Total Ã¢â€šÂ¬${(totalFee3/100).toFixed(2)}.`
-                : `Thank you! Total Ã¢â€šÂ¬${(totalFee3/100).toFixed(2)}. (Payment pending)`,
+                ? `Thank you! Total €${(totalFee3/100).toFixed(2)}.`
+                : `Thank you! Total €${(totalFee3/100).toFixed(2)}. (Payment pending)`,
               timeToDisplayMessage:"5", responseCode:"00",
               responseDescription:"Successful Response" };
       } else {
-        // TopUp declined by JCC Ã¢â€ â€™ Release pre-auth Ã¢â€ â€™ ask app for full SALE
-        console.log("[JCC] TopUp declined Ã¢â‚¬â€ falling back to full SALE flow");
+        // TopUp declined by JCC → Release pre-auth → ask app for full SALE
+        console.log("[JCC] TopUp declined — falling back to full SALE flow");
         if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
         try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-        // Do NOT delete entry Ã¢â‚¬â€ app needs it alive to send exitPayment
+        // Do NOT delete entry — app needs it alive to send exitPayment
         response = { barrierOpen:"-2", moneyToPay:String(totalFee3),
           recordId: entry.recordId,
-          displayMessage:`Card declined. Please tap card for full Ã¢â€šÂ¬${(totalFee3/100).toFixed(2)}.`,
+          displayMessage:`Card declined. Please tap card for full €${(totalFee3/100).toFixed(2)}.`,
           timeToDisplayMessage:"10", responseCode:"31",
-          responseDescription:"TopUp declined Ã¢â‚¬â€ full SALE required" };
+          responseDescription:"TopUp declined — full SALE required" };
       }
       break;
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Scenario 4: TOPUP DECLINED Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    // TopUp declined Ã¢â€ â€™ Release pre-auth Ã¢â€ â€™ ask app for full SALE (barrierOpen:"-2")
+    // ── Scenario 4: TOPUP DECLINED ────────────────────────────────────────────
+    // TopUp declined → Release pre-auth → ask app for full SALE (barrierOpen:"-2")
     case 4: {
       if (!entry) { response = staffResponse("Entry not found."); break; }
       const totalFee4 = feeCents > 0 ? feeCents : (config.topupAmount || 500);
       // Generate recordId once and store it on the entry so it is stable across retries
       if (!entry.recordId) entry.recordId = require("crypto").randomBytes(16).toString("hex").toUpperCase();
       try { await jccRelease(entry); } catch(e) { console.error("[JCC RELEASE]", e.message); }
-      // Do NOT delete entry Ã¢â‚¬â€ app needs it alive to send exitPayment
+      // Do NOT delete entry — app needs it alive to send exitPayment
       response = { barrierOpen:"-2", moneyToPay:String(totalFee4),
         recordId: entry.recordId,
-        displayMessage:`Card declined. Please tap card for full Ã¢â€šÂ¬${(totalFee4/100).toFixed(2)}.`,
+        displayMessage:`Card declined. Please tap card for full €${(totalFee4/100).toFixed(2)}.`,
         timeToDisplayMessage:"10", responseCode:"31",
-        responseDescription:"TopUp declined Ã¢â‚¬â€ full SALE required" };
+        responseDescription:"TopUp declined — full SALE required" };
       break;
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Scenario 5: BARRIER FAILED Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ── Scenario 5: BARRIER FAILED ────────────────────────────────────────────
     case 5: default:
       response = staffResponse("Technical issue. Please contact staff.");
       break;
@@ -3618,7 +3618,7 @@ app.post("/exitCall", async (req, res) => {
   addLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /exitPayment Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /exitPayment ─────────────────────────────────────────────────────────
 app.post("/exitPayment", async (req, res) => {
   const { token } = req.body;
   const exitEntry = token ? activeEntries[token] : null;
@@ -3671,7 +3671,7 @@ app.post("/vehiclePresent", async (req, res) => {
   addLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /help Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /help ────────────────────────────────────────────────────────────────
 app.post("/help", (req, res) => {
   const action      = req.body.action      || "";
   const application = req.body.application || "";
@@ -3700,7 +3700,7 @@ app.post("/help", (req, res) => {
       req.body.intallationPoint || "?",
       action
     );
-    console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} Ã¢â‚¬â€ ${action}`);
+    console.log(`[ECR_DECLINE] ${req.body.intallationPoint || "?"} — ${action}`);
   }
 
   const cfg = isCarWash ? carWashConfig : config;
@@ -3719,11 +3719,11 @@ app.post("/help", (req, res) => {
   addLog(req, response); res.json(response);
 });
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ═══════════════════════════════════════════════════════════════════════════════
 // Car Wash API
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /washStart Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /washStart ───────────────────────────────────────────────────────────
 app.post("/washStart", (req, res) => {
   const { washId, token, authCode, lastDigits, expiryDate, tokenCode,
           receiptNumber, referenceNo, preAuthAmount, outlet, terminal, inputType } = req.body;
@@ -3758,7 +3758,7 @@ app.post("/washStart", (req, res) => {
     startTime:          Date.now()
   };
 
-  console.log(`[WASH_START] washId=${washId} last4=${lastDigits} preAuth=Ã¢â€šÂ¬${(parseInt(preAuthAmount||0)/100).toFixed(2)}`);
+  console.log(`[WASH_START] washId=${washId} last4=${lastDigits} preAuth=€${(parseInt(preAuthAmount||0)/100).toFixed(2)}`);
 
   const response = {
     responseCode:         "00",
@@ -3769,7 +3769,7 @@ app.post("/washStart", (req, res) => {
   addCarWashLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /washStop Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /washStop ────────────────────────────────────────────────────────────
 app.post("/washStop", async (req, res) => {
   const { washId, timeUsedSeconds, reason } = req.body;
   const session = washId ? activeWashSessions[washId] : null;
@@ -3786,26 +3786,26 @@ app.post("/washStop", async (req, res) => {
 
   delete activeWashSessions[washId];
 
-  // Always calculate time used server-side from session.startTime Ã¢â‚¬â€ more reliable than app-reported value
+  // Always calculate time used server-side from session.startTime — more reliable than app-reported value
   const timeUsed = Math.round((Date.now() - session.startTime) / 1000);
 
-  // Monthly card Ã¢â‚¬â€ no pre-auth was taken, free wash, no JCC calls
+  // Monthly card — no pre-auth was taken, free wash, no JCC calls
   if (session.isMonthly) {
     const mins = Math.floor(timeUsed / 60);
     const secs = timeUsed % 60;
-    console.log(`[WASH_STOP] Monthly card Ã¢â‚¬â€ free wash washId=${washId} timeUsed=${timeUsed}s`);
+    console.log(`[WASH_STOP] Monthly card — free wash washId=${washId} timeUsed=${timeUsed}s`);
     const response = {
       responseCode: "00", responseDescription: "Successful Response",
       amountCharged: "0", timeUsedSeconds: String(timeUsed),
-      displayMessage: `Monthly Card Ã¢â‚¬â€ Free Wash\nTime used: ${mins}m ${secs}s`,
+      displayMessage: `Monthly Card — Free Wash\nTime used: ${mins}m ${secs}s`,
       timeToDisplayMessage: "5"
     };
     addCarWashLog(req, response); return res.json(response);
   }
 
-  // Void pre-auth immediately Ã¢â‚¬â€ wash never started or crashed before completing
+  // Void pre-auth immediately — wash never started or crashed before completing
   if (reason === "controller_failed" || reason === "app_restart") {
-    console.log(`[WASH_STOP] Void pre-auth Ã¢â‚¬â€ reason=${reason} washId=${washId}`);
+    console.log(`[WASH_STOP] Void pre-auth — reason=${reason} washId=${washId}`);
     try { await jccRelease(session); } catch(e) { console.error("[WASH_STOP VOID]", e.message); }
     const response = {
       responseCode: "00", responseDescription: "Pre-auth voided. No charge applied.",
@@ -3819,11 +3819,11 @@ app.post("/washStop", async (req, res) => {
   let amountCents = 0;
   switch (carWashConfig.washScenario) {
     case 1: {
-      // Proportional to actual time used Ã¢â‚¬â€ capped at pre-auth amount
+      // Proportional to actual time used — capped at pre-auth amount
       const maxSecs = carWashConfig.maxWashTimeSeconds || 300;
       const ratio   = Math.min(timeUsed / maxSecs, 1.0);
       amountCents   = Math.round(session.preAuthAmountCents * ratio);
-      console.log(`[WASH_STOP] Proportional charge: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% Ã¢â€ â€™ Ã¢â€šÂ¬${(amountCents/100).toFixed(2)}`);
+      console.log(`[WASH_STOP] Proportional charge: ${timeUsed}s / ${maxSecs}s = ${(ratio*100).toFixed(1)}% → €${(amountCents/100).toFixed(2)}`);
       break;
     }
     case 2: amountCents = carWashConfig.maxWashAmountCents; break;  // fixed amount
@@ -3849,7 +3849,7 @@ app.post("/washStop", async (req, res) => {
   const captureOk = captureResult && captureResult.responseCode === "00";
   if (!captureOk) {
     addWashPendingCapture(session, amountCents);
-    console.log(`[WASH_STOP] Capture failed (${captureResult?.responseCode}) Ã¢â‚¬â€ stored for retry. washId=${washId}`);
+    console.log(`[WASH_STOP] Capture failed (${captureResult?.responseCode}) — stored for retry. washId=${washId}`);
   }
 
   const mins = Math.floor(timeUsed / 60);
@@ -3861,14 +3861,14 @@ app.post("/washStop", async (req, res) => {
     amountCharged:        String(amountCents),
     timeUsedSeconds:      String(timeUsed),
     displayMessage:       captureOk
-      ? `Time used: ${mins}m ${secs}s\nAmount charged: Ã¢â€šÂ¬${(amountCents/100).toFixed(2)}`
-      : `Time used: ${mins}m ${secs}s\nAmount charged: Ã¢â€šÂ¬${(amountCents/100).toFixed(2)} (pending)`,
+      ? `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)}`
+      : `Time used: ${mins}m ${secs}s\nAmount charged: €${(amountCents/100).toFixed(2)} (pending)`,
     timeToDisplayMessage: "8"
   };
   addCarWashLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ CarWash Admin endpoints Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── CarWash Admin endpoints ───────────────────────────────────────────────────
 app.get("/admin/carwash-config",  (req, res) => res.json(carWashConfig));
 app.get("/admin/carwash-sessions",(req, res) => res.json(Object.values(activeWashSessions)));
 app.get("/admin/carwash-logs",    (req, res) => res.json(carWashLogs));
@@ -3900,16 +3900,16 @@ app.post("/admin/carwash-clear-logs", (req, res) => {
   res.json({ ok: true });
 });
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ═══════════════════════════════════════════════════════════════════════════════
 // JCC IPPI Financial Services API  (mirroring test-apis.jccsecure.com)
 // Base path: /financialservices/v1/ippi
 // Auth: HMAC as per JCC spec (Authorization: hmacauth appId:sig:nonce:ts)
-// One active transaction stored in memory Ã¢â‚¬â€ cleared per transaction
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// One active transaction stored in memory — cleared per transaction
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const crypto = require("crypto");
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ HMAC credentials per endpoint Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── HMAC credentials per endpoint ─────────────────────────────────────────────
 let jccConfig = {
   topup:   { appId: "1cbb351c501647ef8f855335d2017dbc", apiKey: "CbGMgGAnQp1Hk+qeXSqjOsiRcN4P54skp32VWOav+ti=" },
   capture: { appId: "c677c1ba0bc349cfb04e2d10d67763f6", apiKey: "jzHup+gUjZo4XDKm54DtoIE9oK51THQ+Vp1AStzIfvI=" },
@@ -3919,7 +3919,7 @@ let jccConfig = {
   validateHmac: false
 };
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ In-memory transaction store (one at a time) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── In-memory transaction store (one at a time) ───────────────────────────────
 let activeTransaction = null;
 let jccLogs = [];
 
@@ -3936,7 +3936,7 @@ function addJccLog(endpoint, req, res, hmacValid) {
   console.log(`[JCC] ${endpoint} | HMAC:${hmacValid} | res=${JSON.stringify(res).substring(0,80)}`);
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ HMAC Validation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── HMAC Validation ───────────────────────────────────────────────────────────
 function validateHmac(req) {
   try {
     const auth = req.headers["authorization"] || "";
@@ -3980,7 +3980,7 @@ function jccAuth(req, res, next) {
   next();
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Standard JCC success response Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Standard JCC success response ─────────────────────────────────────────────
 function jccOk(extra = {}) {
   return { responseCode: "00", responseDescription: "Successful Response", ...extra };
 }
@@ -3989,7 +3989,7 @@ function jccErr(code, desc) {
   return { responseCode: code, responseDescription: desc };
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /financialservices/v1/ippi/auth/topup Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /financialservices/v1/ippi/auth/topup ────────────────────────────────
 app.post("/financialservices/v1/ippi/auth/topup", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -4008,7 +4008,7 @@ app.post("/financialservices/v1/ippi/auth/topup", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /financialservices/v1/ippi/auth/capture Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /financialservices/v1/ippi/auth/capture ──────────────────────────────
 app.post("/financialservices/v1/ippi/auth/capture", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -4026,7 +4026,7 @@ app.post("/financialservices/v1/ippi/auth/capture", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /financialservices/v1/ippi/auth/release (PreAuthorisationRelease) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /financialservices/v1/ippi/auth/release (PreAuthorisationRelease) ────
 app.post("/financialservices/v1/ippi/auth/release", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -4044,7 +4044,7 @@ app.post("/financialservices/v1/ippi/auth/release", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /financialservices/v1/ippi/void Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /financialservices/v1/ippi/void ─────────────────────────────────────
 app.post("/financialservices/v1/ippi/void", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -4061,7 +4061,7 @@ app.post("/financialservices/v1/ippi/void", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /financialservices/v1/ippi/reversal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /financialservices/v1/ippi/reversal ──────────────────────────────────
 app.post("/financialservices/v1/ippi/reversal", jccAuth, (req, res) => {
   const b = req.body;
   const response = jccOk({
@@ -4078,28 +4078,28 @@ app.post("/financialservices/v1/ippi/reversal", jccAuth, (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /jcc/transaction Ã¢â€â‚¬Ã¢â€â‚¬ current active transaction Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /jcc/transaction ── current active transaction ────────────────────────
 app.get("/jcc/transaction", (req, res) => {
   res.json({ activeTransaction });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ DELETE /jcc/transaction Ã¢â€â‚¬Ã¢â€â‚¬ clear active transaction Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── DELETE /jcc/transaction ── clear active transaction ───────────────────────
 app.delete("/jcc/transaction", (req, res) => {
   activeTransaction = null;
   res.json({ cleared: true });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /jcc/logs Ã¢â€â‚¬Ã¢â€â‚¬ JCC transaction logs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /jcc/logs ── JCC transaction logs ─────────────────────────────────────
 app.get("/jcc/logs", (req, res) => {
   res.json(jccLogs);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /jcc/config Ã¢â€â‚¬Ã¢â€â‚¬ get JCC HMAC config Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /jcc/config ── get JCC HMAC config ───────────────────────────────────
 app.get("/jcc/config", (req, res) => {
   res.json({ appId: jccConfig.appId, validateHmac: jccConfig.validateHmac });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /jcc/config Ã¢â€â‚¬Ã¢â€â‚¬ update JCC HMAC config Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /jcc/config ── update JCC HMAC config ───────────────────────────────
 app.post("/jcc/config", (req, res) => {
   const { topupAppId, topupApiKey, captureAppId, captureApiKey,
           releaseAppId, releaseApiKey, validateHmac } = req.body;
@@ -4113,7 +4113,7 @@ app.post("/jcc/config", (req, res) => {
   res.json({ ok: true });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/init Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /rental/init ─────────────────────────────────────────────────────────
 // Android app calls this on startup to get station config + initial item list
 app.post("/rental/init", (req, res) => {
   if (rentalConfig.responseCode !== "00") {
@@ -4140,8 +4140,8 @@ app.post("/rental/init", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/keepAlive Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// Sent every 30s Ã¢â‚¬â€ returns refreshed item list + any pending flags
+// ── POST /rental/keepAlive ────────────────────────────────────────────────────
+// Sent every 30s — returns refreshed item list + any pending flags
 app.post("/rental/keepAlive", (req, res) => {
   const response = {
     responseCode:   "00",
@@ -4152,8 +4152,8 @@ app.post("/rental/keepAlive", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/preAuthAmount Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// Called just before ECR PreAuth Ã¢â‚¬â€ confirms item is still available and returns amount
+// ── POST /rental/preAuthAmount ────────────────────────────────────────────────
+// Called just before ECR PreAuth — confirms item is still available and returns amount
 app.post("/rental/preAuthAmount", (req, res) => {
   const { itemId, itemType } = req.body;
   const item = rentalConfig.items.find(i => i.itemId === itemId);
@@ -4172,8 +4172,8 @@ app.post("/rental/preAuthAmount", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/entry Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// ECR PreAuth approved Ã¢â€ â€™ create rental record, generate unlock code
+// ── POST /rental/entry ────────────────────────────────────────────────────────
+// ECR PreAuth approved → create rental record, generate unlock code
 app.post("/rental/entry", (req, res) => {
   const { entryId, outlet, terminal, stationId, itemId, itemType, dock,
           authCode, receiptNumber, tokenCode, lastDigits, expiryDate, preAuthAmountCents } = req.body;
@@ -4185,7 +4185,7 @@ app.post("/rental/entry", (req, res) => {
     const response = { responseCode: rentalConfig.responseCode, responseDescription: "Service unavailable" };
     addRentalLog(req, response); return res.json(response);
   }
-  // Duplicate guard Ã¢â‚¬â€ return same unlock code
+  // Duplicate guard — return same unlock code
   if (activeRentals[entryId]) {
     const response = { responseCode: "00", entryId, unlockCode: activeRentals[entryId].unlockCode, duplicate: true };
     addRentalLog(req, response); return res.json(response);
@@ -4199,7 +4199,7 @@ app.post("/rental/entry", (req, res) => {
     unlockCode,
     startTime: Date.now()
   };
-  console.log(`[RENTAL] Entry Ã¢â‚¬â€ entryId=${entryId} item=${itemId} last4=****${lastDigits} code=${unlockCode}`);
+  console.log(`[RENTAL] Entry — entryId=${entryId} item=${itemId} last4=****${lastDigits} code=${unlockCode}`);
   const response = {
     responseCode:      "00",
     responseDescription: "Rental entry created",
@@ -4212,8 +4212,8 @@ app.post("/rental/entry", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/return Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// ECR PAN-Capture approved Ã¢â€ â€™ verify card, calc fee, JCC capture, release item
+// ── POST /rental/return ───────────────────────────────────────────────────────
+// ECR PAN-Capture approved → verify card, calc fee, JCC capture, release item
 app.post("/rental/return", async (req, res) => {
   const { entryId, outlet, terminal, stationId, panToken, panLastDigits, panExpiry } = req.body;
   const session = activeRentals[entryId];
@@ -4240,9 +4240,9 @@ app.post("/rental/return", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending Ã¢â‚¬â€ please contact staff.";
+        displayMessage = "Return received. Payment pending — please contact staff.";
       } else {
-        displayMessage = `Thank you! Ã¢â€šÂ¬${(amountCents/100).toFixed(2)} charged.`;
+        displayMessage = `Thank you! €${(amountCents/100).toFixed(2)} charged.`;
       }
     } else {
       amountCents = calcRentalFee(session.startTime, endTime);
@@ -4250,21 +4250,21 @@ app.post("/rental/return", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending Ã¢â‚¬â€ please contact staff.";
+        displayMessage = "Return received. Payment pending — please contact staff.";
       } else {
         const mins = Math.floor(timeUsedSec / 60);
         const secs = timeUsedSec % 60;
-        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: Ã¢â€šÂ¬${(amountCents/100).toFixed(2)}`;
+        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: €${(amountCents/100).toFixed(2)}`;
       }
     }
   } catch(e) {
     console.error("[RENTAL/return] JCC error:", e.message);
     addRentalPendingCapture(session, amountCents || calcRentalFee(session.startTime, endTime));
-    displayMessage = "Return received. Payment pending Ã¢â‚¬â€ please contact staff.";
+    displayMessage = "Return received. Payment pending — please contact staff.";
   }
   rentalItemAvailability[session.itemId] = true;
   delete activeRentals[entryId];
-  console.log(`[RENTAL] Return Ã¢â‚¬â€ entryId=${entryId} timeUsed=${timeUsedSec}s charged=Ã¢â€šÂ¬${(amountCents/100).toFixed(2)}`);
+  console.log(`[RENTAL] Return — entryId=${entryId} timeUsed=${timeUsedSec}s charged=€${(amountCents/100).toFixed(2)}`);
   const response = {
     responseCode:         "00",
     entryId,
@@ -4276,8 +4276,8 @@ app.post("/rental/return", async (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/start Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// Android pre-auth approved Ã¢â€ â€™ store rental session
+// ── POST /rental/start ────────────────────────────────────────────────────────
+// Android pre-auth approved → store rental session
 app.post("/rental/start", (req, res) => {
   const { rentalId, outlet, terminal, token, lastDigits, expiryDate,
           authCode, rrn, receiptNumber, tokenCode, preAuthAmountCents, timeOfStart } = req.body;
@@ -4295,7 +4295,7 @@ app.post("/rental/start", (req, res) => {
     preAuthAmountCents: parseInt(preAuthAmountCents || rentalConfig.preAuthAmountCents),
     timeOfStart, startTime: Date.now()
   };
-  console.log(`[RENTAL] Started Ã¢â‚¬â€ rentalId=${rentalId} last4=****${lastDigits}`);
+  console.log(`[RENTAL] Started — rentalId=${rentalId} last4=****${lastDigits}`);
   const response = {
     responseCode:  "00",
     responseDescription: "Rental started",
@@ -4306,8 +4306,8 @@ app.post("/rental/start", (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/stop Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// Customer returns item Ã¢â€ â€™ capture fee based on time used, then clear session
+// ── POST /rental/stop ─────────────────────────────────────────────────────────
+// Customer returns item → capture fee based on time used, then clear session
 app.post("/rental/stop", async (req, res) => {
   const { rentalId, timeOfStop, reason } = req.body;
   const session = activeRentals[rentalId];
@@ -4326,7 +4326,7 @@ app.post("/rental/stop", async (req, res) => {
 
   try {
     if (rentalConfig.rentalScenario === 3) {
-      // Free Ã¢â‚¬â€ release the pre-auth
+      // Free — release the pre-auth
       await jccRelease(session);
       amountCents = 0;
       displayMessage = "Thank you! No charge for this rental.";
@@ -4337,9 +4337,9 @@ app.post("/rental/stop", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending Ã¢â‚¬â€ please contact staff.";
+        displayMessage = "Return received. Payment pending — please contact staff.";
       } else {
-        displayMessage = "Thank you! Ã¢â€šÂ¬" + (amountCents / 100).toFixed(2) + " charged.";
+        displayMessage = "Thank you! €" + (amountCents / 100).toFixed(2) + " charged.";
       }
     } else {
       // Scenario 1: time-based
@@ -4348,21 +4348,21 @@ app.post("/rental/stop", async (req, res) => {
       if (!r || r.responseCode !== "00") {
         addRentalPendingCapture(session, amountCents);
         amountCents = 0;
-        displayMessage = "Return received. Payment pending Ã¢â‚¬â€ please contact staff.";
+        displayMessage = "Return received. Payment pending — please contact staff.";
       } else {
         const mins = Math.floor(timeUsedSec / 60);
         const secs = timeUsedSec % 60;
-        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: Ã¢â€šÂ¬${(amountCents/100).toFixed(2)}`;
+        displayMessage = `Thank you! Time: ${mins}m ${secs}s. Charged: €${(amountCents/100).toFixed(2)}`;
       }
     }
   } catch(e) {
     console.error(`[RENTAL/stop] JCC error:`, e.message);
     addRentalPendingCapture(session, amountCents || calcRentalFee(session.startTime, endTime));
-    displayMessage = "Return received. Payment pending Ã¢â‚¬â€ please contact staff.";
+    displayMessage = "Return received. Payment pending — please contact staff.";
   }
 
   delete activeRentals[rentalId];
-  console.log(`[RENTAL] Stopped Ã¢â‚¬â€ rentalId=${rentalId} timeUsed=${timeUsedSec}s charged=Ã¢â€šÂ¬${(amountCents/100).toFixed(2)}`);
+  console.log(`[RENTAL] Stopped — rentalId=${rentalId} timeUsed=${timeUsedSec}s charged=€${(amountCents/100).toFixed(2)}`);
   const response = {
     responseCode,
     rentalId,
@@ -4374,7 +4374,7 @@ app.post("/rental/stop", async (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /rental/help Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /rental/help ─────────────────────────────────────────────────────────
 app.post("/rental/help", async (req, res) => {
   const action = req.body.action || "Help Button";
   if (action === "Help Button" || action.startsWith("Help")) {
@@ -4388,19 +4388,19 @@ app.post("/rental/help", async (req, res) => {
   addRentalLog(req, response); res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /rental/rentals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /rental/rentals ───────────────────────────────────────────────────────
 app.get("/rental/rentals", (req, res) => res.json(Object.values(activeRentals)));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /rental/logs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /rental/logs ──────────────────────────────────────────────────────────
 app.get("/rental/logs", (req, res) => res.json(rentalLogs));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ DELETE /rental/logs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── DELETE /rental/logs ───────────────────────────────────────────────────────
 app.delete("/rental/logs", (req, res) => { rentalLogs = []; res.json({ ok: true }); });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /rental/config Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /rental/config ────────────────────────────────────────────────────────
 app.get("/rental/config", (req, res) => res.json(rentalConfig));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/rental-config Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /admin/rental-config ─────────────────────────────────────────────────
 app.post("/admin/rental-config", (req, res) => {
   const { key, value } = req.body;
   if (!(key in rentalConfig)) return res.json({ ok: false, error: `Unknown key: ${key}` });
@@ -4419,7 +4419,7 @@ app.post("/admin/rental-config", (req, res) => {
   res.json({ ok: true, config: rentalConfig });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/rental-add-charge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /admin/rental-add-charge ─────────────────────────────────────────────
 app.post("/admin/rental-add-charge", (req, res) => {
   const { upToMins, fee } = req.body;
   if (!fee) return res.json({ ok: false, error: "fee required" });
@@ -4428,20 +4428,20 @@ app.post("/admin/rental-add-charge", (req, res) => {
   res.json({ ok: true });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/rental-remove-charge Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /admin/rental-remove-charge ─────────────────────────────────────────
 app.post("/admin/rental-remove-charge", (req, res) => {
   const { index } = req.body;
   if (index >= 0 && index < rentalConfig.charges.length) rentalConfig.charges.splice(index, 1);
   res.json({ ok: true });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/rental-clear Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /admin/rental-clear ──────────────────────────────────────────────────
 app.post("/admin/rental-clear", (req, res) => { activeRentals = {}; res.json({ ok: true }); });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ GET /admin/rental-pending-captures Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── GET /admin/rental-pending-captures ───────────────────────────────────────
 app.get("/admin/rental-pending-captures", (req, res) => res.json(rentalPendingCaptures));
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /admin/rental-item-avail Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /admin/rental-item-avail ────────────────────────────────────────────
 // Toggle item availability in the catalogue (simulate dock state)
 app.post("/admin/rental-item-avail", (req, res) => {
   const { itemId, available } = req.body;
@@ -4454,9 +4454,9 @@ app.post("/admin/rental-item-avail", (req, res) => {
 });
 
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ═══════════════════════════════════════════════════════════════════════════════
 // PETROLINA API  (called by S1U2 app)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════════════════════════
 
 const http = require("http");
 // crypto is already required at the top of the CarWash section.
@@ -4656,7 +4656,7 @@ app.post("/petrolAppInit", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// POST /optTransaction â€” creates a new OPT transaction record, returns transactionId
+// POST /optTransaction — creates a new OPT transaction record, returns transactionId
 app.post("/optTransaction", petroRequireJwt, (req, res) => {
   if (petrolinaConfig.responseCode !== "00") {
     const body = { responseCode: petrolinaConfig.responseCode, responseDescription: "OPT error", uuid: req.body.UUID || "" };
@@ -4688,7 +4688,7 @@ app.post("/optTransaction", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// POST /preAuthorization â€” records ECR pre-auth result, schedules completion callback
+// POST /preAuthorization — records ECR pre-auth result, schedules completion callback
 app.post("/preAuthorization", petroRequireJwt, (req, res) => {
   const transactionId = req.body.transactionId || "";
   const txn = petrolinaTransactions[transactionId];
@@ -4778,14 +4778,14 @@ function petroHelp(req, res) {
   res.json(body);
 }
 
-// POST /loyaltyCheck â€” MyPetrolina loyalty lookup by phone number
+// POST /loyaltyCheck — MyPetrolina loyalty lookup by phone number
 /**
- * Only these numbers have an account. Anything else is declined â€” a lookup that approves whatever
+ * Only these numbers have an account. Anything else is declined — a lookup that approves whatever
  * it is given cannot exercise the "no such account" path the device has to handle.
  */
 const mockLoyaltyAccounts = {
-  "99123456": { maskedName: "Î“Î¹ÏŽ*** Î‘Î½Ï„****", pointsBalance: 1250 },
-  "99654321": { maskedName: "ÎœÎ±Ï*** Î Î±Ï€****", pointsBalance:  320 }
+  "99123456": { maskedName: "Γιώ*** Αντ****", pointsBalance: 1250 },
+  "99654321": { maskedName: "Μαρ*** Παπ****", pointsBalance:  320 }
 };
 app.post("/loyaltyCheck", petroRequireJwt, (req, res) => {
   const phoneNo = req.body.phoneNo || "";
@@ -4804,8 +4804,8 @@ app.post("/loyaltyCheck", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// POST /petrolinaCard â€” Petrolina proprietary card auth (PAN + PIN)
-// UID â†’ card number mapping. In production this lives in the OPT / card host and is populated at
+// POST /petrolinaCard — Petrolina proprietary card auth (PAN + PIN)
+// UID → card number mapping. In production this lives in the OPT / card host and is populated at
 // card issuance; here it is a stub so the contactless path can be tested end to end.
 const petrolinaUidMap = {
   "9566709B":       "9100001880880805",   // MIFARE Classic 1K test card
@@ -4828,7 +4828,7 @@ function petroCardRcText(rc) {
 
 app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
   // A swipe sends petrolinaCard (the card number); a tap sends petrolinaCardUid, because the
-  // terminal cannot read the card's data sector. A real OPT resolves the UID to an account â€”
+  // terminal cannot read the card's data sector. A real OPT resolves the UID to an account —
   // this mock accepts either and records which was used.
   const uid = req.body.petrolinaCardUid || "";
   const pan = req.body.petrolinaCard || (uid ? petroCardForUid(uid) : "");
@@ -4861,7 +4861,7 @@ app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// POST /confirmPetrolinaCard â€” after fuel/KM/reg selection; OPT authorises pump
+// POST /confirmPetrolinaCard — after fuel/KM/reg selection; OPT authorises pump
 app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
   const transactionId  = req.body.transactionId || "";
   const productId   = req.body.productId  || "";
@@ -4879,7 +4879,7 @@ app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
     transactionId,
     UUID:                req.body.UUID || "",
     responseCode:        "00",
-    responseDescription: "Confirmed â€” pump authorised"
+    responseDescription: "Confirmed — pump authorised"
   };
   addPetroLog("POST", "/confirmPetrolinaCard", req.body, body);
 
@@ -4901,10 +4901,10 @@ app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// â”€â”€ Petrolina callback helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Petrolina callback helper ──────────────────────────────────────────────────
 /**
- * A completion is valid once, and only while the pre-authorisation still stands. A second one â€” or
- * one sent after a reversal â€” is what produces a double charge on a live terminal.
+ * A completion is valid once, and only while the pre-authorisation still stands. A second one — or
+ * one sent after a reversal — is what produces a double charge on a live terminal.
  *
  * The device deliberately keeps no record of past transactions, so it cannot refuse these itself:
  * it will acknowledge whatever arrives and fire the ECR completion. That makes ordering the OPT's
@@ -4919,7 +4919,7 @@ function petroCompletionBlockedReason(txn) {
   }
 }
 
-/** The OPT holds the outcome â€” whether this call delivered it or an earlier one did. */
+/** The OPT holds the outcome — whether this call delivered it or an earlier one did. */
 function petroAcknowledged(reply) {
   return reply && (reply.responseCode === RC.APPROVED || reply.responseCode === RC.ALREADY_PROCESSED);
 }
@@ -4989,7 +4989,7 @@ function postToDevice(callbackBase, path, payload, label) {
     hostname: url.hostname, port: url.port || (url.protocol === "https:" ? 443 : 80),
     path: url.pathname, method: "POST",
     // agent:false forces a fresh socket. Node's global agent keeps sockets alive, but
-    // NanoHTTPD on the terminal closes them between ticks â€” reusing one gives "socket hang up".
+    // NanoHTTPD on the terminal closes them between ticks — reusing one gives "socket hang up".
     agent: false,
     headers: {
       "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body),
@@ -5007,7 +5007,7 @@ function postToDevice(callbackBase, path, payload, label) {
 /**
  * Simulates the pump: the nozzle is lifted, fuel flows, then the nozzle is returned.
  *
- * The device is told at each stage â€” a /fueling tick every fuelingTickSec while the fill climbs,
+ * The device is told at each stage — a /fueling tick every fuelingTickSec while the fill climbs,
  * then /completion once it stops. The ticks are what let the terminal show the fill progressing and
  * keep its screen alive, so a slow fill is indistinguishable from an abandoned one without them.
  */
@@ -5044,12 +5044,12 @@ function petroStartFuelling(transactionId, callbackBase) {
       pumpId:          txn.pumpId || petrolinaConfig.pumpNo,
       productid:       txn.productId || "",
       timeOfTheServer: nowIso()
-    }, "FUELINGâ†’APP");
+    }, "FUELING→APP");
 
     if (tick >= ticks) {
       clearInterval(timer);
       // Nozzle returned: the OPT now knows the final amount and completes. Passed explicitly so
-      // the completion matches the fill the device has just watched â€” writing it back into the
+      // the completion matches the fill the device has just watched — writing it back into the
       // config would pin every later transaction to this one's amount.
       // Remembered so the settlement sweep knows fuel was actually dispensed. Without it an
       // unacknowledged completion would later be settled as a reversal and the fuel given away.
@@ -5072,16 +5072,16 @@ function firePetroCompletion(transactionId, callbackBase, isPetrolinaCard = fals
 
   const blocked = petroCompletionBlockedReason(txn);
   if (blocked) {
-    const note = { responseCode: RC.INVALID_STATE, responseDescription: `Completion refused â€” ${blocked}` };
+    const note = { responseCode: RC.INVALID_STATE, responseDescription: `Completion refused — ${blocked}` };
     console.log(`[PETRO_CB] refused completion for ${transactionId}: ${blocked}`);
-    addPetroLog("CALLBACK REFUSED", `${transactionId} â€” ${blocked}`, { transactionId, state: txn.state }, note);
+    addPetroLog("CALLBACK REFUSED", `${transactionId} — ${blocked}`, { transactionId, state: txn.state }, note);
     return { ok: false, error: note.responseDescription };
   }
 
   const isPetro = isPetrolinaCard || txn.isPetrolinaCard || false;
   const maxCents = Math.round((txn.jccFinalAmount || 0) * 100) || 20000;
   // The pump controller stops at the authorised amount, so a completion can never exceed the
-  // pre-authorisation. Randomising above it â€” as this did via Math.max(maxCents, 5000) â€” produced
+  // pre-authorisation. Randomising above it — as this did via Math.max(maxCents, 5000) — produced
   // traces the physical system cannot generate, and made the app look wrong for capturing them.
   const floorCents  = Math.min(500, maxCents);
   const actualCents = forcedCents > 0
@@ -5115,10 +5115,10 @@ function firePetroCompletion(transactionId, callbackBase, isPetrolinaCard = fals
     petrolinaCardNo:       isPetro ? (txn.petrolinaCardPan || "") : undefined
   });
 
-  // Petrolina card â†’ /completionPetrolina; bank card â†’ /completion
+  // Petrolina card → /completionPetrolina; bank card → /completion
   const endpoint = isPetro ? "/completionPetrolina" : "/completion";
   const callbackUrl = callbackBase.replace(/\/$/, "") + endpoint;
-  console.log(`[PETRO_CB] â†’ ${callbackUrl}  ${payload}`);
+  console.log(`[PETRO_CB] → ${callbackUrl}  ${payload}`);
   try {
     const url = new URL(callbackUrl);
     const req = (url.protocol === "https:" ? require("https") : http).request({
@@ -5129,28 +5129,28 @@ function firePetroCompletion(transactionId, callbackBase, isPetrolinaCard = fals
     }, (r) => {
       let data = ""; r.on("data", c => data += c);
       r.on("end", () => {
-        console.log(`[PETRO_CB] â† HTTP ${r.statusCode} ${data}`);
+        console.log(`[PETRO_CB] ← HTTP ${r.statusCode} ${data}`);
         const reply = safeJson(data);
         // Only on an acknowledgement. Marking it completed regardless would hide a device that
         // rejected the completion, and the advice would look settled when it is not.
         if (petrolinaTransactions[transactionId] && petroAcknowledged(reply)) {
           petrolinaTransactions[transactionId].state = "completed";
         }
-        addPetroLog("CALLBACKâ†’APP", callbackUrl, { actualAmountCents: actualCents, liters }, reply);
+        addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents, liters }, reply);
       });
     });
     req.on("error", e => {
       console.error(`[PETRO_CB] FAILED: ${e.message}`);
-      addPetroLog("CALLBACKâ†’APP", callbackUrl, { actualAmountCents: actualCents }, { error: e.message });
+      addPetroLog("CALLBACK→APP", callbackUrl, { actualAmountCents: actualCents }, { error: e.message });
     });
     req.write(payload); req.end();
   } catch (e) {
     console.error(`[PETRO_CB] URL parse error: ${e.message}`);
-    addPetroLog("CALLBACKâ†’APP", callbackUrl || "?", { actualAmountCents: actualCents }, { error: e.message });
+    addPetroLog("CALLBACK→APP", callbackUrl || "?", { actualAmountCents: actualCents }, { error: e.message });
   }
 }
 
-// â”€â”€ Petrolina admin endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Petrolina admin endpoints ──────────────────────────────────────────────────
 app.get("/petrolina/logs",    (req, res) => res.json(petrolinaLogs));
 app.post("/petrolina/clear-logs", (req, res) => { petrolinaLogs = []; res.json({ ok: true }); });
 app.get("/petrolina/transactions", (req, res) => res.json(petrolinaTransactions));
@@ -5180,7 +5180,7 @@ app.post("/petrolina/fire-completion", (req, res) => {
   const txn = transactionId ? petrolinaTransactions[transactionId] : null;
   const base = callbackBase || txn?.callbackBase || "";
   if (!txn) return res.json({ ok: false, error: "transactionId not found" });
-  if (!base) return res.json({ ok: false, error: "No callbackBase â€” app must send it in optTransaction" });
+  if (!base) return res.json({ ok: false, error: "No callbackBase — app must send it in optTransaction" });
   const result = firePetroCompletion(transactionId, base);
   if (result && result.ok === false) return res.json(result);
   res.json({ ok: true, transactionId, callbackBase: base });
@@ -5229,15 +5229,15 @@ function firePetroReversal(transactionId, base, reverseReason = REVERSE_REASON_N
       // it in, so a reversed pre-authorisation still reads as completed and a second completion
       // looks legitimate.
       if (petroAcknowledged(reply)) txn.state = "reversed";
-      addPetroLog("REVERSALâ†’APP", callbackUrl, safeJson(payload), reply);
+      addPetroLog("REVERSAL→APP", callbackUrl, safeJson(payload), reply);
     }); });
-    r.on("error", e => addPetroLog("REVERSALâ†’APP", callbackUrl, JSON.parse(payload), { error: e.message }));
+    r.on("error", e => addPetroLog("REVERSAL→APP", callbackUrl, JSON.parse(payload), { error: e.message }));
     r.write(payload); r.end();
   } catch(e) { console.error(`[PETRO_REV] ${e.message}`); }
   return callbackUrl;
 }
 
-// The device may answer a callback with a non-JSON body â€” a NanoHTTPD HTML error page, plain text,
+// The device may answer a callback with a non-JSON body — a NanoHTTPD HTML error page, plain text,
 // or nothing at all. Parsing that unguarded inside a response handler throws asynchronously and
 // takes the whole server down, so every callback response goes through this.
 function safeJson(s) {
@@ -5260,10 +5260,10 @@ function lastPetroCallbackBase() {
   return txns.length ? txns[txns.length - 1].callbackBase : "";
 }
 
-// Generic OPTâ†’App callback sender â€” used by batchClosure / serviceChange / getStatus
+// Generic OPT→App callback sender — used by batchClosure / serviceChange / getStatus
 function firePetroCallback(path, payload, callbackBase, res) {
   const base = callbackBase || lastPetroCallbackBase();
-  if (!base) return res.json({ ok: false, error: "No callbackBase known â€” run a transaction first" });
+  if (!base) return res.json({ ok: false, error: "No callbackBase known — run a transaction first" });
   const body = JSON.stringify(payload);
   const callbackUrl = base.replace(/\/$/, "") + path;
   try {
@@ -5278,19 +5278,19 @@ function firePetroCallback(path, payload, callbackBase, res) {
       resp.on("end", () => {
         const reply = safeJson(d);
         if (path === "/getStatus") {
-          addPetroLog(`${path}â†’APP`, `${callbackUrl}  [${describePetroStatus(reply)}]`, payload, reply);
+          addPetroLog(`${path}→APP`, `${callbackUrl}  [${describePetroStatus(reply)}]`, payload, reply);
         } else {
-          addPetroLog(`${path}â†’APP`, callbackUrl, payload, reply);
+          addPetroLog(`${path}→APP`, callbackUrl, payload, reply);
         }
       });
     });
-    r.on("error", e => addPetroLog(`${path}â†’APP`, callbackUrl, payload, { error: e.message }));
+    r.on("error", e => addPetroLog(`${path}→APP`, callbackUrl, payload, { error: e.message }));
     r.write(body); r.end();
   } catch (e) { return res.json({ ok: false, error: e.message }); }
   res.json({ ok: true, sentTo: callbackUrl });
 }
 
-// Manual: batch closure â†’ app
+// Manual: batch closure → app
 app.post("/petrolina/fire-batch-closure", (req, res) => {
   const { callbackBase, batchNo, noOfTransactions, totalAmount, force } = req.body;
 
@@ -5326,7 +5326,7 @@ app.post("/petrolina/fire-batch-closure", (req, res) => {
   }, callbackBase, res);
 });
 
-// Manual: service change (in / out) â†’ app
+// Manual: service change (in / out) → app
 app.post("/petrolina/fire-service-change", (req, res) => {
   const { callbackBase, service } = req.body;
   // Spec Table 37: the field is serviceStatus, carrying IN_SERVICE / OUT_OF_SERVICE.
@@ -5340,12 +5340,12 @@ app.post("/petrolina/fire-service-change", (req, res) => {
   }, callbackBase, res);
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ATTENDED (PORTABLE) MODE â€” Amendment 1
+// ══════════════════════════════════════════════════════════════════════════════
+// ATTENDED (PORTABLE) MODE — Amendment 1
 // Post-pay: the customer has already fuelled, so there is no pre-auth. The device
 // fetches the unpaid fuelling for a pump, claims it exclusively, takes payment,
 // then advises the OPT.
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ══════════════════════════════════════════════════════════════════════════════
 
 let petrolinaUnpaid    = {};      // transactionId -> fuelling
 let petrolinaReceiptNo = 100;
@@ -5365,7 +5365,7 @@ function nowIso(d = new Date()) {
          `${sign}${p(Math.floor(Math.abs(off) / 60))}:${p(Math.abs(off) % 60)}`;
 }
 
-/** The single unpaid fuelling for a pump â€” Petrolina cannot serve a second car until settled. */
+/** The single unpaid fuelling for a pump — Petrolina cannot serve a second car until settled. */
 function unpaidForPump(pumpid) {
   return Object.values(petrolinaUnpaid)
     .find(f => String(f.pumpId) === String(pumpid) && !f.paid) || null;
@@ -5384,7 +5384,7 @@ function petroAck(req, extra) {
   }, extra);
 }
 
-// â”€â”€ A3: the unpaid fuelling for a pump â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── A3: the unpaid fuelling for a pump ────────────────────────────────────────
 app.post("/pumpTransaction", petroRequireJwt, (req, res) => {
   const pumpid = String(req.body.pumpid || "");
   let body;
@@ -5414,7 +5414,7 @@ app.post("/pumpTransaction", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// â”€â”€ A4: exclusive claim â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── A4: exclusive claim ───────────────────────────────────────────────────────
 app.post("/claimPumpTransaction", petroRequireJwt, (req, res) => {
   const f = petrolinaUnpaid[req.body.transactionId];
   const me = req.body.terminal || "";
@@ -5438,7 +5438,7 @@ app.post("/claimPumpTransaction", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// â”€â”€ A5: release without payment â€” still owed, NOT an abort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── A5: release without payment — still owed, NOT an abort ────────────────────
 app.post("/releasePumpTransaction", petroRequireJwt, (req, res) => {
   const f = petrolinaUnpaid[req.body.transactionId];
   if (f && !f.paid) { f.claimedBy = ""; f.claimExpiry = null; }
@@ -5450,10 +5450,10 @@ app.post("/releasePumpTransaction", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// â”€â”€ A6/A8: payment advice â€” idempotent on (transactionId, UUID) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── A6/A8: payment advice — idempotent on (transactionId, UUID) ──────────────────
 app.post("/saleAdvice", petroRequireJwt, (req, res) => {
   // Test switch: fail the advice at transport level so the device cannot tell whether the payment
-  // was recorded. This is the ambiguous case the durable queue exists for â€” the advice must stay
+  // was recorded. This is the ambiguous case the durable queue exists for — the advice must stay
   // queued and be retried, NOT discarded.
   if (petrolinaConfig.failSaleAdvice === "1") {
     addPetroLog("POST", "/saleAdvice", req.body, { simulatedFailure: true, note: "failSaleAdvice enabled" });
@@ -5510,11 +5510,11 @@ app.post("/saleAdvice", petroRequireJwt, (req, res) => {
   res.json(body);
 });
 
-// â”€â”€ A16: receipt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── A16: receipt ──────────────────────────────────────────────────────────────
 // Returned already formatted for the printer, per ECR field 29:
-//   FJ<line><GS>FJ<line><GS>â€¦   F = font (B double width, N normal, C barcode, P paper)
+//   FJ<line><GS>FJ<line><GS>…   F = font (B double width, N normal, C barcode, P paper)
 //                               J = justification (L left, R right, C centred, S separator)
-// Max 42 chars normal / 21 double-width. The Petrolina logo is NOT included â€” it is pre-loaded
+// Max 42 chars normal / 21 double-width. The Petrolina logo is NOT included — it is pre-loaded
 // on the terminal and prepended by the payment application.
 const GS = String.fromCharCode(29);
 
@@ -5594,7 +5594,7 @@ app.post("/receipt", petroRequireJwt, (req, res) => {
   if (!f) {
     body = petroAck(req, { responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" });
   } else if (!f.paid) {
-    body = petroAck(req, { responseCode: RC.NOT_SETTLED, responseDescription: "Not settled â€” no receipt available" });
+    body = petroAck(req, { responseCode: RC.NOT_SETTLED, responseDescription: "Not settled — no receipt available" });
   } else {
     body = petroAck(req, {
       receiptNo:      f.receiptNo,
@@ -5637,7 +5637,7 @@ app.post("/petrolina/steal-claim", (req, res) => {
   res.json({ ok: true, transactionId: req.body.transactionId, claimedBy: f.claimedBy });
 });
 
-// â”€â”€ Dashboard: simulate a car having fuelled at a pump â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Dashboard: simulate a car having fuelled at a pump ────────────────────────
 app.post("/petrolina/add-unpaid", (req, res) => {
   const transactionId = String(++petrolinaTranCounter);
   const litres = Number(req.body.litres) || 20;
@@ -5662,7 +5662,7 @@ app.post("/petrolina/clear-unpaid", (req, res) => {
   res.json({ ok: true });
 });
 
-// Manual: get status â†’ app
+// Manual: get status → app
 app.post("/petrolina/fire-get-status", (req, res) => {
   const { callbackBase } = req.body;
   firePetroCallback("/getStatus", {
@@ -5683,16 +5683,16 @@ function describePetroStatus(reply) {
   const free = reply.responseCode === STATUS_RC_IDLE;
   const code = reply.stateCode || "--";
   const desc = reply.stateDescription || reply.responseDescription || "";
-  return `${free ? "IDLE" : "IN USE"} Â· ${code} ${desc}`.trim();
+  return `${free ? "IDLE" : "IN USE"} · ${code} ${desc}`.trim();
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ═══════════════════════════════════════════════════════════════════════════════
 // FAIRWAY API  (RESA / Hermes Airports)
-// POST /connect/token   Ã¢â‚¬â€ OAuth2 client_credentials (identity server)
-// POST /fairway/:method Ã¢â‚¬â€ Fairway API call (Bearer token required)
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// POST /connect/token   — OAuth2 client_credentials (identity server)
+// POST /fairway/:method — Fairway API call (Bearer token required)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /connect/token Ã¢â‚¬â€ OAuth2 token endpoint Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /connect/token — OAuth2 token endpoint ───────────────────────────────
 app.post("/connect/token", (req, res) => {
   const { grant_type, client_id, client_secret, scope } = req.body;
   if (grant_type !== "client_credentials") {
@@ -5725,7 +5725,7 @@ app.post("/connect/token", (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ POST /fairway/:apimethod Ã¢â‚¬â€ Fairway API Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── POST /fairway/:apimethod — Fairway API ────────────────────────────────────
 app.post("/fairway/:apimethod", (req, res) => {
   const method = req.params.apimethod;
 
@@ -5753,7 +5753,7 @@ app.post("/fairway/:apimethod", (req, res) => {
     return res.status(404).json(r);
   }
 
-  // help=1 Ã¢â€ â€™ parameter discovery
+  // help=1 → parameter discovery
   if (req.body.help !== undefined) {
     const response = { Data: def.params.map(p => ({ name: p.name, type: p.type })) };
     addFairwayLog("POST", `/fairway/${method}?help`, req.body, response);
@@ -5765,7 +5765,7 @@ app.post("/fairway/:apimethod", (req, res) => {
   res.json(response);
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Fairway admin endpoints Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Fairway admin endpoints ───────────────────────────────────────────────────
 app.get("/fairway/logs",    (req, res) => res.json(fairwayLogs));
 app.delete("/fairway/logs", (req, res) => { fairwayLogs = []; res.json({ ok: true }); });
 
@@ -5799,9 +5799,9 @@ app.post("/admin/fairway-method", (req, res) => {
   res.json({ ok: true });
 });
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ START Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── START ─────────────────────────────────────────────────────────────────────
 // This is a test rig: a stray throw in an async callback handler must not take the server down
-// mid-test. Log it and keep serving â€” a crashed mock looks exactly like a network fault from the
+// mid-test. Log it and keep serving — a crashed mock looks exactly like a network fault from the
 // device, which is expensive to diagnose.
 process.on("uncaughtException", (e) => {
   console.error(`[UNCAUGHT] ${e && e.stack ? e.stack : e}`);
@@ -5817,5 +5817,5 @@ app.listen(PORT, "0.0.0.0", () => {
   setInterval(petroSettlementSweep, petrolinaConfig.settlementSweepSec * 1000);
   console.log(`[PETRO_SETTLE] Sweep every ${petrolinaConfig.settlementSweepSec}s; ` +
     `pre-auths with no fuelling reversed after ${petrolinaConfig.abandonedAfterSec}s`);
-  console.log(`[PENDING_CAPTURE] Retry loop started Ã¢â‚¬â€ every ${config.captureRetryMins} min, max ${config.captureMaxRetries} retries`);
+  console.log(`[PENDING_CAPTURE] Retry loop started — every ${config.captureRetryMins} min, max ${config.captureMaxRetries} retries`);
 })
