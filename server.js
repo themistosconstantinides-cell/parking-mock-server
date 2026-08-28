@@ -4552,7 +4552,7 @@ app.post("/petrolAppInit", petroRequireJwt, (req, res) => {
     displayAskRegNo:         petrolinaConfig.displayAskRegNo,
     insertPetrolinaCardTO:   petrolinaConfig.insertPetrolinaCardTO,
     displayScreenFuelingTO:  petrolinaConfig.displayScreenFuelingTO,
-    serverTime:              new Date().toISOString()
+    serverTime:              nowIso()
   };
   addPetroLog("POST", "/petrolAppInit", req.body, body);
   res.json(body);
@@ -4579,7 +4579,7 @@ app.post("/optTransaction", petroRequireJwt, (req, res) => {
   };
   const body = {
     terminal:            petrolinaTransactions[transactionId].terminal,
-    timeOfTheServer:     new Date().toISOString(),
+    timeOfTheServer:     nowIso(),
     transactionId,
     UUID:                uuid,
     batchNo:             req.body.batchNo || "",
@@ -4595,12 +4595,12 @@ app.post("/preAuthorization", petroRequireJwt, (req, res) => {
   const transactionId = req.body.transactionId || "";
   const txn = petrolinaTransactions[transactionId];
   if (!txn) {
-    const body = { terminal: req.body.terminal || "", timeOfTheServer: new Date().toISOString(), transactionId, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" };
+    const body = { terminal: req.body.terminal || "", timeOfTheServer: nowIso(), transactionId, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: RC.UNKNOWN_TRANSACTION_ID, responseDescription: "Unknown transactionId" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
   if (petrolinaConfig.preAuthResult !== "ok") {
-    const body = { terminal: txn.terminal || "", timeOfTheServer: new Date().toISOString(), transactionId, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT" };
+    const body = { terminal: txn.terminal || "", timeOfTheServer: nowIso(), transactionId, UUID: req.body.UUID || "", batchNo: req.body.batchNo || "", responseCode: petrolinaConfig.responseCode || "05", responseDescription: "Pre-auth rejected by OPT" };
     addPetroLog("POST", "/preAuthorization", req.body, body);
     return res.json(body);
   }
@@ -4616,7 +4616,7 @@ app.post("/preAuthorization", petroRequireJwt, (req, res) => {
   });
   const body = {
     terminal:            txn.terminal || petrolinaConfig.terminal,
-    timeOfTheServer:     new Date().toISOString(),
+    timeOfTheServer:     nowIso(),
     transactionId,
     UUID:                req.body.UUID || "",
     batchNo:             req.body.batchNo || "",
@@ -4648,7 +4648,7 @@ app.post("/abortTransaction", petroRequireJwt, (req, res) => {
   }
   const body = {
     terminal:            req.body.terminal || petrolinaConfig.terminal,
-    timeOfTheServer:     new Date().toISOString(),
+    timeOfTheServer:     nowIso(),
     transactionId:          transactionId,
     UUID:                req.body.UUID || "",
     responseCode:        "00",
@@ -4674,7 +4674,7 @@ function petroHelp(req, res) {
     timeToDisplayMessage: String(petrolinaConfig.helpMessageSecs),
     responseCode:         RC.APPROVED,
     responseDescription:  "Help Ok",
-    timeOfTheServer:      new Date().toISOString()
+    timeOfTheServer:      nowIso()
   };
   addPetroLog("POST", "/help", req.body, body);
   res.json(body);
@@ -4694,7 +4694,7 @@ app.post("/loyaltyCheck", petroRequireJwt, (req, res) => {
   const account = mockLoyaltyAccounts[phoneNo];
   const body = {
     terminal:            req.body.terminal || "",
-    timeOfTheServer:     new Date().toISOString(),
+    timeOfTheServer:     nowIso(),
     transactionId:          req.body.transactionId || "",
     UUID:                req.body.UUID || "",
     responseCode:        account ? RC.APPROVED : RC.LOYALTY_DECLINED,
@@ -4751,7 +4751,7 @@ app.post("/petrolinaCard", petroRequireJwt, (req, res) => {
   const ok   = rc === RC.APPROVED;
   const body = {
     terminal:                   req.body.terminal || "",
-    timeOfTheServer:             new Date().toISOString(),
+    timeOfTheServer:             nowIso(),
     transactionId:                  req.body.transactionId || "",
     UUID:                        req.body.UUID || "",
     petrolinacardaskforkm:       ok ? petrolinaConfig.askForKm    : undefined,
@@ -4777,7 +4777,7 @@ app.post("/confirmPetrolinaCard", petroRequireJwt, (req, res) => {
 
   const body = {
     terminal:            req.body.terminal || "",
-    timeOfTheServer:     new Date().toISOString(),
+    timeOfTheServer:     nowIso(),
     transactionId,
     UUID:                req.body.UUID || "",
     responseCode:        "00",
@@ -4945,7 +4945,7 @@ function petroStartFuelling(transactionId, callbackBase) {
       litresUsed:      parseFloat((cents / price).toFixed(3)),
       pumpId:          txn.pumpId || petrolinaConfig.pumpNo,
       productid:       txn.productId || "",
-      timeOfTheServer: new Date().toISOString()
+      timeOfTheServer: nowIso()
     }, "FUELINGâ†’APP");
 
     if (tick >= ticks) {
@@ -4996,7 +4996,7 @@ function firePetroCompletion(transactionId, callbackBase, isPetrolinaCard = fals
 
   const payload = JSON.stringify({
     terminal:              txn.terminal || petrolinaConfig.terminal,
-    timeOfTheServer:       new Date().toISOString(),
+    timeOfTheServer:       nowIso(),
     UUID:                  txn.uuid || "",
     transactionId,
     amountUsed:            actualCents / 100,
@@ -5224,7 +5224,7 @@ app.post("/petrolina/fire-batch-closure", (req, res) => {
     noOfTransactions: Number(noOfTransactions) || 0,
     totalAmount:      Number(totalAmount) || 0,
     UUID:             require("crypto").randomUUID(),
-    timeOfTheServer:  new Date().toISOString()
+    timeOfTheServer:  nowIso()
   }, callbackBase, res);
 });
 
@@ -5238,7 +5238,7 @@ app.post("/petrolina/fire-service-change", (req, res) => {
     serviceStatus:   service === "out" ? SERVICE_OUT : SERVICE_IN,
     reason:          req.body.reason || "",
     UUID:            require("crypto").randomUUID(),
-    timeOfTheServer: new Date().toISOString()
+    timeOfTheServer: nowIso()
   }, callbackBase, res);
 });
 
@@ -5571,7 +5571,7 @@ app.post("/petrolina/fire-get-status", (req, res) => {
     application:     "petrolinaApp",
     terminal:        petrolinaConfig.terminal,
     UUID:            require("crypto").randomUUID(),
-    timeOfTheServer: new Date().toISOString()
+    timeOfTheServer: nowIso()
   }, callbackBase, res);
 });
 
