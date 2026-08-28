@@ -1,4 +1,4 @@
-﻿# Only server.js, package*.json belong here
+# Only server.js, package*.json belong here
 node_modules/
 
 # Android app — belongs in a separate repo
@@ -34,3 +34,6 @@ fin_app_mockup.html
 
 # Claude internals
 .claude/
+
+# Server console output, one file per day. Diagnostic, not source.
+logs/
