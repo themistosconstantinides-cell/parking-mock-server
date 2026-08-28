@@ -152,11 +152,14 @@ rem  most useful thing it produces and they used to go nowhere: the dashboard
 rem  log holds only the structured request/response pairs, and it is in memory,
 rem  so a restart loses it. One file per day, appended, so a restart mid-session
 rem  does not discard the earlier run.
-rem  The server writes its own console output to logs\server-YYYY-MM-DD.log,
-rem  appended, one file per day. Nothing to set up here - this only says where
-rem  to look, because the first thing anyone needs after a failed test is the
-rem  reason the server gave, and it is no use if nobody knows it was kept.
-echo  [OK] Log file: %~dp0logs\server-^<today^>.log
+rem  The server writes its own console output to logs\server-YYYY-MM-DD.log. It
+rem  is NOT written by this script, so this cannot report [OK] for it - saying so
+rem  once cost an afternoon on a PC running an older server.js, where this line
+rem  promised a log file that nothing was writing. The server states the truth
+rem  itself, on its first line, and that is the one to trust.
+echo   Log file: the server reports this on startup, below.
+echo             If you do not see a [LOG] line, that copy of server.js
+echo             predates file logging - copy the current one over.
 
 rem -- 7. Run -----------------------------------------------------------------
 echo  Starting. Leave this window open - closing it stops the server.
