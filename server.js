@@ -41,6 +41,30 @@ function logFileForToday() {
 // being hidden or printing on every line until the console is unreadable.
 let logWriteFailed = false;
 
+/**
+ * Appends one line to today's log without printing it.
+ *
+ * The console and the file want different things. A console line has to stay
+ * short enough to read while a test is running, so the request/response logging
+ * cuts the body at 80 characters - which is fine on screen and useless
+ * afterwards, because the truncation lands in the middle of the JSON and takes
+ * the transactionId, the amount and the response code with it. The file is read
+ * after the fact, when the whole body is the point.
+ */
+/** Never let an unserialisable body - a circular reference, say - break logging. */
+function safeStringify(v) {
+  try { return JSON.stringify(v); } catch (e) { return `[unserialisable: ${e.message}]`; }
+}
+
+function appendLogLine(text) {
+  if (!LOG_OK || logWriteFailed) return;
+  try {
+    fsLog.appendFileSync(logFileForToday(), `${nowIso()} ${text}\n`, "utf8");
+  } catch (e) {
+    logWriteFailed = true;
+  }
+}
+
 ["log", "warn", "error"].forEach(level => {
   const passThrough = console[level].bind(console);
   console[level] = (...args) => {
@@ -611,7 +635,18 @@ function addFairwayLog(method, path, reqBody, resBody) {
 function addPetroLog(method, path, req, res) {
   petrolinaLogs.unshift({ time: new Date().toLocaleTimeString(), method, path, req, res });
   if (petrolinaLogs.length > 200) petrolinaLogs.pop();
-  console.log(`[PETRO] ${method} ${path} Ã¢â€ â€™ ${JSON.stringify(res).substring(0,80)}`);
+  // Short on screen, so a test can be watched while it runs. The 80-character
+  // cut is fine here and no use afterwards: it falls in the middle of the JSON
+  // and takes the transactionId, the amount and the response code with it.
+  const brief = JSON.stringify(res);
+  console.log(`[PETRO] ${method} ${path} -> ${brief.length > 80 ? brief.substring(0, 80) + "..." : brief}`);
+
+  // The whole thing to the file, request included. The console never carried
+  // the request at all, so a log kept from it showed what the server answered
+  // but not what it was answering.
+  appendLogLine(`[PETRO] ${method} ${path}` +
+                `\n    req: ${safeStringify(req)}` +
+                `\n    res: ${safeStringify(res)}`);
 }
 
 function addCarWashLog(req, response) {
