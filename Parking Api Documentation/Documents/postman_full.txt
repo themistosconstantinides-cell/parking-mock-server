@@ -1,0 +1,179 @@
+=== COLLECTION VARIABLES ===
+  base_url: 'https://localhost:5001'
+  hmac_client_id: 'MarinaParking-T01'
+  hmac_secret: 'Y2hhbmdlbWUtZGV2LXNoYXJlZC1obWFjLWtleS0wMDAwMDAwMDAwMDAwMDA='
+  outlet: '0000259010'
+  terminal_number: '000025901025'
+  company_code: 'MarinaParking'
+  sample_token: '7d2b15a5bb54a579374912383c432ff4d7bb12d1003a836895f9c78d1dddeb180d09c81a5d942b06c417e5af8f063eea2dd6'
+
+=== REQUESTS (12 total) ===
+
+--- GET Parking Init (GET) (/) ---
+URL: {{base_url}}/api/parkingInit?application=Parking&outlet={{outlet}}&terminal={{terminal_number}}&versionName=ParkingApp&versionNumber=1.0.0
+
+--- POST Parking Init (POST) (/) ---
+URL: {{base_url}}/api/parkingInit
+BODY: {
+    "application": "Parking",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "versionName": "ParkingApp",
+    "versionNumber": "1.0.0"
+}
+
+--- POST Help Button (/) ---
+URL: {{base_url}}/api/help
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "20241103090152",
+    "action": "Help Button"
+}
+
+--- POST Help Button (ECR Decline) (/) ---
+URL: {{base_url}}/api/help
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "20241103090152",
+    "action": "ECR Decline. Decline by Host"
+}
+
+--- POST Help Button (Technical Error) (/) ---
+URL: {{base_url}}/api/help
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "20241103090152",
+    "action": "Problem with the ECR call. No Connection"
+}
+
+--- POST Vehicle Present Check (/) ---
+URL: {{base_url}}/api/vehiclePresent
+BODY: {
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "20241103090152"
+}
+
+--- POST Entrance Call (Bank Card) (/) ---
+URL: {{base_url}}/api/entranceCall
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}",
+    "inputType": "Bank Card",
+    "lastDigits": "3412",
+    "firstDigits": "454891",
+    "expiryDate": "2706",
+    "timeOfInput": "20241029183625",
+    "authCode": "1U8732",
+    "referenceNo": "123654789058",
+    "receiptNumber": "1234",
+    "preAuthAmount": "300",
+    "tokenCode": "0000259010251U873212343412C"
+}
+
+--- POST Entrance Call (Monthly Card) (/) ---
+URL: {{base_url}}/api/entranceCall
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    "inputType": "Monthly Card",
+    "lastDigits": "3412",
+    "firstDigits": "454891",
+    "expiryDate": "2706",
+    "timeOfInput": "20241029183625",
+    "authCode": "111111",
+    "referenceNo": "112233445566",
+    "receiptNumber": "1234",
+    "preAuthAmount": "0",
+    "tokenCode": "00002590102511111134124548"
+}
+
+--- POST Exit Call (Bank Card) (/) ---
+URL: {{base_url}}/api/exitCall
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}",
+    "inputType": "Card",
+    "lastDigits": "3412",
+    "firstDigits": "871321",
+    "timeOfInput": "20241029183625"
+}
+
+--- POST Exit Call (Monthly Card) (/) ---
+URL: {{base_url}}/api/exitCall
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    "inputType": "Monthly Card",
+    "lastDigits": "3412",
+    "firstDigits": "871321",
+    "timeOfInput": "20241029183625"
+}
+
+--- POST Exit Payment (ECR Payment Approved) (/) ---
+URL: {{base_url}}/api/exitPayment
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}",
+    "inputType": "Card",
+    "lastDigits": "3412",
+    "firstDigits": "871321",
+    "timeOfInput": "20241029183625",
+    "amountPayed": "1212",
+    "authCode": "123456",
+    "responseCode": "00",
+    "referenceNo": "123456789012",
+    "originalRefNum": "1234"
+}
+
+--- POST Exit Payment (ECR Payment Declined) (/) ---
+URL: {{base_url}}/api/exitPayment
+BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}",
+    "inputType": "Card",
+    "lastDigits": "3412",
+    "firstDigits": "871321",
+    "timeOfInput": "20241029183625",
+    "amountPayed": "0",
+    "authCode": "",
+    "responseCode": "05",
+    "referenceNo": "",
+    "originalRefNum": ""
+}

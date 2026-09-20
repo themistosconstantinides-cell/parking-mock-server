@@ -1,0 +1,154 @@
+FOLDER: 
+  REQUEST: GET {{base_url}}/api/parkingInit?application=Parking&outlet={{outlet}}&terminal={{terminal_number}}&versionName=ParkingApp&versionNumber=1.0.0
+  REQUEST: POST {{base_url}}/api/parkingInit
+    BODY: {
+    "application": "Parking",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "versionName": "ParkingApp",
+    "versionNumber": "1.0.0"
+}
+  REQUEST: POST {{base_url}}/api/help
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "202411030
+  REQUEST: POST {{base_url}}/api/help
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "202411030
+  REQUEST: POST {{base_url}}/api/help
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "202411030
+  REQUEST: POST {{base_url}}/api/vehiclePresent
+    BODY: {
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "dateTime": "20241103090152"
+}
+  REQUEST: POST {{base_url}}/api/entranceCall
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_tok
+  REQUEST: POST {{base_url}}/api/entranceCall
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Entrance",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "a1b2c3d4e5f6
+  REQUEST: POST {{base_url}}/api/exitCall
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}
+  REQUEST: POST {{base_url}}/api/exitCall
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "a1b2c3d4e5f6a1b2
+  REQUEST: POST {{base_url}}/api/exitPayment
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}
+  REQUEST: POST {{base_url}}/api/exitPayment
+    BODY: {
+    "companyCode": "{{company_code}}",
+    "application": "Parking",
+    "intallationPoint": "Exit",
+    "outlet": "{{outlet}}",
+    "terminal": "{{terminal_number}}",
+    "token": "{{sample_token}}
+  PRE-REQUEST SCRIPT (65 lines):
+    // ------------------------------------------------------------------
+    // RPS HMAC pre-request script (collection level)
+    //
+    // Stamps every request in this collection with an Authorization header
+    // in the wire format the server expects:
+    //   Authorization: hmacauth <clientId>:<sig>:<nonce>:<timestamp>
+    //
+    // Reads two collection variables:
+    //   hmac_client_id   matches a key in the server's Hmac:Clients map
+    //   hmac_secret      Base64-encoded shared secret for that client
+    //
+    // Signature base (must mirror RPS.Api HmacAuthenticationHandler):
+    //   sigBase = clientId + METHOD + lowercase(encodeURIComponent(path+query))
+    //           + timestamp + nonce + base64(SHA256(rawBody))
+    // scheme/host are intentionally NOT signed (reverse-proxy-safe).
+    //
+    // Full spec: Documents/HMAC_TerminalAuth.md
+    // Debugging a 401: Documents/ClientApp_Integration_Guide.md §7
+    // ------------------------------------------------------------------
+    const clientId = pm.collectionVariables.get('hmac_client_id');
+    const secretB64 = pm.collectionVariables.get('hmac_secret');
+    if (!clientId || !secretB64) {
+        throw new Error('Set hmac_client_id and hmac_secret collection variables to use the parking endpoints.');
+    }
+    
+    // Path + query, with {{variables}} resolved. Strip scheme://host so we
+    // sign only what the server sees as Request.Path + QueryString.
+    const fullUrl = pm.variables.replaceIn(pm.request.url.toString());
+    const pathQuery = (fullUrl.replace(/^https?:\/\/[^/]+/i, '')) || '/';
+    const encodedPath = encodeURIComponent(pathQuery).toLowerCase();
+    
+    // Body bytes (after variable substitution); empty string for GET / no body.
+    const bodyRaw = (pm.request.body && pm.request.body.raw)
+        ? pm.variables.replaceIn(pm.request.body.raw)
+        : '';
+    const bodyHash = CryptoJS.enc.Base64.stringify(CryptoJS.SHA256(bodyRaw));
+    
+    const method = pm.request.method.toUpperCase();
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const nonceBytes = CryptoJS.lib.WordArray.random(16);
+    const nonce = CryptoJS.enc.Hex.stringify(nonceBytes);
+    
+    const sigBase = clientId + method + encodedPath + timestamp + nonce + bodyHash;
+    const keyBytes = CryptoJS.enc.Base64.parse(secretB64);
+    const signature = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(sigBase, keyBytes));
+    const authValue = 'hmacauth ' + clientId + ':' + signature + ':' + nonce + ':' + timestamp;
+    pm.request.headers.upsert({ key: 'Authorization', value: authValue });
+    
+    // Toggle to true when debugging a 401. The server logs the same fields
+    // in its 'HMAC auth failed: ...' warning so byte-level mismatches are easy to spot.
+    const debug = false;
+    if (debug) {
+        console.log('--- RPS HMAC signing ---');
+        console.log('clientId  :', clientId);
+        console.log('method    :', method);
+        console.log('pathQuery :', pathQuery);
+        console.log('encoded   :', encodedPath);
+        console.log('timestamp :', timestamp);
+        console.log('nonce     :', nonce);
+        console.log('bodyHash  :', bodyHash);
+        console.log('sigBase   :', sigBase);
+        console.log('signature :', signature);
+        console.log('header    :', authValue);
+        console.log('-------------------------');
+    }

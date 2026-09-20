@@ -1,0 +1,358 @@
+{
+	"info": {
+		"_postman_id": "rps-parking-app-api-collection",
+		"name": "RPS - Parking App API",
+		"description": "Standalone Postman collection containing ONLY the six parking-terminal endpoints (parkingInit / entranceCall / exitCall / exitPayment / vehiclePresent / help). Extracted from the master Remote Parking Server collection for handoff to the client-app development team - the admin / JCC / Tell / internal-debug requests in the master collection are intentionally omitted.\n\n**Read first:** `Documents/ClientApp_Integration_Guide.md` and `Documents/HMAC_TerminalAuth.md`.\n\n**Setup:**\n1. Edit the collection variables `hmac_client_id` and `hmac_secret` (or override them in a Postman Environment for production credentials so they never end up in a collection export).\n2. Set `base_url` to the dev/UAT/prod hostname you were given.\n3. Set `outlet`, `terminal_number`, `company_code` to the values for the parking area you are testing against.\n4. Open any request and hit Send - the collection-level pre-request script signs every request with HMAC-SHA256 automatically.\n\n**Defaults ship pointing at dev:** the `hmac_client_id` / `hmac_secret` values below match the public dev sandbox documented in the integration guide (§3). Safe to use against the dev API; **must** be overridden for UAT/Prod.\n\nThe pre-request script is identical to the one in `src/RPS.Api/Authentication/HmacAuthenticationHandler.cs` and `src/RPS.HmacSample/ParkingHmacSigner.cs`. If a request returns 401 with `WWW-Authenticate: hmacauth ... error=\"...\"`, see `Documents/ClientApp_Integration_Guide.md` §7 for the error catalogue and signature-mismatch checklist.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://localhost:5001",
+			"type": "string",
+			"description": "Scheme + host + port of the target RPS API. Override per environment (dev / UAT / prod)."
+		},
+		{
+			"key": "hmac_client_id",
+			"value": "MarinaParking-T01",
+			"type": "string",
+			"description": "Identifies the terminal/client to the parking API. Must match a key in the server's Hmac:Clients map. The default ships matching the public dev sandbox; override for UAT/Prod with the per-terminal value you were issued."
+		},
+		{
+			"key": "hmac_secret",
+			"value": "Y2hhbmdlbWUtZGV2LXNoYXJlZC1obWFjLWtleS0wMDAwMDAwMDAwMDAwMDA=",
+			"type": "string",
+			"description": "Base64-encoded shared secret for hmac_client_id. The default matches the public dev sandbox secret; safe to use against the dev API only. For UAT/Prod, override in a Postman Environment (Postman -> Environments) so the real secret never lands in a collection export."
+		},
+		{
+			"key": "outlet",
+			"value": "0000259010",
+			"type": "string",
+			"description": "10-digit outlet/parking-area identifier. Matches ParkingAreas.OutletNumber on the server."
+		},
+		{
+			"key": "terminal_number",
+			"value": "000025901025",
+			"type": "string",
+			"description": "12-digit terminal identifier within the parking area. Matches Terminals.TerminalNumber on the server."
+		},
+		{
+			"key": "company_code",
+			"value": "MarinaParking",
+			"type": "string",
+			"description": "Company code sent in entranceCall / exitCall / exitPayment / help bodies. Same value for every terminal of an installation."
+		},
+		{
+			"key": "sample_token",
+			"value": "7d2b15a5bb54a579374912383c432ff4d7bb12d1003a836895f9c78d1dddeb180d09c81a5d942b06c417e5af8f063eea2dd6f6d8728883954f715a55c48b230f",
+			"type": "string",
+			"description": "Sample SHA-512 card token used in bank-card entrance / exit requests. Any 128-char hex string works for dev smoke tests; in production the ECR produces this on the device."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// ------------------------------------------------------------------",
+					"// RPS HMAC pre-request script (collection level)",
+					"//",
+					"// Stamps every request in this collection with an Authorization header",
+					"// in the wire format the server expects:",
+					"//   Authorization: hmacauth <clientId>:<sig>:<nonce>:<timestamp>",
+					"//",
+					"// Reads two collection variables:",
+					"//   hmac_client_id   matches a key in the server's Hmac:Clients map",
+					"//   hmac_secret      Base64-encoded shared secret for that client",
+					"//",
+					"// Signature base (must mirror RPS.Api HmacAuthenticationHandler):",
+					"//   sigBase = clientId + METHOD + lowercase(encodeURIComponent(path+query))",
+					"//           + timestamp + nonce + base64(SHA256(rawBody))",
+					"// scheme/host are intentionally NOT signed (reverse-proxy-safe).",
+					"//",
+					"// Full spec: Documents/HMAC_TerminalAuth.md",
+					"// Debugging a 401: Documents/ClientApp_Integration_Guide.md \u00a77",
+					"// ------------------------------------------------------------------",
+					"const clientId = pm.collectionVariables.get('hmac_client_id');",
+					"const secretB64 = pm.collectionVariables.get('hmac_secret');",
+					"if (!clientId || !secretB64) {",
+					"    throw new Error('Set hmac_client_id and hmac_secret collection variables to use the parking endpoints.');",
+					"}",
+					"",
+					"// Path + query, with {{variables}} resolved. Strip scheme://host so we",
+					"// sign only what the server sees as Request.Path + QueryString.",
+					"const fullUrl = pm.variables.replaceIn(pm.request.url.toString());",
+					"const pathQuery = (fullUrl.replace(/^https?:\\/\\/[^/]+/i, '')) || '/';",
+					"const encodedPath = encodeURIComponent(pathQuery).toLowerCase();",
+					"",
+					"// Body bytes (after variable substitution); empty string for GET / no body.",
+					"const bodyRaw = (pm.request.body && pm.request.body.raw)",
+					"    ? pm.variables.replaceIn(pm.request.body.raw)",
+					"    : '';",
+					"const bodyHash = CryptoJS.enc.Base64.stringify(CryptoJS.SHA256(bodyRaw));",
+					"",
+					"const method = pm.request.method.toUpperCase();",
+					"const timestamp = Math.floor(Date.now() / 1000).toString();",
+					"const nonceBytes = CryptoJS.lib.WordArray.random(16);",
+					"const nonce = CryptoJS.enc.Hex.stringify(nonceBytes);",
+					"",
+					"const sigBase = clientId + method + encodedPath + timestamp + nonce + bodyHash;",
+					"const keyBytes = CryptoJS.enc.Base64.parse(secretB64);",
+					"const signature = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(sigBase, keyBytes));",
+					"const authValue = 'hmacauth ' + clientId + ':' + signature + ':' + nonce + ':' + timestamp;",
+					"pm.request.headers.upsert({ key: 'Authorization', value: authValue });",
+					"",
+					"// Toggle to true when debugging a 401. The server logs the same fields",
+					"// in its 'HMAC auth failed: ...' warning so byte-level mismatches are easy to spot.",
+					"const debug = false;",
+					"if (debug) {",
+					"    console.log('--- RPS HMAC signing ---');",
+					"    console.log('clientId  :', clientId);",
+					"    console.log('method    :', method);",
+					"    console.log('pathQuery :', pathQuery);",
+					"    console.log('encoded   :', encodedPath);",
+					"    console.log('timestamp :', timestamp);",
+					"    console.log('nonce     :', nonce);",
+					"    console.log('bodyHash  :', bodyHash);",
+					"    console.log('sigBase   :', sigBase);",
+					"    console.log('signature :', signature);",
+					"    console.log('header    :', authValue);",
+					"    console.log('-------------------------');",
+					"}"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Parking Init (GET)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/parkingInit?application=Parking&outlet={{outlet}}&terminal={{terminal_number}}&versionName=ParkingApp&versionNumber=1.0.0",
+					"host": ["{{base_url}}"],
+					"path": ["api", "parkingInit"],
+					"query": [
+						{ "key": "application", "value": "Parking" },
+						{ "key": "outlet", "value": "{{outlet}}" },
+						{ "key": "terminal", "value": "{{terminal_number}}" },
+						{ "key": "versionName", "value": "ParkingApp" },
+						{ "key": "versionNumber", "value": "1.0.0" }
+					]
+				},
+				"description": "Initialize terminal. Returns config, charges, messages, available spaces. `versionName` and `versionNumber` identify the terminal application version. Full contract: `Documents/parkingInit.md`."
+			}
+		},
+		{
+			"name": "Parking Init (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"application\": \"Parking\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"versionName\": \"ParkingApp\",\n    \"versionNumber\": \"1.0.0\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/parkingInit",
+					"host": ["{{base_url}}"],
+					"path": ["api", "parkingInit"]
+				},
+				"description": "Initialize terminal (POST variant). Same as GET but with JSON body. Full contract: `Documents/parkingInit.md`."
+			}
+		},
+		{
+			"name": "Help Button",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Entrance\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"dateTime\": \"20241103090152\",\n    \"action\": \"Help Button\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/help",
+					"host": ["{{base_url}}"],
+					"path": ["api", "help"]
+				},
+				"description": "Driver pressed HELP button. Creates a help request and notifies admin/user via SignalR. Full contract: `Documents/help.md`."
+			}
+		},
+		{
+			"name": "Help Button (ECR Decline)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Entrance\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"dateTime\": \"20241103090152\",\n    \"action\": \"ECR Decline. Decline by Host\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/help",
+					"host": ["{{base_url}}"],
+					"path": ["api", "help"]
+				},
+				"description": "Help call triggered by ECR decline event."
+			}
+		},
+		{
+			"name": "Help Button (Technical Error)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Entrance\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"dateTime\": \"20241103090152\",\n    \"action\": \"Problem with the ECR call. No Connection\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/help",
+					"host": ["{{base_url}}"],
+					"path": ["api", "help"]
+				},
+				"description": "Help call triggered by communication/technical error."
+			}
+		},
+		{
+			"name": "Vehicle Present Check",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"dateTime\": \"20241103090152\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/vehiclePresent",
+					"host": ["{{base_url}}"],
+					"path": ["api", "vehiclePresent"]
+				},
+				"description": "Check if a vehicle is present at the entrance/exit via barrier controller. Full contract: `Documents/vehiclePresent.md`."
+			}
+		},
+		{
+			"name": "Entrance Call (Bank Card)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Entrance\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"token\": \"{{sample_token}}\",\n    \"inputType\": \"Bank Card\",\n    \"lastDigits\": \"3412\",\n    \"firstDigits\": \"454891\",\n    \"expiryDate\": \"2706\",\n    \"timeOfInput\": \"20241029183625\",\n    \"authCode\": \"1U8732\",\n    \"referenceNo\": \"123654789058\",\n    \"receiptNumber\": \"1234\",\n    \"preAuthAmount\": \"300\",\n    \"tokenCode\": \"0000259010251U873212343412C\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/entranceCall",
+					"host": ["{{base_url}}"],
+					"path": ["api", "entranceCall"]
+				},
+				"description": "Vehicle entering with a bank card. Pre-authorization already done by ECR on the Android device. Full contract: `Documents/entranceCall.md`."
+			}
+		},
+		{
+			"name": "Entrance Call (Monthly Card)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Entrance\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"token\": \"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\",\n    \"inputType\": \"Monthly Card\",\n    \"lastDigits\": \"3412\",\n    \"firstDigits\": \"454891\",\n    \"expiryDate\": \"2706\",\n    \"timeOfInput\": \"20241029183625\",\n    \"authCode\": \"111111\",\n    \"referenceNo\": \"112233445566\",\n    \"receiptNumber\": \"1234\",\n    \"preAuthAmount\": \"0\",\n    \"tokenCode\": \"00002590102511111134124548\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/entranceCall",
+					"host": ["{{base_url}}"],
+					"path": ["api", "entranceCall"]
+				},
+				"description": "Vehicle entering with a monthly card. authCode=111111 and referenceNo=112233445566 are hardcoded identifiers for monthly cards."
+			}
+		},
+		{
+			"name": "Exit Call (Bank Card)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Exit\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"token\": \"{{sample_token}}\",\n    \"inputType\": \"Card\",\n    \"lastDigits\": \"3412\",\n    \"firstDigits\": \"871321\",\n    \"timeOfInput\": \"20241029183625\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/exitCall",
+					"host": ["{{base_url}}"],
+					"path": ["api", "exitCall"]
+				},
+				"description": "Vehicle exiting with bank card. RPS matches token to entrance record, calculates fee, and handles payment scenarios:\n- Scenario 1: Amount = 0 -> barrier opens, pre-auth released\n- Scenario 2: Amount <= pre-auth -> barrier opens, capture amount\n- Scenario 3: Amount > pre-auth -> topup attempted, if declined returns moneyToPay for ECR\n\nFull contract: `Documents/exitCall.md`."
+			}
+		},
+		{
+			"name": "Exit Call (Monthly Card)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Exit\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"token\": \"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\",\n    \"inputType\": \"Monthly Card\",\n    \"lastDigits\": \"3412\",\n    \"firstDigits\": \"871321\",\n    \"timeOfInput\": \"20241029183625\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/exitCall",
+					"host": ["{{base_url}}"],
+					"path": ["api", "exitCall"]
+				},
+				"description": "Monthly card exit. Typically zero amount -> barrier opens immediately."
+			}
+		},
+		{
+			"name": "Exit Payment (ECR Payment Approved)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Exit\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"token\": \"{{sample_token}}\",\n    \"inputType\": \"Card\",\n    \"lastDigits\": \"3412\",\n    \"firstDigits\": \"871321\",\n    \"timeOfInput\": \"20241029183625\",\n    \"amountPayed\": \"1212\",\n    \"authCode\": \"123456\",\n    \"responseCode\": \"00\",\n    \"referenceNo\": \"123456789012\",\n    \"originalRefNum\": \"1234\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/exitPayment",
+					"host": ["{{base_url}}"],
+					"path": ["api", "exitPayment"]
+				},
+				"description": "Called after Scenario 3 when topup was declined and ECR payment was processed on the Android device. If responseCode=00 and authCode is present, RPS opens barrier and records payment. Full contract: `Documents/exitPayment.md`."
+			}
+		},
+		{
+			"name": "Exit Payment (ECR Payment Declined)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"companyCode\": \"{{company_code}}\",\n    \"application\": \"Parking\",\n    \"intallationPoint\": \"Exit\",\n    \"outlet\": \"{{outlet}}\",\n    \"terminal\": \"{{terminal_number}}\",\n    \"token\": \"{{sample_token}}\",\n    \"inputType\": \"Card\",\n    \"lastDigits\": \"3412\",\n    \"firstDigits\": \"871321\",\n    \"timeOfInput\": \"20241029183625\",\n    \"amountPayed\": \"0\",\n    \"authCode\": \"\",\n    \"responseCode\": \"05\",\n    \"referenceNo\": \"\",\n    \"originalRefNum\": \"\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/exitPayment",
+					"host": ["{{base_url}}"],
+					"path": ["api", "exitPayment"]
+				},
+				"description": "ECR payment was declined on the Android device. Barrier stays closed."
+			}
+		}
+	]
+}

@@ -1,0 +1,137 @@
+[3] P: 'Remote Parking Server — Client App Integration Handbook'
+[5] P: 'HMAC-authenticated terminal endpoints (parkingInit / entranceCall / exitCall / exitPayment / vehiclePresent / help)'
+[17] P: 'Remote Parking Server engineering team'
+[18] P: '2026-05-19'
+[20] SDT
+[21] P: '1\tDocument control'
+[22] TABLE: 2 rows
+[24] P: '2\tScope'
+[25] P: 'This handbook is the single entry point for implementing a client application that talks to the Remote Parking Server (RPS) API. It consolidates, in reading order:'
+[26] P: 'The HMAC-SHA256 authentication scheme used by every terminal endpoint.'
+[27] P: "The wire contract for the six parking endpoints that drive a vehicle's entrance, exit, and payment lifecycle."
+[28] P: 'Operational guidance for onboarding, debugging a 401 Unauthorized, and rotating shared secrets.'
+[29] P: 'Companion artifacts shipped alongside this document:'
+[30] P: 'src/RPS.HmacSample/ — a runnable C# reference implementation of the request-signing logic, intended to be ported into the client app.'
+[31] P: 'Documents/Parking_App_API.postman_collection.json — Postman 2.1 collection with all six endpoints, auto-signed by a collection-level pre-request script. Useful for smoke-testing against the dev sandbo'
+[33] P: '3\tHow to read this document'
+[34] P: 'The chapters are ordered so that a developer can read top-to-bottom and have working code by the end:'
+[35] P: 'Chapter 1 (Integration Guide) gives the 60-second mental model and an onboarding checklist.'
+[36] P: 'Chapter 2 (HMAC Terminal Auth) is the normative authentication spec — every other chapter assumes this is in place.'
+[37] P: 'Chapters 3 – 8 are the per-endpoint contracts. Each one is self-contained and follows the same template: purpose, request schema, response schema, error handling, worked examples.'
+[38] P: 'Code blocks are reproduced verbatim from the source markdown. JSON payloads in the request/response examples are the same fixtures used by the C# sample app and the Postman collection, so values are d'
+[40] P: '4\tParking Terminal App — Integration Guide'
+[41] P: 'Audience: the development team building the Android parking-terminal application that calls the Remote Parking Server (RPS). Purpose: single entry point — read this first, then follow the links in §2 '
+[42] P: 'What ships with this guide:'
+[43] P: 'This document (Documents/ClientApp_Integration_Guide.md).'
+[44] P: 'The wire-format spec (Documents/HMAC_TerminalAuth.md).'
+[45] P: 'The six per-endpoint contract docs under Documents/ (see §5).'
+[46] P: 'A working C# reference implementation under src/RPS.HmacSample/ — a 100-line console app that signs and calls parkingInit against any RPS instance. Use it both as algorithm-truth (port the signer byte'
+[47] P: 'The Postman collection (RemoteParkingServer.postman_collection.json) with a JavaScript signer in the Parking App API folder pre-request script — handy for ad-hoc verification without writing code.'
+[49] P: '4.1\tSummary'
+[50] P: 'RPS exposes six HTTPS endpoints that the parking terminal calls during normal operation. Every one of them is protected by an HMAC-SHA256 scheme that we ship under the literal token hmacauth:'
+[51] P: 'Authorization: hmacauth <clientId>:<signature>:<nonce>:<timestamp>'
+[52] P: 'clientId identifies the terminal (assigned by us per device).'
+[53] P: 'signature is HMAC-SHA256(secret, sigBase) where secret is the decoded Base64 of the per-client shared secret and sigBase is the canonical string defined in HMAC_TerminalAuth.md §1.'
+[54] P: 'nonce is 16 random bytes hex-encoded — fresh per request.'
+[55] P: 'timestamp is Unix epoch seconds (not milliseconds — common bug).'
+[56] P: 'The server rejects unknown clients, stale timestamps (±5 min by default), replayed nonces (same clientId+nonce within 10 min), and signature mismatches with a 401 whose WWW-Authenticate header explain'
+[59] P: '4.2\tReading order'
+[60] P: 'Tackle the docs in this sequence — each one builds on the previous.'
+[61] TABLE: 7 rows
+[64] P: '4.3\tOnboarding checklist — what you need from us'
+[65] P: 'Before you can hit a non-dev environment you need the following from the RPS team. Email these requests to your project contact; the turnaround is usually same-day.'
+[66] TABLE: 6 rows
+[67] P: '4.3.1\tDev sandbox (no onboarding needed)'
+[68] P: "For initial development we ship a public dev secret that matches the RPS dev API. It's safe because the dev API has no real data:"
+[69] P: 'clientId   = MarinaParking-T01\nsecret     = Y2hhbmdlbWUtZGV2LXNoYXJlZC1obWFjLWtleS0wMDAwMDAwMDAwMDAwMDA=\noutlet     = 0000259010\nterminal   = 000025901025'
+[70] P: "The dev API is reachable as soon as we give you the dev hostname. Never reuse this secret outside dev — it lives in source control and on every developer's laptop."
+[72] P: '4.4\tThe C# sample app '
+[73] P: 'src/RPS.HmacSample/ is a tiny .NET 8 console app that does exactly what your client needs to do:'
+[74] P: 'builds the canonical signature base string for two flavours of request (a GET with query string, a POST with JSON body),'
+[75] P: 'signs it with HMAC-SHA256,'
+[76] P: 'stamps the Authorization header in the wire format,'
+[77] P: 'fires the request and prints the response.'
+[78] P: '4.4.1\tFiles '
+[79] TABLE: 6 rows
+[80] P: '4.4.2\tBuild + run'
+[81] P: 'Prerequisites: .NET 8 SDK.'
+[82] P: '# From the repo root\ncd src\\RPS.HmacSample\ndotnet run\n# Output: \n#   RPS HMAC sample → https://localhost:5001 (clientId=MarinaParking-T01, env=Development)\n#\n#   GET  /api/parkingInit?application=Park'
+[83] P: 'Point it at our dev environment by changing ParkingApi:BaseUrl in appsettings.json (or override via env vars — ParkingApi__BaseUrl=https://parking-app-dev.printecgroup.com).'
+[84] P: '4.4.3\tWhat to study in ParkingHmacSigner.cs'
+[85] P: 'keyBytes    = Convert.FromBase64String(secretBase64)\nbodyHash    = base64(SHA256(body))           // empty span for GET\ntimestamp   = unix-epoch-SECONDS, decimal string\nnonce       = 16 random bytes, '
+[86] P: "That's the entire scheme. Take into consideration the following:"
+[87] P: 'timestamp is seconds, not milliseconds. Date.now() / 1000 in JS; System.currentTimeMillis() / 1000 in Java/Kotlin. The server rejects anything > 5 min off either way.'
+[88] P: "The path is URL-encoded and lower-cased before being signed. Sign exactly what's in Request.Path + QueryString, not the full URL with scheme/host. (Scheme/host are deliberately not signed — see HMAC_T"
+[89] P: "bodyHash is over the exact bytes you send. If your HTTP client re-serialises the JSON (re-orders keys, re-spaces, changes number format) between sign-time and send-time, the server's recomputed hash w"
+[90] P: "secret is decoded before being used as the HMAC key. The stored format is Base64; the key passed to HMAC-SHA256 is the raw 32 bytes that Base64 decodes to. Don't HMAC with the Base64 string."
+[91] P: 'Fresh nonce every request. Even a 50-ms retry must mint a new one — the server caches (clientId, nonce) for 10 minutes and replies 401 replay on the second sighting.'
+[92] P: 'The sample also runs a ValidateCanonicalSecret(...) check at startup to catch a subtle Base64 footgun where two different strings decode to the same bytes — read the XML doc comment on that method, it'
+[94] P: '4.5\tPer-endpoint contracts'
+[95] P: "The HMAC scheme is the transport security; what you actually send and receive is in these six docs. Each one has request/response schemas, every field's meaning, status codes, worked examples, and lin"
+[96] TABLE: 7 rows
+[98] P: '4.6\tPostman (optional but useful)'
+[99] P: 'RemoteParkingServer.postman_collection.json ships with every parking-app endpoint pre-configured, sitting inside a folder called Parking App API whose pre-request script signs each outgoing request au'
+[100] P: 'Sanity-check the server is reachable from your machine before you start writing client code.'
+[101] P: "Compare your client's generated signature against Postman's when a request you've written returns 401 invalid_signature — enable the script's debug = true flag (line 242) and the Postman Console print"
+[102] P: 'Demo the API to non-developers without setting up a build.'
+[103] P: '4.6.1\tOne-time Postman setup'
+[104] P: 'Import RemoteParkingServer.postman_collection.json.'
+[105] P: 'Edit the collection variables:'
+[106] P: 'base_url → the dev/UAT/prod hostname we gave you.'
+[107] P: "hmac_client_id → your terminal's clientId."
+[108] P: "hmac_secret → your terminal's Base64 secret."
+[109] P: "outlet, terminal_number, company_code → values for the parking area you're testing against."
+[110] P: 'Open any request under the Parking App API folder and Send.'
+[111] P: "For production secrets, override hmac_client_id and hmac_secret in a Postman environment (Postman → Environments) rather than the collection variables, so they don't end up in a collection export."
+[113] P: '4.7\tDebugging a 401'
+[114] P: 'The server\'s WWW-Authenticate response header carries an error="…" parameter that pinpoints which check failed. Match the value to this table and you\'ve usually solved it in five minutes.'
+[115] TABLE: 10 rows
+[116] P: '4.7.1\tSignature mismatch checklist'
+[117] P: 'When you get invalid_signature, walk this list top-to-bottom:'
+[118] P: "Did the body change between sign and send? Serialise to a byte array once, hash that array, send that array. Don't let an HTTP-client middleware (logging interceptor, content-encoding, pretty-printer)"
+[119] P: 'Is timestamp in seconds? Print it. A 10-digit number is seconds; a 13-digit one is milliseconds.'
+[120] P: 'Is the path lower-cased after URL-encoding? "/api/parkingInit" → URL-encode → "%2Fapi%2FparkingInit" → lower-case → "%2fapi%2fparkinginit". Both transformations, in that order.'
+[121] P: 'Is the secret being decoded before use? HMAC(Base64.decode(secretBase64), sigBase), not HMAC(secretBase64, sigBase). The Base64 string and the raw 32 bytes look identical when wrong, but produce diffe'
+[122] P: 'Encoding everywhere is UTF-8. No platform default-charset surprises.'
+[123] P: 'nonce is hex, lower-case. 0xA3 → "a3", not "A3" or "ÿ".'
+[124] P: "If you've checked all six and it still mismatches, turn on the sample's debug logging (or Postman's), paste the sigBase lines from both sides, and a byte-diff will pin it down. We can also enable Debu"
+[127] P: "4.8\tWhat we'll send you"
+[128] P: 'The handoff package contains:'
+[129] P: 'This guide (Documents/ClientApp_Integration_Guide.md).'
+[130] P: 'The wire-format spec (Documents/HMAC_TerminalAuth.md).'
+[131] P: 'The six per-endpoint contracts under Documents/.'
+[132] P: 'The C# sample as a self-contained folder (src/RPS.HmacSample/) — dotnet run works out of the box against the dev environment once you set ParkingApi:BaseUrl.'
+[133] P: 'The Postman collection (RemoteParkingServer.postman_collection.json).'
+[134] P: 'Your environment-specific credentials (over a secure channel, separately from this package).'
+[135] P: "If anything is missing or ambiguous, push back and we'll fix the document rather than the answer-in-email — keep this guide in good shape for whoever inherits it next."
+[137] P: '5\tHMAC authentication for parking terminal endpoints'
+[138] P: 'This document describes the HMAC-SHA256 authentication scheme that protects the parking-terminal-facing API endpoints:'
+[139] TABLE: 7 rows
+[141] P: '5.1\tWire format'
+[142] P: 'A single Authorization header carries everything the server needs:'
+[143] P: 'Authorization: hmacauth <clientId>:<signature>:<nonce>:<timestamp>'
+[144] TABLE: 6 rows
+[145] P: 'The signature base string is exactly:'
+[146] P: 'sigBase = clientId\n        + METHOD                                      # "POST", "GET", upper-case\n        + lowercase(percent_encode(path + query))     # "/api/parkinginit?outlet=..."\n        + tim'
+[147] P: 'The bytes signed are the UTF-8 encoding of sigBase. The HMAC key is the decoded Base64 value of the configured client secret (so the secret can carry binary entropy without JSON-escaping issues).'
+[148] P: '5.1.1\tWorked example'
+[149] P: 'For a POST /api/parkingInit to https://parking-api.example.com:443/api/parkingInit with body {"application":"Parking","outlet":"0000259010","terminal":"000025901025"}, clientId MarinaParking-T01 and s'
+[150] P: 'clientId     = "MarinaParking-T01"\nmethod       = "POST"\npathQuery    = "/api/parkingInit"\nencodedPath  = "%2fapi%2fparkinginit"\ntimestamp    = "1747140000"\nnonce        = "9f8a1c2b4d6e7f0a1b3c4d5e6f7'
+[151] P: 'If the server\'s recomputed signature differs by a single byte, you get a 401 with WWW-Authenticate: hmacauth realm="rps", error="invalid_signature". Common culprits: trailing / mismatch, body re-prett'
+[152] P: '5.2\tTesting from Postman'
+[153] P: 'The collection (RemoteParkingServer.postman_collection.json) already ships with:'
+[154] P: 'Two collection variables: hmac_client_id and hmac_secret.'
+[155] P: 'A folder-level pre-request script on Parking App API that:'
+[156] P: 'Reads those variables.'
+[157] P: 'Builds the same sigBase string the server validates.'
+[158] P: "Computes HMAC-SHA256 via Postman's bundled CryptoJS."
+[159] P: 'Stamps Authorization: hmacauth … on the outgoing request.'
+[160] P: '5.2.1\tDefault values'
+[161] P: 'The dev collection ships with hmac_client_id = MarinaParking-T01 and hmac_secret = Y2hhbmdlbWUtZGV2LXNoYXJlZC1obWFjLWtleS0wMDAwMDAwMDAwMDAwMDA=, which match appsettings.Development.json. Hitting the d'
+[162] P: '5.2.2\tProduction / staging tests'
+[163] P: 'Override hmac_client_id and hmac_secret in a Postman environment (not the collection variables) so the production secret never lands in a collection export.'
+[164] P: 'The script reads via pm.collectionVariables.get(...) which transparently resolves environment-level overrides too.'
+[165] P: '5.2.3\tDebugging a 401'
+[166] P: "When the script's debug flag is true, it logs clientId, method, pathQuery, encoded, timestamp, nonce, bodyHash, sigBase, and signature to the Postman Console (Ctrl+Alt+C). The server logs the same fie"
+[167] P: 'The 401 response itself includes a WWW-Authenticate header whose error="..." parameter explains the failure:'
+[168] TABLE: 10 rows

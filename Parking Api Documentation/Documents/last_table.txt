@@ -1,0 +1,11 @@
+Element [168] tag: tbl
+error value || Meaning || First thing to check
+missing_credentials || No Authorization header || The pre-request script didn't run; check the request is in the Parking App API folder.
+invalid_scheme || Header doesn't start with hmacauth || Token shape; confirm script output.
+invalid_header || Less than 4 colon-separated parts || Truncated header.
+invalid_timestamp || Non-numeric ts field || Postman-side bug.
+clock_skew || |now - ts| > ClockSkewSeconds || NTP-sync the client/server.
+unknown_client || clientId not in Hmac:Clients and no DefaultSecretKey || Provision the terminal / fix typo.
+invalid_signature || Recomputed signature differs || Body re-pretty-printing, path case, query substitution; see "Worked example" above.
+replay || Same (clientId, nonce) seen recently || The script must use a fresh nonce per request — CryptoJS.lib.WordArray.random(16) already does this; suspect a manual paste.
+server_misconfiguration || Configured secret isn't valid Base64 || Check appsettings*.json.
